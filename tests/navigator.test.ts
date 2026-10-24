@@ -24,7 +24,7 @@ describe("Today", () => {
 			"    Message Max about a coat and a jacket | [Not Started]",
 			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
 			"    Shift my physio appointment | [Blocked]",
-			"    Submit timesheet | [Not Started] | repeat Weekly · Fri",
+			"    Submit timesheet | [Not Started]",
 			"    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct",
 			"# project Atlas Billing 1 (Work)",
 			"    Create a system testing plan | [Not Started] | 0/4 | Deadline Today (overdue)",
@@ -45,7 +45,7 @@ describe("Today", () => {
 			"# Not Started 3",
 			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | Deadline Today (overdue)",
 			"    Message Max about a coat and a jacket | [Not Started]",
-			"    Submit timesheet | [Not Started] | repeat Weekly · Fri",
+			"    Submit timesheet | [Not Started]",
 		]);
 		expect(list({ kind: "today" }, ctx, { groupings: { today: "Open" } }).sections.map((s) => s.id)).toEqual(["today|Open"]);
 	});
@@ -127,7 +127,7 @@ describe("Loose tasks", () => {
 			"    Shift my physio appointment | [Blocked] | Today",
 			"# Not Started 3",
 			"    Message Max about a coat and a jacket | [Not Started] | Today",
-			"    Submit timesheet | [Not Started] | repeat Weekly · Fri | Today",
+			"    Submit timesheet | [Not Started] | Today",
 			"    Update 2DS before the next session | [Not Started] | Sat 3 Oct",
 		]);
 	});

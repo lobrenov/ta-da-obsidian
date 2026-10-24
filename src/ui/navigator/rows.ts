@@ -35,7 +35,6 @@ export interface TaskRowModel {
 	/** The task's project or area, where the list's groups don't name it. */
 	place: string | null;
 	subtasks: { done: number; total: number } | null;
-	repeat: string | null;
 	date: RowDate | null;
 	tags: number;
 }
@@ -107,7 +106,6 @@ export function taskRow(index: VaultIndex, task: Item, today: LocalDate, options
 		closed: isClosed(p.status),
 		place: options.place ? (index.parentOf(task)?.title ?? null) : null,
 		subtasks: subtasks.total > 0 ? subtasks : null,
-		repeat: p.repeatRule,
 		date: rowDate(task, today, options),
 		tags: task.tags.length,
 	};

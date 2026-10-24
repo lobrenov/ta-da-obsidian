@@ -42,7 +42,6 @@ function rowText(row: ListRow): string {
 			const parts = [row.title, `[${row.status}]`];
 			if (row.place) parts.push(`in ${row.place}`);
 			if (row.subtasks) parts.push(`${row.subtasks.done}/${row.subtasks.total}`);
-			if (row.repeat) parts.push(`repeat ${row.repeat}`);
 			if (row.date) parts.push(row.date.text + (row.date.overdue ? " (overdue)" : ""));
 			if (row.tags > 0) parts.push(`${row.tags} tag${row.tags === 1 ? "" : "s"}`);
 			return parts.join(" | ");

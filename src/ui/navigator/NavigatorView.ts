@@ -56,6 +56,8 @@ export class NavigatorView extends ItemView {
 	private paths: string[] = [];
 	private lastKey = "";
 	private opened = false;
+	/** In the narrow layout, whether the list pane (not the navigation pane) is showing. */
+	private showingList = false;
 	private readonly rowEls = new Map<string, HTMLElement[]>();
 
 	private searchEl!: HTMLInputElement;
@@ -180,6 +182,7 @@ export class NavigatorView extends ItemView {
 			list = buildList(this.domain, ctx, { ...options, picked: noPicked });
 		}
 		if (!list) return;
+		this.contentEl.toggleClass("is-showing-list", this.showingList);
 		this.renderNav(ctx);
 		this.renderList(list);
 	}
@@ -199,6 +202,7 @@ export class NavigatorView extends ItemView {
 		this.domain = domain;
 		this.query = "";
 		this.searchEl.value = "";
+		this.showingList = true;
 		const mode = modeOf(domain);
 		if (mode) this.mode = mode;
 		for (const id of ancestorsOf(domain)) this.expanded.add(id);
@@ -209,6 +213,7 @@ export class NavigatorView extends ItemView {
 
 	private search(query: string): void {
 		this.query = query;
+		if (query.trim() !== "") this.showingList = true;
 		this.refresh();
 	}
 
@@ -378,6 +383,11 @@ export class NavigatorView extends ItemView {
 		head.empty();
 		const { header } = list;
 		const title = head.createDiv({ cls: "ta-da-list-title-row" });
+		this.iconButton(title, "chevron-left", "Back", () => {
+			this.showingList = false;
+			this.refresh();
+		});
+		title.lastElementChild?.addClass("ta-da-list-back");
 		drawIcon(title.createSpan({ cls: "ta-da-list-title-icon" }), header.icon);
 		title.createEl("h2", { cls: "ta-da-list-title", text: header.title });
 		if (header.detail) title.createSpan({ cls: "ta-da-list-detail", text: header.detail });
@@ -539,7 +549,7 @@ export class NavigatorView extends ItemView {
 		});
 		const main = el.createDiv({ cls: "ta-da-row-main" });
 		main.createSpan({ cls: "ta-da-row-title", text: row.title });
-		const hasMeta = row.place !== null || row.subtasks !== null || row.repeat !== null || row.date !== null || row.tags > 0;
+		const hasMeta = row.place !== null || row.subtasks !== null || row.date !== null || row.tags > 0;
 		if (hasMeta) {
 			const meta = main.createDiv({ cls: "ta-da-row-meta" });
 			if (row.place) meta.createSpan({ text: row.place });
@@ -547,11 +557,6 @@ export class NavigatorView extends ItemView {
 				const span = meta.createSpan({ cls: "ta-da-meta-item", attr: { "aria-label": `${row.subtasks.done} of ${row.subtasks.total} subtasks done` } });
 				metaIcon(span, "list-checks");
 				span.appendText(`${row.subtasks.done}/${row.subtasks.total}`);
-			}
-			if (row.repeat) {
-				const span = meta.createSpan({ cls: "ta-da-meta-item", attr: { "aria-label": `Repeats ${row.repeat}` } });
-				metaIcon(span, "repeat");
-				span.appendText(row.repeat);
 			}
 			if (row.tags > 0) {
 				const span = meta.createSpan({ cls: "ta-da-meta-item", attr: { "aria-label": row.tags === 1 ? "1 tag" : `${row.tags} tags` } });

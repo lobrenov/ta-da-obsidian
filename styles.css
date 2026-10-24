@@ -435,6 +435,7 @@
 	--ta-da-selected: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.18);
 	--ta-da-nav-width: 200px;
 
+	container-type: inline-size;
 	display: flex;
 	height: 100%;
 	padding: 0;
@@ -483,10 +484,6 @@
 	border-right: 1px solid var(--background-modifier-border);
 }
 
-.ta-da-navigator.is-list-collapsed .ta-da-nav-pane {
-	flex: 1 1 auto;
-	border-right: 0;
-}
 
 .ta-da-navigator .ta-da-search {
 	margin-bottom: var(--size-4-2);
@@ -557,8 +554,39 @@
 	outline: none;
 }
 
-.ta-da-navigator.is-list-collapsed .ta-da-list-pane {
+.ta-da-navigator .ta-da-list-back {
 	display: none;
+}
+
+/* Wide: two panes side by side; the setting can hide the list. */
+@container (min-width: 520px) {
+	.ta-da-navigator.is-list-collapsed .ta-da-nav-pane {
+		flex: 1 1 auto;
+		border-right: 0;
+	}
+
+	.ta-da-navigator.is-list-collapsed .ta-da-list-pane {
+		display: none;
+	}
+}
+
+/* Narrow: one pane at a time. The navigation pane shows first; picking a list shows it, with a back button. */
+@container (max-width: 519px) {
+	.ta-da-navigator .ta-da-nav-pane,
+	.ta-da-navigator .ta-da-list-pane {
+		flex: 1 1 100%;
+		min-width: 0;
+		border-right: 0;
+	}
+
+	.ta-da-navigator:not(.is-showing-list) .ta-da-list-pane,
+	.ta-da-navigator.is-showing-list .ta-da-nav-pane {
+		display: none;
+	}
+
+	.ta-da-navigator .ta-da-list-back {
+		display: flex;
+	}
 }
 
 .ta-da-navigator .ta-da-list-head {
