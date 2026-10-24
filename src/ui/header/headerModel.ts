@@ -120,9 +120,4 @@ export function statusLabel(status: Status): string {
 	return status.slice(0, 1) + status.slice(1).toLowerCase();
 }
 
-/** The statuses a menu offers, in the app's order; Ongoing only for projects. */
-export function statusChoices(kind: Kind): Status[] {
-	return kind === "project"
-		? ["Not Started", "Doing", "Ongoing", "Blocked", "Done", "Cancelled"]
-		: ["Not Started", "Doing", "Blocked", "Done", "Cancelled"];
-}
+export { statusChoices } from "../../core/model/status";

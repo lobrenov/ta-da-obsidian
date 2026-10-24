@@ -51,7 +51,8 @@ function buildPropertiesButton(doc: Document, actions: HeaderActions, shown: boo
 	return button;
 }
 
-function buildChip(doc: Document, chip: Chip, actions: HeaderActions): HTMLElement {
+/** A chip's button; the New task modal draws these too. */
+export function buildChip(doc: Document, chip: Chip, actions: Pick<HeaderActions, "openStatus" | "openParent" | "openDate">): HTMLElement {
 	const classes = ["ta-da-chip", `is-${chip.kind}`];
 	if ("missing" in chip && chip.missing) classes.push("is-missing");
 	if (chip.kind === "parent" && chip.unresolved) classes.push("is-unresolved");
@@ -87,7 +88,8 @@ function buildChip(doc: Document, chip: Chip, actions: HeaderActions): HTMLEleme
 	return button;
 }
 
-function buildTag(doc: Document, tag: TagChip, actions: HeaderActions): HTMLElement {
+/** A tag's chip, with a remove button for one written in `tags:`. */
+export function buildTag(doc: Document, tag: TagChip, actions: Pick<HeaderActions, "removeTag">): HTMLElement {
 	const chip = element(doc, "span", `ta-da-tag${tag.inFrontmatter ? "" : " is-text"}`);
 	chip.appendChild(icon(doc, "tag", 11, 2));
 	const label = element(doc, "span", "ta-da-tag-label");

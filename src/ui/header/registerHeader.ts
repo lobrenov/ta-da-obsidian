@@ -3,6 +3,7 @@ import type { EditorView } from "@codemirror/view";
 import type { TaDaIndex } from "../../TaDaIndex";
 import type { TaDaSettings } from "../../settingsData";
 import type { Writer } from "../../Writer";
+import type { StatusActions } from "../statusActions";
 import { buildHeader } from "./buildHeader";
 import { headerActions, type HeaderHost } from "./headerActions";
 import { headerExtension, refreshHeader } from "./headerExtension";
@@ -15,13 +16,14 @@ import { localToday } from "../dates";
  * Registers the Ta Da header: the Live Preview widget, the Reading view post-processor, and the `ta-da-file` class
  * that hides Obsidian's Properties. Returns what to call when the setting changes.
  */
-export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Writer, settings: TaDaSettings): { refresh(): void } {
+export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Writer, status: StatusActions, settings: TaDaSettings): { refresh(): void } {
 	const { app } = plugin;
 	const shown = new ShownProperties();
 	const host: HeaderHost = {
 		app,
 		index: taDaIndex.index,
 		writer,
+		status,
 		today: localToday,
 		onIndexChange: (listener) => taDaIndex.onChange(listener),
 		propertiesShown: (path) => shown.has(path),

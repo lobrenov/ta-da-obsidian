@@ -436,6 +436,124 @@
 	margin: 0;
 }
 
+/* New task modal and the completion question */
+
+.ta-da-new-modal {
+	width: 560px;
+}
+
+.ta-da-new-modal .modal-content {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.ta-da-new-switch {
+	display: flex;
+	align-self: flex-start;
+	gap: 2px;
+	padding: 2px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-secondary);
+}
+
+.ta-da-new-kind {
+	height: 22px;
+	padding: 0 10px;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.ta-da-new-kind.is-on {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-new-modal input.ta-da-new-title {
+	height: 38px;
+	font-size: var(--font-ui-larger);
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-new-header {
+	padding-bottom: 0;
+}
+
+.ta-da-new-header .ta-da-header-inner {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.ta-da-new-path,
+.ta-da-new-warning {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-new-path span {
+	font-family: var(--font-monospace);
+}
+
+.ta-da-new-warning {
+	margin-top: 4px;
+	color: var(--text-warning);
+	font-size: var(--font-ui-small);
+}
+
+.ta-da-new-footer,
+.ta-da-completion-buttons {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ta-da-completion-modal {
+	width: 480px;
+}
+
+.ta-da-completion-tasks {
+	max-height: 296px;
+	overflow-y: auto;
+	margin-bottom: 14px;
+	padding: 4px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 9px;
+	background: var(--background-secondary);
+}
+
+.ta-da-completion-task {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 32px;
+	padding: 0 12px;
+}
+
+.ta-da-completion-title {
+	flex-grow: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ta-da-completion-status {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-new-footer .ta-da-grow,
+.ta-da-completion-modal .ta-da-grow {
+	flex-grow: 1;
+}
+
 /* Navigator */
 
 /* Ta Da navigator. Colours come from Obsidian's variables, so every theme and accent applies. */
