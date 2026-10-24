@@ -118,7 +118,7 @@ describe("Writer", () => {
 		expect(fake.process).not.toHaveBeenCalled();
 	});
 
-	it("changes the active view's editor as one transaction on the changed text", async () => {
+	it("changes the active view's editor as one `set` transaction on the changed text", async () => {
 		const file = makeFile("a.md");
 		const view = Object.assign(newView(), {
 			file,
@@ -128,7 +128,7 @@ describe("Writer", () => {
 		await expect(fake.writer.apply(file as never, (text) => text.replace("Doing", "Done"))).resolves.toBe(true);
 		expect(view.editor.transaction).toHaveBeenCalledWith({
 			changes: [{ from: { line: 1, ch: 10 }, to: { line: 1, ch: 13 }, text: "ne" }],
-		});
+		}, "set");
 		expect(fake.process).not.toHaveBeenCalled();
 	});
 

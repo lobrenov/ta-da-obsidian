@@ -81,7 +81,8 @@ export class Writer {
 		const after = edit(before);
 		const change = after === null ? null : lineChange(before, after);
 		if (!change) return false;
-		editor.transaction({ changes: [change] });
+		// As a `set` event, which Obsidian's Properties filter lets through while the cursor is in the frontmatter.
+		editor.transaction({ changes: [change] }, "set");
 		return true;
 	}
 }
