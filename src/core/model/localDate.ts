@@ -41,6 +41,39 @@ export class LocalDate {
 		return new LocalDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
 	}
 
+	/** The first day of this day's month. */
+	get startOfMonth(): LocalDate {
+		return new LocalDate(this.year, this.month, 1);
+	}
+
+	/** The first day of the month `months` away. */
+	addingMonths(months: number): LocalDate {
+		const index = this.year * 12 + (this.month - 1) + months;
+		const first = LocalDate.of(Math.trunc(index / 12), (index % 12) + 1, 1);
+		if (!first) throw new RangeError(`Month out of range: ${months} from ${this.toString()}`);
+		return first;
+	}
+
+	/** The same day `months` away, or that month's last day when it's shorter; null outside years 1 to 9999. */
+	addingMonthsKeepingDay(months: number): LocalDate | null {
+		const index = this.year * 12 + (this.month - 1) + months;
+		for (let day = this.day; day >= Math.max(this.day - 3, 1); day--) {
+			const date = LocalDate.of(Math.trunc(index / 12), (index % 12) + 1, day);
+			if (date) return date;
+		}
+		return null;
+	}
+
+	/** The coming Saturday, or this day on a Saturday or Sunday. */
+	get thisWeekend(): LocalDate {
+		return this.weekday === 1 ? this : this.addingDays(7 - this.weekday);
+	}
+
+	/** The first day of the week after this day's, from `firstWeekday` (1 = Sunday). */
+	nextWeek(firstWeekday: number): LocalDate {
+		return this.addingDays(7 - ((this.weekday - firstWeekday + 7) % 7));
+	}
+
 	/** Whole days from this day to `other`; negative when `other` is earlier. */
 	daysTo(other: LocalDate): number {
 		return Math.round((other.midnightUTC() - this.midnightUTC()) / dayMs);

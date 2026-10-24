@@ -42,7 +42,8 @@ export function splitFrontmatter(text: string): FrontmatterSplit {
 	return none;
 }
 
-function isFenceLine(line: string): boolean {
+/** A `---` line, trailing spaces, tabs and a CR allowed. */
+export function isFenceLine(line: string): boolean {
 	let end = line.length;
 	while (end > 0 && (line[end - 1] === " " || line[end - 1] === "\t" || line[end - 1] === "\r")) end--;
 	return line.slice(0, end) === "---";
