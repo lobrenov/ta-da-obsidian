@@ -91,6 +91,14 @@ export class LocalDate {
 		return new ISOWeek(thursday.year, Math.floor(dayOfYear / 7) + 1);
 	}
 
+	/** The ISO weeks that have a day in this day's month, in order. */
+	get isoWeeksOfMonth(): ISOWeek[] {
+		const last = this.addingMonths(1).addingDays(-1);
+		const first = this.startOfMonth.isoWeek;
+		const count = first.firstDay.daysTo(last.mondayOfWeek()) / 7;
+		return Array.from({ length: count + 1 }, (_, at) => first.addingWeeks(at));
+	}
+
 	mondayOfWeek(): LocalDate {
 		return this.addingDays(-((this.weekday + 5) % 7));
 	}
@@ -115,6 +123,15 @@ export class ISOWeek {
 		const fourth = LocalDate.of(this.year, 1, 4);
 		if (!fourth) throw new RangeError(`Year out of range: ${this.year}`);
 		return fourth.mondayOfWeek().addingDays((this.week - 1) * 7);
+	}
+
+	/** The week `weeks` away (earlier when negative). */
+	addingWeeks(weeks: number): ISOWeek {
+		return this.firstDay.addingDays(weeks * 7).isoWeek;
+	}
+
+	equals(other: ISOWeek): boolean {
+		return this.year === other.year && this.week === other.week;
 	}
 
 	/** Monday to Sunday. */

@@ -26,7 +26,7 @@ export interface RowDate {
 
 export interface TaskRowModel {
 	type: "task";
-	/** Unique in the list: Upcoming lists a task once for each date. */
+	/** Unique in the list: a week lists a task once for each date. */
 	id: string;
 	path: string;
 	title: string;
@@ -80,16 +80,30 @@ export interface ArchiveRowModel {
 	date: string | null;
 }
 
-export type ListRow = TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel;
+/** A day in a week's list; clicking it picks the day. It has no file, so the arrow keys pass it. */
+export interface AgendaDayRowModel {
+	type: "day";
+	id: string;
+	path: null;
+	date: LocalDate;
+	/** `Mon 28`. */
+	label: string;
+	/** `3 due`, or nothing. */
+	summary: string;
+	today: boolean;
+	hasOpenTasks: boolean;
+}
 
-/** Which date a list shows. Today and Upcoming show a due date only when overdue; other lists show the date itself. */
+export type ListRow = TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel;
+
+/** Which date a list shows. The Agenda shows a due date only when overdue; other lists show the date itself. */
 export type DateRule = "agenda" | "elsewhere";
 
 export interface TaskRowOptions {
 	dates: DateRule;
 	/** Name the task's project or area on the row. */
 	place: boolean;
-	/** Upcoming's entry: the row shows its kind, as the day's header gives the date. */
+	/** A week's entry: the row shows the date it's listed for. */
 	entry?: AgendaEntry;
 }
 
@@ -112,15 +126,13 @@ export function taskRow(index: VaultIndex, task: Item, today: LocalDate, options
 }
 
 /**
- * A task's one date: the deadline when set, else the due date; closed tasks show none. Today and Upcoming show a due
- * date only when it's overdue. An Upcoming entry shows its kind alone for a deadline and nothing for a due date.
+ * A task's one date: the deadline when set, else the due date; closed tasks show none. The Agenda shows a due date
+ * only when it's overdue. A week's entry shows its own kind and date.
  */
 export function rowDate(task: Item, today: LocalDate, options: Pick<TaskRowOptions, "dates" | "entry">): RowDate | null {
 	const p = task.properties;
 	if (isClosed(p.status)) return null;
-	if (options.entry) {
-		return options.entry.kind === "deadline" ? { kind: "deadline", text: "Deadline", overdue: false } : null;
-	}
+	if (options.entry) return dateOf(options.entry.kind, options.entry.date, today);
 	if (p.deadline) return dateOf("deadline", p.deadline, today);
 	if (p.dueDate && (options.dates === "elsewhere" || p.dueDate.compare(today) < 0)) return dateOf("due", p.dueDate, today);
 	return null;

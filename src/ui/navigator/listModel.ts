@@ -1,19 +1,20 @@
 import { type Grouping, listSections, type ListSection, TagFilter } from "../../core/index/grouping";
 import type { TaskGroup } from "../../core/index/queries";
-import { grouped, looseTasks, progress, todayTasks, upcoming } from "../../core/index/queries";
+import { agendaDay, agendaWeek, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
 import { folderTree, type FolderNode, notesIn } from "../../core/index/noteQueries";
 import { search as searchIndex } from "../../core/index/queries";
 import { tagBrowser } from "../../core/index/tagQueries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { type Item, subtasks as subtasksOf } from "../../core/model/item";
-import type { LocalDate } from "../../core/model/localDate";
+import type { ISOWeek, LocalDate } from "../../core/model/localDate";
 import { isClosed } from "../../core/model/status";
 import type { Tag } from "../../core/model/tag";
 import { tagLeaf } from "../../core/model/tag";
 import { type TrashedItem, contentsOf } from "../../core/storage/trash";
 import { folderOf } from "../../core/storage/vault";
 import { linkTitle } from "../../core/model/wikiLink";
-import { shortMonth, shortWeekday, weekdayDayMonth } from "./dates";
+import { buildStrip, type AgendaState, type StripModel, weekOf } from "./agenda";
+import { dayMonth, fullDate, shortWeekday } from "./dates";
 import { type Domain, domainKey, type GroupedList, groupingOf, type Groupings } from "./domain";
 import { logbookGroups, logbookItems, logbookRow } from "./logbook";
 import {
@@ -37,6 +38,8 @@ export interface ListContext {
 	trash: readonly TrashedItem[];
 	/** The folders known to be on disk, which the Notes tree shows even when empty. */
 	folders: ReadonlySet<string>;
+	/** The Agenda's day or week, and whether its strip shows the month. */
+	agenda: AgendaState;
 }
 
 export interface ListOptions {
@@ -53,8 +56,12 @@ export type SectionHeader =
 	| { style: "area"; title: string; path: string; count: number }
 	| { style: "project"; title: string; path: string; icon: IconSpec; count: number; area: string | null; sub: boolean }
 	| { style: "loose" }
-	| { style: "day"; day: string; detail: string }
-	| { style: "archive"; title: string; note: string | null };
+	| { style: "archive"; title: string; note: string | null }
+	/** A day's full date and relative name. */
+	| { style: "dayTitle"; title: string; relative: string | null }
+	/** "Scheduled", with the Group menu and the tag filter. */
+	| { style: "scheduled" }
+	| { style: "weekTitle"; title: string; range: string; thisWeek: boolean };
 
 export interface SectionModel {
 	id: string;
@@ -93,6 +100,8 @@ export interface ListModel {
 	groupList: GroupedList | null;
 	grouping: Grouping | null;
 	filter: FilterModel | null;
+	/** The Agenda's header, in place of the title row. */
+	strip?: StripModel;
 	sections: SectionModel[];
 	/** The empty state's title, when there is nothing to list. */
 	empty: string | null;
@@ -103,10 +112,8 @@ const noHeader: Omit<ListHeader, "title" | "icon"> = { detail: null, lines: [], 
 /** The list a domain shows, or null when its project or area no longer exists. */
 export function buildList(domain: Domain, ctx: ListContext, options: ListOptions): ListModel | null {
 	switch (domain.kind) {
-		case "today":
-			return todayList(ctx, options);
-		case "upcoming":
-			return upcomingList(ctx, options);
+		case "agenda":
+			return agendaList(ctx, options);
 		case "loose":
 			return looseList(ctx, options);
 		case "logbook":
@@ -146,21 +153,58 @@ export function visiblePaths(list: ListModel): string[] {
 
 // Task lists
 
-function todayList(ctx: ListContext, options: ListOptions): ListModel {
+/** The Agenda: a day's tasks, or a week's days and what's due in it, under the strip. */
+function agendaList(ctx: ListContext, options: ListOptions): ListModel {
+	const { selection } = ctx.agenda;
+	const strip = buildStrip(ctx.index, ctx.agenda, ctx.today);
+	const base = { domain: { kind: "agenda" } as Domain, header: { ...noHeader, title: "Agenda", icon: { type: "icon", name: "calendar", tint: "due" } as IconSpec }, strip, empty: null };
+	if (selection.kind === "week") {
+		return { ...base, groupList: null, grouping: null, filter: null, sections: weekSections(ctx, selection.week) };
+	}
 	const { index, today } = ctx;
-	const all = todayTasks(index, today);
+	const all = agendaDay(index, selection.date, today);
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
-	const grouping = groupingOf("today", options.groupings);
-	return {
-		domain: { kind: "today" },
-		header: { ...noHeader, title: "Today", icon: { type: "icon", name: "star", tint: "due", filled: true }, detail: weekdayDayMonth(today) },
-		groupList: "today",
-		grouping,
-		filter: filterModel(all, options.picked, tasks.length),
-		sections: taskSections(ctx, tasks, grouping, { dates: "agenda", place: grouping !== "Project" }, "today", options),
-		empty: emptyOf(all.length, tasks.length, "Nothing scheduled"),
-	};
+	const grouping = groupingOf("agenda", options.groupings);
+	const relative = ["Today", "Tomorrow", "Yesterday"][[0, 1, -1].indexOf(today.daysTo(selection.date))] ?? null;
+	const title = plain("agenda:day", [], { style: "dayTitle", title: fullDate(selection.date, today), relative });
+	const sections = [title];
+	if (all.length === 0) {
+		title.message = "Nothing scheduled";
+	} else {
+		const scheduled = plain("agenda:scheduled", [], { style: "scheduled" });
+		if (tasks.length === 0) scheduled.message = "Nothing here carries the picked tags.";
+		sections.push(scheduled, ...taskSections(ctx, tasks, grouping, { dates: "agenda", place: grouping !== "Project" }, "agenda", options));
+	}
+	return { ...base, groupList: "agenda", grouping, filter: filterModel(all, options.picked, tasks.length), sections };
+}
+
+/** A week: a row for each day, then the entries due or at their deadline in it. */
+function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
+	const { index, today } = ctx;
+	const entries = agendaWeek(index, week);
+	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay);
+	const days = week.days.map((date): ListRow => {
+		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
+		return {
+			type: "day",
+			id: `day:${date.toString()}`,
+			path: null,
+			date,
+			label: `${shortWeekday(date)} ${date.day}`,
+			summary: due > 0 ? `${due} due` : "",
+			today: date.equals(today),
+			hasOpenTasks: marks.get(date.toString())?.hasOpenTasks === true,
+		};
+	});
+	const sections = [
+		plain("agenda:week", [], { style: "weekTitle", title: `Week ${week.week}`, range: `${dayMonth(week.firstDay, today)} – ${dayMonth(week.days[6] ?? week.firstDay, today)}`, thisWeek: week.equals(today.isoWeek) }),
+		plain("agenda:days", days),
+	];
+	if (entries.length > 0) {
+		sections.push(plain("agenda:due", entries.map((entry) => taskRow(index, entry.item, today, { dates: "agenda", place: true, entry })), { style: "archive", title: "Due this week", note: null }));
+	}
+	return sections;
 }
 
 function looseList(ctx: ListContext, options: ListOptions): ListModel {
@@ -239,36 +283,6 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 		filter: filterModel(files, options.picked, projects.length + tasks.length),
 		sections,
 		empty: files.length === 0 ? "No tasks" : sections.length === 0 ? noMatches : null,
-	};
-}
-
-function upcomingList(ctx: ListContext, options: ListOptions): ListModel {
-	const { index, today } = ctx;
-	const all = upcoming(index, today);
-	const filter = new TagFilter(options.picked);
-	const entries = all.filter((entry) => filter.matches(entry.item));
-	const sections: SectionModel[] = [];
-	for (const entry of entries) {
-		const day = entry.date.toString();
-		let section = sections[sections.length - 1];
-		if (section?.id !== `day:${day}`) {
-			const monthDiffers = entry.date.month !== today.month || entry.date.year !== today.year;
-			const year = entry.date.year === today.year ? "" : ` ${entry.date.year}`;
-			const detail = monthDiffers ? `${shortWeekday(entry.date)} ${shortMonth(entry.date)}${year}` : shortWeekday(entry.date);
-			section = { id: `day:${day}`, header: { style: "day", day: String(entry.date.day), detail }, rows: [], foldable: false, folded: false, message: null };
-			sections.push(section);
-		}
-		section.rows.push(taskRow(index, entry.item, today, { dates: "agenda", place: true, entry }));
-	}
-	const items = [...new Map(all.map((entry) => [entry.item.path, entry.item])).values()];
-	return {
-		domain: { kind: "upcoming" },
-		header: { ...noHeader, title: "Upcoming", icon: { type: "icon", name: "calendar", tint: "deadline" } },
-		groupList: null,
-		grouping: null,
-		filter: filterModel(items, options.picked, new Set(entries.map((entry) => entry.item.path)).size),
-		sections,
-		empty: emptyOf(all.length, entries.length, "Nothing upcoming"),
 	};
 }
 

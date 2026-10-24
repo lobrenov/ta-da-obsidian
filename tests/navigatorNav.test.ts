@@ -14,13 +14,13 @@ const describeItems = (items: NavItem[]): string[] =>
 	items.map((item) => `${"  ".repeat(item.depth)}${item.expanded === null ? "" : item.expanded ? "v " : "> "}${item.label}${item.count ? ` ${item.count}` : ""}`);
 
 describe("navigation pane", () => {
-	it("counts the open tasks due for Today, Loose tasks and Trash beside the domains", () => {
+	it("counts the open tasks due today under Agenda, Loose tasks and Trash beside the domains", () => {
 		const nav = buildNav(context(loadFixtureIndex("DesignVault"), today), "tasks", new Set());
-		expect(describeItems(nav.domains)).toEqual(["Today 7", "Upcoming", "Loose tasks 6", "Logbook", "Trash"]);
-		expect(nav.domains.map((item) => item.domain.kind)).toEqual(["today", "upcoming", "loose", "logbook", "trash"]);
+		expect(describeItems(nav.domains)).toEqual(["Agenda 7", "Loose tasks 6", "Logbook", "Trash"]);
+		expect(nav.domains.map((item) => item.domain.kind)).toEqual(["agenda", "loose", "logbook", "trash"]);
 	});
 
-	it("leaves a task completed today out of Today's count", () => {
+	it("leaves a task completed today out of the Agenda's count", () => {
 		const index = new VaultIndex([makeItem("Ta Da/tasks/A.md", "type: task\nstatus: Done\ncompletedDate: 2026-10-02"), makeItem("Ta Da/tasks/B.md", "type: task\nstatus: Doing\ndueDate: 2026-10-01")]);
 		expect(buildNav(context(index, today), "tasks", new Set()).domains[0]?.count).toBe(1);
 	});
@@ -55,7 +55,7 @@ describe("navigation pane", () => {
 		expect(ancestorsOf({ kind: "tag", path: "work/clients" })).toEqual(["tag:work"]);
 		expect(ancestorsOf({ kind: "folder", path: "A/B/C" })).toEqual(["folder:A", "folder:A/B"]);
 		expect(ancestorsOf({ kind: "tag", path: null })).toEqual([]);
-		expect(ancestorsOf({ kind: "today" })).toEqual([]);
+		expect(ancestorsOf({ kind: "agenda" })).toEqual([]);
 	});
 });
 
@@ -80,7 +80,7 @@ describe("selection", () => {
 		const ctx = context(loadFixtureIndex("AreaVault"), today);
 		const model = list({ kind: "project", path: "projects/Garden.md" }, ctx, { groupings: { project: "Date" } });
 		expect(visiblePaths(model)).toEqual([]);
-		const area = list({ kind: "today" }, ctx);
+		const area = list({ kind: "agenda" }, ctx);
 		const shown = visiblePaths(area);
 		expect(shown[0]).toBe("tasks/Buy milk.md");
 		expect(moveSelection(shown, shown[0] ?? null, 1)).toBe(shown[1]);

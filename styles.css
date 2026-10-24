@@ -523,12 +523,16 @@
 
 /* Tasks | Tags | Notes */
 
+/* The segment's radius is the track's less its padding, so the corners nest. */
 .ta-da-navigator .ta-da-switch {
+	--ta-da-switch-radius: 6px;
+	--ta-da-switch-padding: 2px;
+
 	display: flex;
 	gap: 2px;
 	margin: var(--size-4-3) 0 var(--size-4-2);
-	padding: 2px;
-	border-radius: var(--radius-m);
+	padding: var(--ta-da-switch-padding);
+	border-radius: var(--ta-da-switch-radius);
 	background: var(--background-modifier-hover);
 }
 
@@ -536,11 +540,21 @@
 	flex: 1 1 0;
 	height: 24px;
 	padding: 0;
-	border-radius: var(--radius-s);
+	border-radius: calc(var(--ta-da-switch-radius) - var(--ta-da-switch-padding));
 	background: transparent;
 	box-shadow: none;
 	color: var(--text-normal);
 	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-navigator .ta-da-switch.is-compact {
+	margin: 0;
+}
+
+.ta-da-navigator .ta-da-switch.is-compact button {
+	flex: none;
+	height: 22px;
+	padding: 0 10px;
 }
 
 .ta-da-navigator .ta-da-switch button.is-active {
@@ -796,25 +810,6 @@
 	transform: rotate(-90deg);
 }
 
-.ta-da-navigator .ta-da-day-header {
-	display: flex;
-	align-items: baseline;
-	gap: var(--size-4-2);
-	margin: 0 var(--size-4-3) 2px;
-	padding: var(--size-4-1) 0;
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.ta-da-navigator .ta-da-day-number {
-	color: var(--text-normal);
-	font-weight: var(--font-bold);
-}
-
-.ta-da-navigator .ta-da-day-name {
-	color: var(--text-muted);
-	font-weight: var(--font-medium);
-}
-
 /* Rows */
 
 .ta-da-navigator .ta-da-row {
@@ -995,4 +990,198 @@
 	height: 1.5px;
 	border-radius: 1px;
 	background: var(--ta-da-blocked);
+}
+
+/* Agenda */
+
+.ta-da-navigator .ta-da-list-title-row.is-agenda {
+	flex-wrap: wrap;
+}
+
+.ta-da-navigator .ta-da-agenda-controls {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	margin-inline-start: auto;
+}
+
+.ta-da-navigator .ta-da-stepper {
+	display: flex;
+	align-items: center;
+	height: 26px;
+	box-sizing: border-box;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	overflow: hidden;
+}
+
+.ta-da-navigator .ta-da-stepper button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding: 0 var(--size-4-2);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-navigator .ta-da-stepper button + button {
+	border-left: 1px solid var(--background-modifier-border);
+}
+
+.ta-da-navigator .ta-da-stepper svg {
+	width: 12px;
+	height: 12px;
+}
+
+.ta-da-navigator .ta-da-strip-title {
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-bold);
+}
+
+.ta-da-navigator .ta-da-strip {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.ta-da-navigator .ta-da-strip-row {
+	display: grid;
+	grid-template-columns: 36px repeat(7, minmax(0, 1fr));
+}
+
+.ta-da-navigator .ta-da-strip-row.is-initials {
+	padding-bottom: 2px;
+	color: var(--text-muted);
+	font-size: 10.5px;
+	font-weight: var(--font-semibold);
+	text-align: center;
+}
+
+.ta-da-navigator .ta-da-strip-cell {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 3px;
+	height: 38px;
+	padding: 4px 0 0;
+	border-radius: var(--radius-m);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+.ta-da-navigator .ta-da-strip-number {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 22px;
+	border-radius: 11px;
+	font-size: 13px;
+	font-weight: var(--font-medium);
+}
+
+.ta-da-navigator .ta-da-strip-cell.is-week .ta-da-strip-number {
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: 11px;
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-navigator .ta-da-strip-cell.is-faded {
+	color: var(--text-muted);
+}
+
+.ta-da-navigator .ta-da-strip-cell.is-today .ta-da-strip-number {
+	color: var(--ta-da-accent);
+	font-weight: var(--font-bold);
+}
+
+.ta-da-navigator .ta-da-strip-cell.is-selected .ta-da-strip-number {
+	background: var(--text-normal);
+	color: var(--background-primary);
+	font-weight: var(--font-bold);
+}
+
+.ta-da-navigator .ta-da-strip-cell.is-today.is-selected .ta-da-strip-number {
+	background: var(--ta-da-accent);
+	color: var(--text-on-accent);
+}
+
+.ta-da-navigator .ta-da-strip-dots {
+	display: flex;
+	flex: none;
+	gap: 2px;
+	height: 4px;
+}
+
+.ta-da-navigator .ta-da-dot {
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: var(--ta-da-due);
+}
+
+.ta-da-navigator .ta-da-period-title {
+	display: flex;
+	align-items: baseline;
+	gap: var(--size-4-2);
+	padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
+}
+
+.ta-da-navigator .ta-da-period-name {
+	color: var(--text-normal);
+	font-size: 18px;
+	font-weight: var(--font-bold);
+}
+
+.ta-da-navigator .ta-da-period-note {
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.ta-da-navigator .ta-da-period-note.is-accent {
+	margin-inline-start: auto;
+	color: var(--ta-da-accent);
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-navigator .ta-da-group-header.is-scheduled .ta-da-list-actions {
+	margin-inline-start: auto;
+}
+
+.ta-da-navigator .ta-da-section .ta-da-filter {
+	padding: var(--size-4-1) var(--size-4-3);
+}
+
+.ta-da-navigator .ta-da-row.is-day {
+	align-items: center;
+	gap: var(--size-4-3);
+	height: 40px;
+	padding-block: 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+}
+
+.ta-da-navigator .ta-da-day-label {
+	flex: none;
+	width: 52px;
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-navigator .ta-da-row.is-day.is-today .ta-da-day-label {
+	color: var(--ta-da-accent);
+}
+
+.ta-da-navigator .ta-da-day-summary {
+	flex: 1 1 auto;
+	color: var(--text-muted);
+	font-size: 11.5px;
+	text-align: end;
 }

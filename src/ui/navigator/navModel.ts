@@ -23,7 +23,7 @@ export interface NavItem {
 }
 
 export interface NavModel {
-	/** Today, Upcoming, Loose tasks, Logbook and Trash. */
+	/** Agenda, Loose tasks, Logbook and Trash. */
 	domains: NavItem[];
 	/** The rows under the Tasks | Tags | Notes switch. */
 	tree: NavItem[];
@@ -36,8 +36,7 @@ export type Expanded = ReadonlySet<string>;
 export function buildNav(ctx: ListContext, mode: NavMode, expanded: Expanded): NavModel {
 	const { index, today } = ctx;
 	const domains: NavItem[] = [
-		item("today", { kind: "today" }, "Today", { type: "icon", name: "star", tint: "due", filled: true }, todayTasks(index, today).filter((task) => !isClosed(task.properties.status)).length),
-		item("upcoming", { kind: "upcoming" }, "Upcoming", { type: "icon", name: "calendar", tint: "deadline" }, null),
+		item("agenda", { kind: "agenda" }, "Agenda", { type: "icon", name: "calendar", tint: "due" }, todayTasks(index, today).filter((task) => !isClosed(task.properties.status)).length),
 		item("loose", { kind: "loose" }, "Loose tasks", { type: "icon", name: "inbox", tint: "accent" }, looseTasks(index).length),
 		item("logbook", { kind: "logbook" }, "Logbook", { type: "icon", name: "book-check", tint: "done" }, null),
 		item("trash", { kind: "trash" }, "Trash", { type: "icon", name: "trash-2", tint: "muted" }, ctx.trash.length),

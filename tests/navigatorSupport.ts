@@ -3,9 +3,10 @@ import type { VaultIndex } from "../src/core/index/vaultIndex";
 import { buildList, type ListContext, type ListModel, type ListOptions, type SectionHeader } from "../src/ui/navigator/listModel";
 import type { Domain } from "../src/ui/navigator/domain";
 import type { ListRow } from "../src/ui/navigator/rows";
+import { agendaOn } from "../src/ui/navigator/agenda";
 
 export function context(index: VaultIndex, today: LocalDate, extra: Partial<ListContext> = {}): ListContext {
-	return { index, today, trash: [], folders: new Set(), ...extra };
+	return { index, today, trash: [], folders: new Set(), agenda: agendaOn(today), ...extra };
 }
 
 export function options(extra: Partial<ListOptions> = {}): ListOptions {
@@ -29,8 +30,12 @@ function headerText(header: SectionHeader | null): string {
 			return `${header.sub ? "sub" : "project"} ${header.title} ${header.count}${header.area ? ` (${header.area})` : ""}`;
 		case "loose":
 			return "Loose";
-		case "day":
-			return `${header.day} ${header.detail}`;
+		case "dayTitle":
+			return `day ${header.title}${header.relative ? ` (${header.relative})` : ""}`;
+		case "scheduled":
+			return "scheduled";
+		case "weekTitle":
+			return `week ${header.title} ${header.range}${header.thisWeek ? " (this week)" : ""}`;
 		case "archive":
 			return `${header.title}${header.note ? ` [${header.note}]` : ""}`;
 	}
@@ -51,6 +56,8 @@ function rowText(row: ListRow): string {
 			return [row.type, row.title, row.variant, row.meta, row.deadline?.text, row.open === null ? null : `${row.open} open`].filter((part) => part !== null && part !== undefined).join(" | ");
 		case "note":
 			return ["note", row.title, row.folder].filter((part) => part !== null).join(" | ");
+		case "day":
+			return ["day", row.label, row.summary || null, row.hasOpenTasks ? "dot" : null, row.today ? "today" : null].filter((part) => part !== null).join(" | ");
 		case "logged":
 		case "trashed":
 			return [row.type, row.kind, row.title, `[${row.status}]`, row.meta, row.date].filter((part) => part !== null).join(" | ");

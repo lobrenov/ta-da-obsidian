@@ -39,3 +39,9 @@ export function dayMonth(date: LocalDate, today: LocalDate): string {
 export function wideWeekdayDayMonth(date: LocalDate): string {
 	return `${weekdays[date.weekday - 1] ?? ""} ${date.day} ${shortMonth(date)}`;
 }
+
+/** `Friday 2 October`, with the year when it isn't `today`'s. */
+export function fullDate(date: LocalDate, today: LocalDate): string {
+	const text = `${weekdays[date.weekday - 1] ?? ""} ${date.day} ${months[date.month - 1] ?? ""}`;
+	return date.year === today.year ? text : `${text} ${date.year}`;
+}

@@ -11,15 +11,18 @@ import { makeItem } from "./support";
 const date = (text: string): LocalDate => LocalDate.parse(text) as LocalDate;
 const today = date("2026-10-02");
 
-describe("Today", () => {
+describe("Agenda day", () => {
 	const ctx = context(loadFixtureIndex("DesignVault"), today);
+	const day = { kind: "agenda" } as const;
 
-	it("groups by project, tasks without a parent first, with the dates the Agenda shows", () => {
-		const model = list({ kind: "today" }, ctx);
-		expect(model.header.title).toBe("Today");
-		expect(model.header.detail).toBe("Fri 2 Oct");
+	it("groups today by project, tasks without a parent first, with the dates the Agenda shows", () => {
+		const model = list(day, ctx);
+		expect(model.strip).toBeDefined();
 		expect(model.grouping).toBe("Project");
+		expect(model.groupList).toBe("agenda");
 		expect(describeList(model)).toEqual([
+			"# day Friday 2 October (Today)",
+			"# scheduled",
 			"# -",
 			"    Message Max about a coat and a jacket | [Not Started]",
 			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
@@ -34,8 +37,8 @@ describe("Today", () => {
 	});
 
 	it("names each task's place under Status and Open, where no group names it", () => {
-		const model = list({ kind: "today" }, ctx, { groupings: { today: "Status" } });
-		expect(describeList(model)).toEqual([
+		const model = list(day, ctx, { groupings: { agenda: "Status" } });
+		expect(describeList(model).slice(2)).toEqual([
 			"# Doing 3",
 			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
 			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | Deadline Thu 8 Oct",
@@ -47,71 +50,88 @@ describe("Today", () => {
 			"    Message Max about a coat and a jacket | [Not Started]",
 			"    Submit timesheet | [Not Started]",
 		]);
-		expect(list({ kind: "today" }, ctx, { groupings: { today: "Open" } }).sections.map((s) => s.id)).toEqual(["today|Open"]);
+		expect(list(day, ctx, { groupings: { agenda: "Open" } }).sections.map((s) => s.id)).toEqual(["agenda:day", "agenda:scheduled", "agenda|Open"]);
 	});
 
-	it("lists a task completed today in Completed, folded under Status and Date", () => {
+	it("lists a task completed today in Completed, folded under Status", () => {
 		const index = new VaultIndex([
 			makeItem("Ta Da/tasks/Finished.md", "type: task\nstatus: Done\ncompletedDate: 2026-10-02"),
 			makeItem("Ta Da/tasks/Due.md", "type: task\nstatus: Not Started\ndueDate: 2026-10-02"),
 		]);
-		const status = list({ kind: "today" }, context(index, today), { groupings: { today: "Status" } });
-		expect(describeList(status)).toEqual(["# Not Started 1", "    Due | [Not Started]", "+ quiet Done 1", "    Finished | [Done]"]);
-		const opened = list({ kind: "today" }, context(index, today), { groupings: { today: "Status" }, folds: new Set(["today|Status: Done"]) });
-		expect(opened.sections.map((section) => section.folded)).toEqual([false, false]);
+		const status = list(day, context(index, today), { groupings: { agenda: "Status" } });
+		expect(describeList(status).slice(2)).toEqual(["# Not Started 1", "    Due | [Not Started]", "+ quiet Done 1", "    Finished | [Done]"]);
+		const opened = list(day, context(index, today), { groupings: { agenda: "Status" }, folds: new Set(["agenda|Status: Done"]) });
+		expect(opened.sections.slice(2).map((section) => section.folded)).toEqual([false, false]);
+	});
+
+	it("lists another day's tasks due or at their deadline that day, and names it relative to today", () => {
+		const onDay = (date: string): string[] => {
+			const selection = { kind: "day", date: LocalDate.parse(date) as LocalDate } as const;
+			return describeList(list(day, context(loadFixtureIndex("DesignVault"), today, { agenda: { selection, monthOpen: false } })));
+		};
+		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct"]);
+		expect(onDay("2026-10-03")[0]).toBe("# day Saturday 3 October (Tomorrow)");
+		expect(onDay("2026-10-01")).toEqual(["# day Thursday 1 October (Yesterday) {Nothing scheduled}"]);
+	});
+
+	it("says nothing is scheduled on an empty day", () => {
+		const model = list(day, context(new VaultIndex(), today));
+		expect(describeList(model)).toEqual(["# day Friday 2 October (Today) {Nothing scheduled}"]);
+		expect(model.filter).toBeNull();
 	});
 
 	it("falls back to the default when a list's saved grouping isn't one of its choices", () => {
-		expect(groupingOf("today", { today: "Date" })).toBe("Project");
+		expect(groupingOf("agenda", { agenda: "Date" })).toBe("Project");
 		expect(groupingOf("loose", { loose: "Date" })).toBe("Date");
 	});
 });
 
-describe("Upcoming", () => {
-	const ctx = context(loadFixtureIndex("DesignVault"), today);
+describe("Agenda week", () => {
+	const week = (index: VaultIndex) => list({ kind: "agenda" }, context(index, today, { agenda: { selection: { kind: "week", week: today.isoWeek }, monthOpen: false } }));
 
-	it("lists a day at a time, a task on each of its dates, with a deadline's entry marked", () => {
-		const model = list({ kind: "upcoming" }, ctx);
+	it("lists a row for each day, then what's due in the week with the date each is listed for", () => {
+		const model = week(loadFixtureIndex("DesignVault"));
 		expect(model.groupList).toBeNull();
+		expect(model.filter).toBeNull();
 		expect(describeList(model)).toEqual([
-			"# 3 Sat",
-			"    Update 2DS before the next session | [Not Started]",
-			"# 5 Mon",
-			"    Book a roadworthy for the Kombi | [Not Started] | in Sell the Kombi",
-			"    Read and write files through iCloud Drive | [Doing] | in Ta Da MVP | 3/5",
-			"# 6 Tue",
-			"    Update my claude.md files | [Doing] | 2/5 | Deadline",
-			"# 7 Wed",
-			"    Build the sidebar domains | [Doing] | in Ta Da MVP",
-			"# 8 Thu",
-			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | Deadline",
-			"# 9 Fri",
-			"    Live preview editor on swift-markdown-engine | [Blocked] | in Ta Da MVP | 1/4",
-			"# 14 Wed",
-			"    Agenda view for Upcoming | [Not Started] | in Ta Da MVP",
-			"# 16 Fri",
-			"    Live preview editor on swift-markdown-engine | [Blocked] | in Ta Da MVP | 1/4 | Deadline",
-			"# 30 Fri",
-			"    Import iTerm2 colour schemes as themes | [Not Started] | in Ta Da MVP | Deadline",
+			"# week Week 40 28 Sep – 4 Oct (this week)",
+			"# -",
+			"    day | Mon 28",
+			"    day | Tue 29",
+			"    day | Wed 30",
+			"    day | Thu 1",
+			"    day | Fri 2 | 7 due | dot | today",
+			"    day | Sat 3 | 1 due | dot",
+			"    day | Sun 4",
+			"# Due this week",
+			"    Frontmatter schema for tasks and projects | [Done] | in Ta Da MVP",
+			"    Message Max about a coat and a jacket | [Not Started] | Today",
+			"    Shift my physio appointment | [Blocked] | Today",
+			"    Submit timesheet | [Not Started] | Today",
+			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | Today",
+			"    Update my claude.md files | [Doing] | 2/5 | Today",
+			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | Deadline Today (overdue)",
+			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
+			"    Update 2DS before the next session | [Not Started] | Sat 3 Oct",
 		]);
+		expect(model.sections[2]?.header).toEqual({ style: "archive", title: "Due this week", note: null });
 	});
 
-	it("gives a task listed twice two row ids and one selectable path", () => {
-		const model = list({ kind: "upcoming" }, ctx);
-		const ids = visibleRows(model).map((row) => row.id);
-		expect(new Set(ids).size).toBe(ids.length);
-		const paths = visiblePaths(model);
-		expect(paths.filter((path) => path.endsWith("Live preview editor on swift-markdown-engine.md"))).toHaveLength(1);
-		expect(ids.length).toBe(paths.length + 1);
+	it("has no file in a day's row, so the arrow keys pass it", () => {
+		const model = week(loadFixtureIndex("DesignVault"));
+		expect(visibleRows(model).every((row) => row.type === "task")).toBe(true);
 	});
 
-	it("names the month on days outside this one", () => {
-		const index = new VaultIndex([makeItem("Ta Da/tasks/Later.md", "type: task\nstatus: Not Started\ndueDate: 2026-11-03"), makeItem("Ta Da/tasks/Next year.md", "type: task\nstatus: Not Started\ndueDate: 2027-01-04")]);
-		const headers = list({ kind: "upcoming" }, context(index, today)).sections.map((section) => section.header);
-		expect(headers).toEqual([
-			{ style: "day", day: "3", detail: "Tue Nov" },
-			{ style: "day", day: "4", detail: "Mon Jan 2027" },
-		]);
+	it("lists a task on each of its dates in the week", () => {
+		const index = new VaultIndex([makeItem("Ta Da/tasks/Both.md", "type: task\nstatus: Doing\ndueDate: 2026-09-29\ndeadline: 2026-10-01")]);
+		const model = week(index);
+		expect(describeList(model).slice(-3)).toEqual(["# Due this week", "    Both | [Doing] | Tue 29 Sep (overdue)", "    Both | [Doing] | Deadline Thu 1 Oct (overdue)"]);
+		expect(model.sections[2]?.rows.map((row) => row.id)).toEqual(["Ta Da/tasks/Both.md#due", "Ta Da/tasks/Both.md#deadline"]);
+		expect(visiblePaths(model)).toEqual(["Ta Da/tasks/Both.md"]);
+	});
+
+	it("leaves out the due section when nothing is due", () => {
+		expect(week(new VaultIndex()).sections.map((section) => section.id)).toEqual(["agenda:week", "agenda:days"]);
 	});
 });
 
@@ -147,8 +167,10 @@ describe("Loose tasks", () => {
 describe("areas and projects", () => {
 	const ctx = context(loadFixtureIndex("AreaVault"), today);
 
-	it("groups Today by area, each area's projects under it, and a project's missing area beside its name", () => {
-		expect(describeList(list({ kind: "today" }, ctx))).toEqual([
+	it("groups the Agenda by area, each area's projects under it, and a project's missing area beside its name", () => {
+		expect(describeList(list({ kind: "agenda" }, ctx))).toEqual([
+			"# day Friday 2 October (Today)",
+			"# scheduled",
 			"# -",
 			"    Buy milk | [Not Started]",
 			"    Call Nowhere | [Not Started]",
@@ -289,15 +311,17 @@ describe("tag filter", () => {
 		expect(list({ kind: "loose" }, context(bare, today)).filter).toBeNull();
 	});
 
-	it("filters Upcoming's entries and an area's projects and tasks", () => {
+	it("filters the Agenda's day and an area's projects and tasks", () => {
 		const dated = new VaultIndex([
 			makeItem("Ta Da/areas/Home.md", "type: area"),
 			makeItem("Ta Da/tasks/A.md", "type: task\nstatus: Not Started\ndueDate: 2026-10-05\ntags: [x]"),
 			makeItem("Ta Da/tasks/B.md", 'type: task\nstatus: Not Started\ndueDate: 2026-10-05\narea: "[[Home]]"'),
 			makeItem("Ta Da/projects/P.md", 'type: project\nstatus: Doing\narea: "[[Home]]"\ntags: [x]'),
 		]);
-		const upcoming = list({ kind: "upcoming" }, context(dated, today), { picked: new Set(["x"]) });
-		expect(describeList(upcoming)).toEqual(["# 5 Mon", "    A | [Not Started] | 1 tag"]);
+		const onDay = { kind: "day", date: date("2026-10-05") } as const;
+		const agenda = list({ kind: "agenda" }, context(dated, today, { agenda: { selection: onDay, monthOpen: false } }), { picked: new Set(["x"]) });
+		expect(describeList(agenda).slice(2)).toEqual(["# -", "    A | [Not Started] | 1 tag"]);
+		expect(agenda.filter).toMatchObject({ shown: 1, total: 2 });
 		const area = list({ kind: "area", path: "Ta Da/areas/Home.md" }, context(dated, today), { picked: new Set(["x"]) });
 		expect(describeList(area)).toEqual(["# -", "    project | P | line"]);
 	});
@@ -389,15 +413,17 @@ describe("search", () => {
 
 describe("domains", () => {
 	it("reads saved domains and refuses anything else", () => {
-		for (const domain of [{ kind: "today" }, { kind: "project", path: "p.md" }, { kind: "tag", path: null }, { kind: "tag", path: "a/b" }, { kind: "folder", path: "" }] as const) {
+		for (const domain of [{ kind: "agenda" }, { kind: "project", path: "p.md" }, { kind: "tag", path: null }, { kind: "tag", path: "a/b" }, { kind: "folder", path: "" }] as const) {
 			expect(readDomain(JSON.parse(JSON.stringify(domain)))).toEqual(domain);
 		}
+		expect(readDomain({ kind: "today" })).toEqual({ kind: "agenda" });
+		expect(readDomain({ kind: "upcoming" })).toEqual({ kind: "agenda" });
 		for (const bad of [null, "today", { kind: "search", query: "x" }, { kind: "project" }, { kind: "folder", path: 3 }, { kind: "nope" }]) {
 			expect(readDomain(bad)).toBeNull();
 		}
 	});
 
 	it("keys each list apart", () => {
-		expect(new Set([{ kind: "tag", path: null }, { kind: "tag", path: "a" }, { kind: "folder", path: "a" }, { kind: "area", path: "a" }, { kind: "today" }].map((domain) => domainKey(domain as never))).size).toBe(5);
+		expect(new Set([{ kind: "tag", path: null }, { kind: "tag", path: "a" }, { kind: "folder", path: "a" }, { kind: "area", path: "a" }, { kind: "agenda" }].map((domain) => domainKey(domain as never))).size).toBe(5);
 	});
 });

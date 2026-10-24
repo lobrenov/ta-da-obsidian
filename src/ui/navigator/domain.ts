@@ -2,8 +2,8 @@ import { type Grouping, groupings } from "../../core/index/grouping";
 
 /** What the list pane shows. `search` is the navigation pane's search field. */
 export type Domain =
-	| { kind: "today" }
-	| { kind: "upcoming" }
+	/** The Agenda; its day or week is kept apart, in `AgendaState`. */
+	| { kind: "agenda" }
 	| { kind: "loose" }
 	| { kind: "logbook" }
 	| { kind: "trash" }
@@ -56,11 +56,11 @@ export function modeOf(domain: Domain): NavMode | null {
 }
 
 /** The lists with a Group choice. Every project shares one. */
-export type GroupedList = "today" | "loose" | "project";
+export type GroupedList = "agenda" | "loose" | "project";
 
 export function groupedListOf(domain: Domain): GroupedList | null {
 	switch (domain.kind) {
-		case "today":
+		case "agenda":
 		case "loose":
 		case "project":
 			return domain.kind;
@@ -71,13 +71,13 @@ export function groupedListOf(domain: Domain): GroupedList | null {
 
 /** The Group menu's choices, in order. */
 export const groupChoices: Record<GroupedList, readonly Grouping[]> = {
-	today: ["Project", "Status", "Open"],
+	agenda: ["Project", "Status", "Open"],
 	loose: ["Status", "Date", "Open"],
 	project: ["Status", "Date", "Open"],
 };
 
 export const defaultGrouping: Record<GroupedList, Grouping> = {
-	today: "Project",
+	agenda: "Project",
 	loose: "Status",
 	project: "Open",
 };
@@ -95,12 +95,15 @@ export function readDomain(value: unknown): Domain | null {
 	if (typeof value !== "object" || value === null) return null;
 	const { kind, path } = value as { kind?: unknown; path?: unknown };
 	switch (kind) {
-		case "today":
-		case "upcoming":
+		case "agenda":
 		case "loose":
 		case "logbook":
 		case "trash":
 			return { kind };
+		// Saved before the Agenda replaced both.
+		case "today":
+		case "upcoming":
+			return { kind: "agenda" };
 		case "project":
 		case "area":
 		case "folder":
@@ -116,7 +119,7 @@ export function readDomain(value: unknown): Domain | null {
 export function readGroupings(value: unknown): Groupings {
 	const saved = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 	const result: Groupings = {};
-	for (const list of ["today", "loose", "project"] as const) {
+	for (const list of ["agenda", "loose", "project"] as const) {
 		const choice = saved[list];
 		if (typeof choice === "string" && (groupings as readonly string[]).includes(choice) && groupChoices[list].includes(choice as Grouping)) result[list] = choice as Grouping;
 	}

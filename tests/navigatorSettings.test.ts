@@ -80,9 +80,9 @@ describe("resolveData", () => {
 
 describe("readGroupings", () => {
 	it("keeps a list's own choices and drops everything else", () => {
-		expect(readGroupings({ today: "Status", loose: "Date", project: "Open" })).toEqual({ today: "Status", loose: "Date", project: "Open" });
-		expect(readGroupings({ today: "Date", loose: "Project", project: "nope", other: "Open" })).toEqual({});
-		expect(readGroupings({ today: 3 })).toEqual({});
+		expect(readGroupings({ agenda: "Status", loose: "Date", project: "Open" })).toEqual({ agenda: "Status", loose: "Date", project: "Open" });
+		expect(readGroupings({ agenda: "Date", loose: "Project", project: "nope", other: "Open" })).toEqual({});
+		expect(readGroupings({ agenda: 3 })).toEqual({});
 		expect(readGroupings(null)).toEqual({});
 		expect(readGroupings("Status")).toEqual({});
 	});

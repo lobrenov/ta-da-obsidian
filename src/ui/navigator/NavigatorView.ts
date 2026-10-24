@@ -7,6 +7,7 @@ import type { TrashedItem } from "../../core/storage/trash";
 import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
 import type { Writer } from "../../Writer";
+import { agendaOn, type AgendaState, type StripModel, readAgenda, rolledOver, stepSelection, writeAgenda } from "./agenda";
 import { applyStatus } from "./actions";
 import { localToday } from "../dates";
 import { drawCheckbox, drawIcon, metaIcon } from "./dom";
@@ -14,6 +15,8 @@ import {
 	type Domain,
 	domainKey,
 	groupChoices,
+	type GroupedList,
+	groupedListOf,
 	type Groupings,
 	modeOf,
 	type NavMode,
@@ -24,7 +27,7 @@ import {
 } from "./domain";
 import { buildList, type ListContext, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
-import type { ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, TaskRowModel } from "./rows";
+import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, TaskRowModel } from "./rows";
 import { moveSelection } from "./selection";
 import type { NavigatorSettings } from "./navigatorSettings";
 
@@ -46,7 +49,8 @@ const noPicked: ReadonlySet<string> = new Set();
  * beside a list pane. The models in `listModel.ts` and `navModel.ts` decide what's shown; this class draws them.
  */
 export class NavigatorView extends ItemView {
-	private domain: Domain = { kind: "today" };
+	private domain: Domain = { kind: "agenda" };
+	private agenda: AgendaState = agendaOn(localToday());
 	private mode: NavMode = "tasks";
 	private groupings: Groupings = {};
 	/** The tags picked in each list's filter, for the session. */
@@ -96,14 +100,15 @@ export class NavigatorView extends ItemView {
 	}
 
 	override getState(): Record<string, unknown> {
-		return { domain: this.domain, mode: this.mode, groupings: this.groupings };
+		return { domain: this.domain, mode: this.mode, groupings: this.groupings, agenda: writeAgenda(this.agenda) };
 	}
 
 	override async setState(state: unknown, result: ViewStateResult): Promise<void> {
-		const saved = (typeof state === "object" && state !== null ? state : {}) as { domain?: unknown; mode?: unknown; groupings?: unknown };
+		const saved = (typeof state === "object" && state !== null ? state : {}) as { domain?: unknown; mode?: unknown; groupings?: unknown; agenda?: unknown };
 		this.domain = readDomain(saved.domain) ?? this.domain;
 		if (typeof saved.mode === "string" && (navModes as readonly string[]).includes(saved.mode)) this.mode = saved.mode as NavMode;
 		this.groupings = readGroupings(saved.groupings);
+		this.agenda = readAgenda(saved.agenda, localToday());
 		await super.setState(state, result);
 		if (this.opened) this.refresh();
 	}
@@ -181,7 +186,7 @@ export class NavigatorView extends ItemView {
 				.map((folder) => folder.path)
 				.filter((path) => isNotePath(`${path}/x.md`)),
 		);
-		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders };
+		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders, agenda: this.agenda };
 	}
 
 	/** Whether the Trash count or list is on screen: the navigation pane shows when wide, or when the list isn't showing. */
@@ -206,13 +211,15 @@ export class NavigatorView extends ItemView {
 	/** Redraws both panes from the index. */
 	private refresh(): void {
 		if (!this.opened) return;
-		this.today = localToday();
+		const today = localToday();
+		if (!today.equals(this.today)) this.agenda = { ...this.agenda, selection: rolledOver(this.agenda.selection, this.today, today) };
+		this.today = today;
 		const ctx = this.context();
 		const domain = this.effectiveDomain();
 		const options = { groupings: this.groupings, picked: this.picked.get(domainKey(domain)) ?? noPicked, folds: this.folds };
 		let list = buildList(domain, ctx, options);
 		if (!list) {
-			this.domain = { kind: "today" };
+			this.domain = { kind: "agenda" };
 			list = buildList(this.domain, ctx, { ...options, picked: noPicked });
 		}
 		if (!list) return;
@@ -308,9 +315,19 @@ export class NavigatorView extends ItemView {
 		this.save();
 	}
 
-	private currentList(): "today" | "loose" | "project" | null {
-		const kind = this.domain.kind;
-		return kind === "today" || kind === "loose" || kind === "project" ? kind : null;
+	private currentList(): GroupedList | null {
+		return groupedListOf(this.domain);
+	}
+
+	/** Changes the Agenda's day or week, or its month, and keeps it. */
+	private setAgenda(change: Partial<AgendaState>): void {
+		this.agenda = { ...this.agenda, ...change };
+		this.refresh();
+		this.save();
+	}
+
+	private stepAgenda(offset: number): void {
+		this.setAgenda({ selection: stepSelection(this.agenda.selection, offset) });
 	}
 
 	private toggleTask(row: TaskRowModel): void {
@@ -340,6 +357,9 @@ export class NavigatorView extends ItemView {
 		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 			event.preventDefault();
 			this.move(event.key === "ArrowDown" ? 1 : -1);
+		} else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && this.domain.kind === "agenda" && this.query.trim() === "") {
+			event.preventDefault();
+			this.stepAgenda(event.key === "ArrowRight" ? 1 : -1);
 		} else if (event.key === "Enter" && this.selected !== null && this.paths.includes(this.selected)) {
 			event.preventDefault();
 			this.openPath(this.selected, event);
@@ -417,7 +437,7 @@ export class NavigatorView extends ItemView {
 		body.empty();
 		this.rowEls.clear();
 		if (list.empty !== null) body.createDiv({ cls: "ta-da-empty", text: list.empty });
-		for (const section of list.sections) this.renderSection(body, section);
+		for (const section of list.sections) this.renderSection(body, section, list);
 		body.scrollTop = scrollTop;
 		if (this.selected !== null) for (const el of this.rowEls.get(this.selected) ?? []) el.addClass("is-selected");
 	}
@@ -436,19 +456,14 @@ export class NavigatorView extends ItemView {
 		drawIcon(title.createSpan({ cls: "ta-da-list-title-icon" }), header.icon);
 		title.createEl("h2", { cls: "ta-da-list-title", text: header.title });
 		if (header.detail) title.createSpan({ cls: "ta-da-list-detail", text: header.detail });
+		if (list.strip) {
+			this.renderStrip(head, title, list.strip);
+			return;
+		}
 		const actions = title.createDiv({ cls: "ta-da-list-actions" });
 		const file = header.file;
 		if (file) this.iconButton(actions, "file-text", file.label, () => this.openPath(file.path));
-		if (list.groupList) {
-			const grouping = list.grouping;
-			this.iconButton(actions, "list", "Group", (event) => {
-				const menu = new Menu();
-				for (const choice of groupChoices[list.groupList ?? "today"]) {
-					menu.addItem((entry) => entry.setTitle(choice).setChecked(choice === grouping).onClick(() => this.setGrouping(choice)));
-				}
-				menu.showAtMouseEvent(event);
-			});
-		}
+		this.groupButton(actions, list);
 		for (const line of header.lines) head.createDiv({ cls: "ta-da-list-line", text: line });
 		if (header.chips.length > 0) {
 			const chips = head.createDiv({ cls: "ta-da-chips" });
@@ -461,6 +476,60 @@ export class NavigatorView extends ItemView {
 			}
 		}
 		this.renderFilter(head, list);
+	}
+
+	/** The Group menu's button, on lists that have a Group choice. */
+	private groupButton(parent: HTMLElement, list: ListModel): void {
+		const groupList = list.groupList;
+		if (!groupList) return;
+		this.iconButton(parent, "list", "Group", (event) => {
+			const menu = new Menu();
+			for (const choice of groupChoices[groupList]) {
+				menu.addItem((entry) => entry.setTitle(choice).setChecked(choice === list.grouping).onClick(() => this.setGrouping(choice)));
+			}
+			menu.showAtMouseEvent(event);
+		});
+	}
+
+	/** The Agenda's header: Week | Month and ‹ Today › beside the title, then the month's title and the weeks' days. */
+	private renderStrip(head: HTMLElement, bar: HTMLElement, strip: StripModel): void {
+		bar.addClass("is-agenda");
+		const controls = bar.createDiv({ cls: "ta-da-agenda-controls" });
+		const size = controls.createDiv({ cls: "ta-da-switch is-compact", attr: { role: "group", "aria-label": "Calendar size" } });
+		for (const [open, label] of [[false, "Week"], [true, "Month"]] as const) {
+			const button = size.createEl("button", { cls: open === strip.monthOpen ? "is-active" : "", text: label, attr: { "aria-pressed": String(open === strip.monthOpen) } });
+			button.addEventListener("click", () => this.setAgenda({ monthOpen: open }));
+		}
+		const stepper = controls.createDiv({ cls: "ta-da-stepper", attr: { role: "group", "aria-label": "Move through days" } });
+		const previous = stepper.createEl("button", { attr: { "aria-label": `Previous ${strip.unit}` } });
+		setIcon(previous, "chevron-left");
+		previous.addEventListener("click", () => this.stepAgenda(-1));
+		const today = stepper.createEl("button", { cls: "ta-da-stepper-today", text: "Today" });
+		today.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: this.today } }));
+		const next = stepper.createEl("button", { attr: { "aria-label": `Next ${strip.unit}` } });
+		setIcon(next, "chevron-right");
+		next.addEventListener("click", () => this.stepAgenda(1));
+
+		head.createDiv({ cls: "ta-da-strip-title", text: strip.title });
+		const grid = head.createDiv({ cls: "ta-da-strip", attr: { role: "grid" } });
+		const initials = grid.createDiv({ cls: "ta-da-strip-row is-initials", attr: { "aria-hidden": "true" } });
+		for (const initial of ["W", ...strip.initials]) initials.createSpan({ text: initial });
+		for (const row of strip.rows) {
+			const line = grid.createDiv({ cls: "ta-da-strip-row" });
+			const week = line.createEl("button", { cls: `ta-da-strip-cell is-week${row.week.selected ? " is-selected" : ""}`, attr: { "aria-label": `Week ${row.week.label}` } });
+			week.createSpan({ cls: "ta-da-strip-number", text: row.week.label });
+			week.addEventListener("click", () => this.setAgenda({ selection: { kind: "week", week: row.week.week } }));
+			for (const day of row.days) {
+				const cell = line.createEl("button", {
+					cls: `ta-da-strip-cell is-day${day.selected ? " is-selected" : ""}${day.today ? " is-today" : ""}${day.faded ? " is-faded" : ""}`,
+					attr: { "aria-label": day.aria },
+				});
+				cell.createSpan({ cls: "ta-da-strip-number", text: day.label });
+				const dots = cell.createSpan({ cls: "ta-da-strip-dots" });
+				if (day.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
+				cell.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: day.date } }));
+			}
+		}
 	}
 
 	private iconButton(parent: HTMLElement, icon: string, label: string, onClick: (event: MouseEvent) => void): void {
@@ -502,15 +571,15 @@ export class NavigatorView extends ItemView {
 		}
 	}
 
-	private renderSection(parent: HTMLElement, section: SectionModel): void {
+	private renderSection(parent: HTMLElement, section: SectionModel, list: ListModel): void {
 		const el = parent.createDiv({ cls: "ta-da-section" });
-		if (section.header) this.renderSectionHeader(el, section, section.header);
+		if (section.header) this.renderSectionHeader(el, section, section.header, list);
 		if (section.folded) return;
 		if (section.message) el.createDiv({ cls: "ta-da-message", text: section.message });
 		for (const row of section.rows) this.renderRow(el, row);
 	}
 
-	private renderSectionHeader(parent: HTMLElement, section: SectionModel, header: SectionHeader): void {
+	private renderSectionHeader(parent: HTMLElement, section: SectionModel, header: SectionHeader, list: ListModel): void {
 		switch (header.style) {
 			case "count": {
 				const el = parent.createDiv({ cls: `ta-da-group-header${header.quiet ? " is-quiet" : ""}${section.foldable ? " is-foldable" : ""}` });
@@ -543,10 +612,26 @@ export class NavigatorView extends ItemView {
 				el.createSpan({ cls: "ta-da-group-title", text: "Loose" });
 				break;
 			}
-			case "day": {
-				const el = parent.createDiv({ cls: "ta-da-day-header" });
-				el.createSpan({ cls: "ta-da-day-number", text: header.day });
-				el.createSpan({ cls: "ta-da-day-name", text: header.detail });
+			case "dayTitle": {
+				const el = parent.createDiv({ cls: "ta-da-period-title" });
+				el.createSpan({ cls: "ta-da-period-name", text: header.title });
+				if (header.relative) el.createSpan({ cls: "ta-da-period-note is-accent", text: header.relative });
+				break;
+			}
+			case "weekTitle": {
+				const el = parent.createDiv({ cls: "ta-da-period-title" });
+				el.createSpan({ cls: "ta-da-period-name", text: header.title });
+				el.createSpan({ cls: "ta-da-period-note", text: header.range });
+				if (header.thisWeek) el.createSpan({ cls: "ta-da-period-note is-accent", text: "This week" });
+				break;
+			}
+			case "scheduled": {
+				const el = parent.createDiv({ cls: "ta-da-group-header is-archive is-scheduled" });
+				drawIcon(el.createSpan({ cls: "ta-da-group-icon" }), { type: "icon", name: "calendar", tint: "due" });
+				el.createSpan({ cls: "ta-da-group-title", text: "Scheduled" });
+				const actions = el.createDiv({ cls: "ta-da-list-actions" });
+				this.groupButton(actions, list);
+				this.renderFilter(parent, list);
 				break;
 			}
 			case "archive": {
@@ -577,6 +662,9 @@ export class NavigatorView extends ItemView {
 			case "trashed":
 				el = this.archiveRow(parent, row);
 				break;
+			case "day":
+				this.dayRow(parent, row);
+				return;
 		}
 		if (row.path === null) return;
 		const path = row.path;
@@ -584,6 +672,16 @@ export class NavigatorView extends ItemView {
 		els.push(el);
 		this.rowEls.set(path, els);
 		el.addEventListener("click", (event) => this.openPath(path, event));
+	}
+
+	/** A day in a week's list: clicking it picks the day. */
+	private dayRow(parent: HTMLElement, row: AgendaDayRowModel): void {
+		const el = parent.createDiv({ cls: `ta-da-row is-day${row.today ? " is-today" : ""}`, attr: { role: "button", tabindex: "-1" } });
+		el.createSpan({ cls: "ta-da-day-label", text: row.label });
+		el.createSpan({ cls: "ta-da-day-summary", text: row.summary });
+		const dots = el.createSpan({ cls: "ta-da-strip-dots" });
+		if (row.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
+		el.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: row.date } }));
 	}
 
 	private taskRow(parent: HTMLElement, row: TaskRowModel): HTMLElement {
