@@ -65,6 +65,48 @@ describe("planStatus", () => {
 	});
 });
 
+describe("planStatus on logged files", () => {
+	const logged = (name: string, status: string) =>
+		makeItem(`Ta Da/Logbook/2026-09/${name}.md`, `type: task\nstatus: ${status}\nproject: "[[Kombi]]"`);
+	const loggedProject = makeItem("Ta Da/Logbook/2026-09/Kombi.md", "type: project\nstatus: Done");
+
+	it("puts a reopened logged task back, with its logged project as Doing", () => {
+		const t = logged("A", "Done");
+		expect(planStatus(indexOf(loggedProject, t), t, "Not Started")).toEqual({
+			changes: [{ path: t.path, status: "Not Started" }],
+			unlog: { paths: [t.path], doing: [loggedProject.path] },
+		});
+	});
+
+	it("puts back a logged project for an open task that's live", () => {
+		const t = task("A", "Doing");
+		expect(planStatus(indexOf(loggedProject, t), t, "Blocked")).toEqual({
+			changes: [{ path: t.path, status: "Blocked" }],
+			unlog: { paths: [loggedProject.path], doing: [loggedProject.path] },
+		});
+	});
+
+	it("puts back a logged task under a live Done project and reopens the project", () => {
+		const t = logged("A", "Cancelled");
+		expect(planStatus(indexOf(project("Done"), t), t, "Doing")).toEqual({
+			changes: [
+				{ path: t.path, status: "Doing" },
+				{ path: "Ta Da/projects/Kombi.md", status: "Doing" },
+			],
+			unlog: { paths: [t.path], doing: [] },
+		});
+	});
+
+	it("puts back a logged project alone, and nothing for a file closed again", () => {
+		expect(planStatus(indexOf(loggedProject), loggedProject, "Doing")).toEqual({
+			changes: [{ path: loggedProject.path, status: "Doing" }],
+			unlog: { paths: [loggedProject.path], doing: [] },
+		});
+		const t = logged("A", "Done");
+		expect(planStatus(indexOf(loggedProject, t), t, "Cancelled")).toEqual({ changes: [{ path: t.path, status: "Cancelled" }] });
+	});
+});
+
 describe("planToggle", () => {
 	it("completes an open task and reopens a closed one with its project", () => {
 		const open = task("A", "Blocked");

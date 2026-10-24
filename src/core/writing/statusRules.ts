@@ -1,9 +1,10 @@
-import type { Item } from "../model/item";
+import { isLogged, type Item } from "../model/item";
 import { isClosed, type Status } from "../model/status";
 
 /*
  * What changing a status does to other files, as the apps' `setStatus`: closing a project that has open tasks asks
- * first, and reopening a Done or Cancelled task reopens its Done or Cancelled project to Doing.
+ * first, and reopening a Done or Cancelled task reopens its Done or Cancelled project to Doing. Reopening a logged file
+ * puts it back out of the Logbook, with its logged project as Doing.
  */
 
 /** What the rules read from the index. */
@@ -28,7 +29,13 @@ export interface CompletionQuestion {
 	tasks: Item[];
 }
 
-export type StatusPlan = { ask: CompletionQuestion } | { changes: StatusChange[] };
+/** Logged files to put back after the changes: `paths` are moved, then `doing` (a subset of them, or the projects brought back) are set to Doing. */
+export interface UnlogRequest {
+	paths: string[];
+	doing: string[];
+}
+
+export type StatusPlan = { ask: CompletionQuestion } | { changes: StatusChange[]; unlog?: UnlogRequest };
 
 /** Setting `status` on `item`: the question to ask first, or the files to set in order. Areas and notes have no status. */
 export function planStatus(index: StatusIndex, item: Item, status: Status): StatusPlan {
@@ -39,11 +46,17 @@ export function planStatus(index: StatusIndex, item: Item, status: Status): Stat
 		if (tasks.length > 0) return { ask: { project: item, status, tasks } };
 	}
 	const changes: StatusChange[] = [{ path: item.path, status }];
-	if (kind === "task" && isClosed(item.properties.status) && !isClosed(status)) {
-		const project = index.projectOf(item);
-		if (project && isClosed(project.properties.status)) changes.push({ path: project.path, status: "Doing" });
+	if (isClosed(status)) return { changes };
+	const wasClosed = isClosed(item.properties.status) || isLogged(item);
+	const unlog: UnlogRequest = { paths: isLogged(item) ? [item.path] : [], doing: [] };
+	const project = kind === "task" ? index.projectOf(item) : null;
+	if (project && isLogged(project)) {
+		if (!isLogged(item)) unlog.paths.push(project.path);
+		unlog.doing.push(project.path);
+	} else if (project && wasClosed && isClosed(project.properties.status)) {
+		changes.push({ path: project.path, status: "Doing" });
 	}
-	return { changes };
+	return unlog.paths.length > 0 ? { changes, unlog } : { changes };
 }
 
 /** Done or Cancelled → Not Started, anything else → Done: what a checkbox and Complete do. */

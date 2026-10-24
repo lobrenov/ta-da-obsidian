@@ -103,6 +103,15 @@ export class VaultIndex {
 		return notes;
 	}
 
+	/** The filenames of every project's title, live or logged, except the project at `path`: the names a project's file avoids. */
+	projectFilenames(excluding?: string): Set<string> {
+		const names = new Set<string>();
+		for (const item of this.itemsByPath.values()) {
+			if (item.properties.kind === "project" && item.path !== excluding) names.add(`${item.title}.md`);
+		}
+		return names;
+	}
+
 	/** Logged tasks and projects. */
 	get logged(): Item[] {
 		return [...this.itemsByPath.values()].filter((item) => isLogged(item));
