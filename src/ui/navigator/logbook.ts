@@ -3,7 +3,8 @@ import { byTitle } from "../../core/index/vaultIndex";
 import { type Item, isLogged, subtasks } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed } from "../../core/model/status";
-import { dayMonth, monthTitle, wideWeekdayDayMonth } from "./dates";
+import { monthTitle } from "../dates";
+import { dayMonth, wideWeekdayDayMonth } from "./dates";
 import type { ArchiveRowModel } from "./rows";
 
 export type LogbookGroupKind = "logsTonight" | "waitsForOpenTasks" | "logged";

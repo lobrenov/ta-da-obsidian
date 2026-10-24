@@ -1,34 +1,36 @@
-import { type MarkdownPostProcessor, MarkdownRenderChild, type TFile } from "obsidian";
-import { splitFrontmatter } from "../../core/parsing/frontmatterSplitter";
+import { type MarkdownPostProcessor, type MarkdownPostProcessorContext, MarkdownRenderChild, type TFile } from "obsidian";
 import { buildHeader } from "./buildHeader";
 import { headerActions, type HeaderHost } from "./headerActions";
-import { modelFromText } from "./headerModel";
+import { buildHeaderModel, modelFromText } from "./headerModel";
+import { kindOfFrontmatter, ownsHeader } from "./sections";
 
 /**
- * Reading view: the header goes at the top of the first section after the frontmatter. It redraws itself from the
- * file's text when the file changes, since Obsidian reuses a section whose own text didn't.
+ * Reading view: the header goes at the top of the first section after the frontmatter, or in the frontmatter's own
+ * section when the file has no body. It redraws itself from the index when that changes, since Obsidian reuses a
+ * section whose own text didn't change.
  */
 export function readingHeaderProcessor(host: HeaderHost): MarkdownPostProcessor {
 	return (el, ctx) => {
 		const file = host.app.vault.getFileByPath(ctx.sourcePath);
+		if (!file) return;
+		const kind = host.index.get(file.path)?.properties.kind ?? kindOfFrontmatter(ctx.frontmatter);
+		if (kind !== "task" && kind !== "project" && kind !== "area") return;
 		const info = ctx.getSectionInfo(el);
-		if (!file || !info) return;
-		const { bodyFirstLineIndex } = splitFrontmatter(info.text);
-		if (info.lineStart < bodyFirstLineIndex) return;
-		const before = info.text.split("\n").slice(bodyFirstLineIndex, info.lineStart);
-		if (before.some((line) => line.trim() !== "")) return;
-		if (modelFromText(info.text, file.path, host.index, host.today()) === null) return;
+		if (!info || !ownsHeader(info.text, info.lineStart)) return;
 		el.querySelector(":scope > .ta-da-header-host")?.remove();
 		const holder = el.ownerDocument.createElement("div");
 		holder.className = "ta-da-header-host";
+		el.classList.add("ta-da-header-section");
 		el.prepend(holder);
-		ctx.addChild(new ReadingHeader(holder, host, file, info.text));
+		ctx.addChild(new ReadingHeader(el, holder, ctx, host, file, info.text));
 	};
 }
 
 class ReadingHeader extends MarkdownRenderChild {
 	constructor(
+		private readonly section: HTMLElement,
 		private readonly holder: HTMLElement,
+		private readonly ctx: MarkdownPostProcessorContext,
 		private readonly host: HeaderHost,
 		private readonly file: TFile,
 		private readonly text: string,
@@ -41,17 +43,18 @@ class ReadingHeader extends MarkdownRenderChild {
 			this.holder.remove();
 			return;
 		}
-		this.draw(this.text);
-		this.registerEvent(
-			this.host.app.metadataCache.on("changed", (file, data) => {
-				if (file.path === this.file.path) this.draw(data);
-			}),
-		);
+		this.draw();
+		this.register(this.host.onIndexChange(() => this.draw()));
 	}
 
-	private draw(text: string): void {
-		const model = modelFromText(text, this.file.path, this.host.index, this.host.today());
+	/** Draws from the index, which follows the editor; empty when this section is no longer the header's. */
+	private draw(): void {
 		this.holder.replaceChildren();
+		const info = this.ctx.getSectionInfo(this.section);
+		if (info && !ownsHeader(info.text, info.lineStart)) return;
+		const today = this.host.today();
+		const item = this.host.index.get(this.file.path);
+		const model = item ? buildHeaderModel(item, this.host.index, today) : modelFromText(this.text, this.file.path, this.host.index, today);
 		if (model === null) return;
 		const actions = headerActions(this.host, this.file, model);
 		this.holder.appendChild(buildHeader(this.holder.ownerDocument, model, actions, this.host.propertiesShown(this.file.path)));

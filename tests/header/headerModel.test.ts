@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../../src/core/index/vaultIndex";
 import { LocalDate } from "../../src/core/model/localDate";
-import { buildHeaderModel, dateLabel, modelFromText, statusChoices } from "../../src/ui/header/headerModel";
+import { buildHeaderModel, dateLabel, hasHeader, modelFromText, statusChoices, statusLabel } from "../../src/ui/header/headerModel";
 import { makeItem } from "../support";
 
 const date = (text: string): LocalDate => LocalDate.parse(text) as LocalDate;
@@ -44,7 +44,7 @@ describe("buildHeaderModel", () => {
 	it("shows missing keys as missing chips", () => {
 		const model = buildHeaderModel(makeItem("Ta Da/tasks/Bare.md", "type: task"), index, today);
 		expect(model?.chips).toEqual([
-			{ kind: "status", status: "Not Started", label: "Not Started" },
+			{ kind: "status", status: "Not Started", label: "Not started" },
 			{ kind: "parent", label: "Project", icon: "ring", missing: true, unresolved: false },
 			{ kind: "dueDate", label: "Due", missing: true, tone: "muted" },
 			{ kind: "deadline", label: "Deadline", missing: true, tone: "muted" },
@@ -101,5 +101,28 @@ describe("statusChoices", () => {
 	it("offers Ongoing on projects only", () => {
 		expect(statusChoices("task")).toEqual(["Not Started", "Doing", "Blocked", "Done", "Cancelled"]);
 		expect(statusChoices("project")).toContain("Ongoing");
+	});
+});
+
+describe("statusLabel", () => {
+	it("writes a status in sentence case", () => {
+		expect(statusLabel("Not Started")).toBe("Not started");
+		expect(statusLabel("Doing")).toBe("Doing");
+		expect(statusLabel("Cancelled")).toBe("Cancelled");
+	});
+});
+
+describe("hasHeader", () => {
+	it("is true for typed files from the frontmatter alone, and false for notes", () => {
+		expect(hasHeader("---\ntype: Project\n---\n")).toBe(true);
+		expect(hasHeader("---\ntype: area\n---\n")).toBe(true);
+		expect(hasHeader("---\ntags: [a]\n---\nBody")).toBe(false);
+		expect(hasHeader("Body only")).toBe(false);
+		expect(hasHeader("---\ntype: meeting\n---\n")).toBe(false);
+	});
+
+	it("doesn't read the body: a note with a long body is turned away", () => {
+		const note = `---\ntags: [a]\n---\n${"- [ ] box\n".repeat(5000)}`;
+		expect(modelFromText(note, "Notes/Big.md", index, today)).toBeNull();
 	});
 });

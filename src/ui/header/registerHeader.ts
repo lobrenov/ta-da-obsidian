@@ -1,4 +1,4 @@
-import { editorInfoField, MarkdownView, debounce, type Plugin, type TFile } from "obsidian";
+import { editorInfoField, MarkdownView, type Plugin, type TFile } from "obsidian";
 import type { EditorView } from "@codemirror/view";
 import type { TaDaIndex } from "../../TaDaIndex";
 import type { TaDaSettings } from "../../settingsData";
@@ -9,7 +9,7 @@ import { headerExtension, refreshHeader } from "./headerExtension";
 import { modelFromText } from "./headerModel";
 import { hidesProperties, ShownProperties, taDaFileClass } from "./propertiesVisibility";
 import { readingHeaderProcessor } from "./readingHeader";
-import { today } from "./today";
+import { localToday } from "../dates";
 
 /**
  * Registers the Ta Da header: the Live Preview widget, the Reading view post-processor, and the `ta-da-file` class
@@ -22,7 +22,8 @@ export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Wri
 		app,
 		index: taDaIndex.index,
 		writer,
-		today,
+		today: localToday,
+		onIndexChange: (listener) => taDaIndex.onChange(listener),
 		propertiesShown: (path) => shown.has(path),
 		toggleProperties: (path) => {
 			const now = shown.toggle(path);
@@ -34,7 +35,7 @@ export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Wri
 	plugin.registerEditorExtension(
 		headerExtension<TFile>({
 			fileOf: (state) => state.field(editorInfoField, false)?.file ?? null,
-			modelOf: (text, file) => modelFromText(text, file.path, host.index, today()),
+			modelOf: (text, file) => modelFromText(text, file.path, host.index, localToday()),
 			render: (model, file, doc) => buildHeader(doc, model, headerActions(host, file, model), shown.has(file.path)),
 		}),
 	);
@@ -52,9 +53,11 @@ export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Wri
 		}
 	}
 
-	/** Redraws every Live Preview header from the index, for a parent that changed in another file. */
+	/** Redraws the Live Preview headers of Ta Da files from the index, for a parent that changed in another file. */
 	const refreshEditors = (): void => {
 		for (const view of markdownViews()) {
+			const kind = view.file ? taDaIndex.index.get(view.file.path)?.properties.kind : undefined;
+			if (kind !== "task" && kind !== "project" && kind !== "area") continue;
 			const cm = (view.editor as unknown as { cm?: EditorView }).cm;
 			cm?.dispatch({ effects: refreshHeader.of(null) });
 		}
@@ -63,13 +66,12 @@ export function registerHeader(plugin: Plugin, taDaIndex: TaDaIndex, writer: Wri
 		refreshClasses();
 		refreshEditors();
 	};
-	/** After `TaDaIndex` has taken the change. */
-	const refreshSoon = debounce(refresh, 300, true);
 	plugin.registerEvent(app.workspace.on("active-leaf-change", refreshClasses));
 	plugin.registerEvent(app.workspace.on("file-open", refreshClasses));
 	plugin.registerEvent(app.workspace.on("layout-change", refreshClasses));
-	plugin.registerEvent(app.metadataCache.on("changed", refreshSoon));
 	plugin.registerEvent(app.vault.on("rename", (file, oldPath) => shown.rename(oldPath, file.path)));
+	/** The index changes after an edit pauses, a save, a rename or a delete; the header and the class follow it. */
+	plugin.register(taDaIndex.onChange(refresh));
 	void taDaIndex.ready.then(refresh);
 	return { refresh };
 }

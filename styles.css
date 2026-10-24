@@ -3,8 +3,13 @@
 /* Properties */
 
 /* Obsidian's own rules set display with more specificity (.show-properties, --metadata-display-*). */
-.ta-da-file .metadata-container {
+.ta-da-file .metadata-container:not(:is(.markdown-embed, .inline-embed, .internal-embed) .metadata-container) {
 	display: none !important;
+}
+
+/* A frontmatter-only file's header sits in the frontmatter's section; its raw block stays hidden. */
+.ta-da-header-section > pre.frontmatter {
+	display: none;
 }
 
 /* Header */

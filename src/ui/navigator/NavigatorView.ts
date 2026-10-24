@@ -1,4 +1,4 @@
-import { ItemView, Keymap, Menu, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
+import { debounce, ItemView, Keymap, Menu, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
 import type { Grouping } from "../../core/index/grouping";
 import type { LocalDate } from "../../core/model/localDate";
 import { statuses } from "../../core/model/status";
@@ -8,7 +8,7 @@ import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
 import type { Writer } from "../../Writer";
 import { applyStatus } from "./actions";
-import { localToday } from "./dates";
+import { localToday } from "../dates";
 import { drawCheckbox, drawIcon, metaIcon } from "./dom";
 import {
 	type Domain,
@@ -19,6 +19,7 @@ import {
 	type NavMode,
 	navModes,
 	readDomain,
+	readGroupings,
 	sameDomain,
 } from "./domain";
 import { buildList, type ListContext, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
@@ -26,6 +27,9 @@ import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, TaskRowModel } from "./rows";
 import { moveSelection } from "./selection";
 import type { NavigatorSettings } from "./navigatorSettings";
+
+/** The width below which one pane shows at a time; the same as the container query in `styles.css`. */
+const narrowBelow = 520;
 
 export const navigatorViewType = "ta-da-navigator";
 
@@ -56,6 +60,10 @@ export class NavigatorView extends ItemView {
 	private paths: string[] = [];
 	private lastKey = "";
 	private opened = false;
+	private closed = false;
+	/** `.trash/` changed since it was last read. */
+	private trashStale = true;
+	private readonly scheduleTrash = debounce(() => void this.refreshTrash(), 1000, true);
 	/** In the narrow layout, whether the list pane (not the navigation pane) is showing. */
 	private showingList = false;
 	private readonly rowEls = new Map<string, HTMLElement[]>();
@@ -95,24 +103,36 @@ export class NavigatorView extends ItemView {
 		const saved = (typeof state === "object" && state !== null ? state : {}) as { domain?: unknown; mode?: unknown; groupings?: unknown };
 		this.domain = readDomain(saved.domain) ?? this.domain;
 		if (typeof saved.mode === "string" && (navModes as readonly string[]).includes(saved.mode)) this.mode = saved.mode as NavMode;
-		if (typeof saved.groupings === "object" && saved.groupings !== null) this.groupings = saved.groupings as Groupings;
+		this.groupings = readGroupings(saved.groupings);
 		await super.setState(state, result);
 		if (this.opened) this.refresh();
 	}
 
 	override async onOpen(): Promise<void> {
+		// Every listener is added before the first await, so closing the view during one removes them all.
 		this.build();
-		await this.deps.settings.ready;
 		this.applyCollapse();
 		this.register(this.deps.settings.onChange(() => this.applyCollapse()));
 		this.register(this.deps.taDaIndex.onChange(() => this.refresh()));
 		this.registerEvent(this.app.workspace.on("file-open", (file) => this.select(file?.path ?? null, true)));
-		this.registerEvent(this.app.vault.on("delete", () => void this.refreshTrash()));
+		this.registerEvent(
+			this.app.vault.on("delete", () => {
+				this.trashStale = true;
+				this.maybeRefreshTrash();
+			}),
+		);
+		this.register(() => this.scheduleTrash.cancel());
 		this.registerInterval(window.setInterval(() => this.rollOver(), 60_000));
 		this.selected = this.app.workspace.getActiveFile()?.path ?? null;
 		await this.deps.taDaIndex.ready;
+		if (this.closed) return;
 		this.opened = true;
 		await this.refreshTrash();
+	}
+
+	override async onClose(): Promise<void> {
+		this.closed = true;
+		this.opened = false;
 	}
 
 	// Structure
@@ -164,8 +184,22 @@ export class NavigatorView extends ItemView {
 		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders };
 	}
 
+	/** Whether the Trash count or list is on screen: the navigation pane shows when wide, or when the list isn't showing. */
+	private wantsTrash(): boolean {
+		return this.domain.kind === "trash" || !this.showingList || this.contentEl.clientWidth >= narrowBelow;
+	}
+
+	/** Reads `.trash/` later, if it changed and something on screen shows it. */
+	private maybeRefreshTrash(): void {
+		if (this.trashStale && this.opened && this.wantsTrash()) this.scheduleTrash();
+	}
+
 	private async refreshTrash(): Promise<void> {
-		this.trash = await readTrash(this.app.vault.adapter);
+		if (this.closed) return;
+		this.trashStale = false;
+		const trash = await readTrash(this.app.vault.adapter);
+		if (this.closed) return;
+		this.trash = trash;
 		this.refresh();
 	}
 
@@ -203,6 +237,7 @@ export class NavigatorView extends ItemView {
 		this.query = "";
 		this.searchEl.value = "";
 		this.showingList = true;
+		this.maybeRefreshTrash();
 		const mode = modeOf(domain);
 		if (mode) this.mode = mode;
 		for (const id of ancestorsOf(domain)) this.expanded.add(id);
@@ -223,13 +258,22 @@ export class NavigatorView extends ItemView {
 		this.save();
 	}
 
+	/**
+	 * Opens a file as the file explorer does. A click or a new tab or split makes the opened leaf active. A key press
+	 * leaves focus in the list and announces the file with `file-open`, so Outline, Backlinks and Properties follow.
+	 */
 	private openPath(path: string, event?: MouseEvent | KeyboardEvent): void {
 		const file = this.app.vault.getFileByPath(path);
 		if (!file) return;
 		this.select(path, false);
-		// A plain open leaves the keyboard in the list, so the arrow keys carry on; a new tab or split takes focus.
 		const newLeaf = event ? Keymap.isModEvent(event) : false;
-		void this.app.workspace.getLeaf(newLeaf).openFile(file, newLeaf ? undefined : { active: false });
+		const fromKey = event instanceof KeyboardEvent && !newLeaf;
+		void this.app.workspace
+			.getLeaf(newLeaf)
+			.openFile(file, { active: !fromKey })
+			.then(() => {
+				if (fromKey) this.app.workspace.trigger("file-open", file);
+			});
 	}
 
 	/** Highlights a path's rows, which follows the active file. */
@@ -385,6 +429,7 @@ export class NavigatorView extends ItemView {
 		const title = head.createDiv({ cls: "ta-da-list-title-row" });
 		this.iconButton(title, "chevron-left", "Back", () => {
 			this.showingList = false;
+			this.maybeRefreshTrash();
 			this.refresh();
 		});
 		title.lastElementChild?.addClass("ta-da-list-back");

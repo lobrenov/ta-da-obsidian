@@ -7,7 +7,7 @@ import type { HeaderActions } from "./buildHeader";
 import { parentChoices, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";
 import { addTagEdit, dateEdit, parentEdit, removeTagEdit, statusEdit } from "./edits";
-import { type HeaderModel, statusChoices } from "./headerModel";
+import { type HeaderModel, statusChoices, statusLabel } from "./headerModel";
 import { dayOrderOf, firstWeekdayOf } from "./locale";
 import { DateModal, ParentModal, TagModal } from "./modals";
 
@@ -17,6 +17,8 @@ export interface HeaderHost {
 	index: VaultIndex;
 	writer: Writer;
 	today(): LocalDate;
+	/** Calls `listener` after the index changes; returns a function that stops it. */
+	onIndexChange(listener: () => void): () => void;
 	propertiesShown(path: string): boolean;
 	/** Flips it for the file and returns the new state. */
 	toggleProperties(path: string): boolean;
@@ -46,7 +48,7 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 			for (const status of statusChoices(model.kind)) {
 				if (status === "Done") menu.addSeparator();
 				menu.addItem((item) => {
-					item.setTitle(status);
+					item.setTitle(statusLabel(status));
 					item.setIcon("circle");
 					markStatus(item, status, status === model.status);
 					item.onClick(() => write(statusEdit(status, file.path, host.today())));

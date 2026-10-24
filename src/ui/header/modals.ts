@@ -4,7 +4,8 @@ import { parseDatePhrase, type DayOrder } from "../../core/writing/datePhrase";
 import { type ParentChoice, type TagChoice } from "./choices";
 import { element, icon } from "./dom";
 import { dateLabel } from "./headerModel";
-import { monthGrid, monthTitle, weekdayLetter, weekdayOrder } from "./monthGrid";
+import { monthTitle } from "../dates";
+import { monthGrid, weekdayLetter, weekdayOrder } from "./monthGrid";
 
 /** The project or area menu: a filtered list with None first and the current choice ticked. */
 export class ParentModal extends SuggestModal<ParentChoice> {

@@ -1,4 +1,4 @@
-import type { Grouping } from "../../core/index/grouping";
+import { type Grouping, groupings } from "../../core/index/grouping";
 
 /** What the list pane shows. `search` is the navigation pane's search field. */
 export type Domain =
@@ -110,4 +110,15 @@ export function readDomain(value: unknown): Domain | null {
 		default:
 			return null;
 	}
+}
+
+/** Groupings read back from saved view state: only a list's own choices, any other key or value dropped. */
+export function readGroupings(value: unknown): Groupings {
+	const saved = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+	const result: Groupings = {};
+	for (const list of ["today", "loose", "project"] as const) {
+		const choice = saved[list];
+		if (typeof choice === "string" && (groupings as readonly string[]).includes(choice) && groupChoices[list].includes(choice as Grouping)) result[list] = choice as Grouping;
+	}
+	return result;
 }

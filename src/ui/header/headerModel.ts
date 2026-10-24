@@ -1,5 +1,7 @@
 import { type Item, type Kind, subtasks } from "../../core/model/item";
 import { parseItem } from "../../core/parsing/parseItem";
+import { splitFrontmatter } from "../../core/parsing/frontmatterSplitter";
+import { readProperties } from "../../core/parsing/propertyReader";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed, type Status } from "../../core/model/status";
 import { linkTitle } from "../../core/model/wikiLink";
@@ -59,7 +61,7 @@ export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalD
 			: null;
 	const chips: Chip[] = [];
 	if (kind !== "area") {
-		chips.push({ kind: "status", status, label: status });
+		chips.push({ kind: "status", status, label: statusLabel(status) });
 		if (parent) {
 			chips.push({
 				kind: "parent",
@@ -102,8 +104,20 @@ export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalD
 
 /** The header for a file's text, as typed; null for a note or a file Ta Da doesn't read. */
 export function modelFromText(text: string, path: string, lookup: ParentLookup, today: LocalDate): HeaderModel | null {
+	if (!hasHeader(text)) return null;
 	const item = parseItem(text, path);
 	return item === null ? null : buildHeaderModel(item, lookup, today);
+}
+
+/** Whether the frontmatter alone says the file is a task, project or area, so a note never pays for a body scan. */
+export function hasHeader(text: string): boolean {
+	const { yaml } = splitFrontmatter(text);
+	return yaml !== null && readProperties(yaml) !== null;
+}
+
+/** `Not Started` as `Not started`. */
+export function statusLabel(status: Status): string {
+	return status.slice(0, 1) + status.slice(1).toLowerCase();
 }
 
 /** The statuses a menu offers, in the app's order; Ongoing only for projects. */

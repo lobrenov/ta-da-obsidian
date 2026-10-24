@@ -19,7 +19,7 @@ function makePlugin(): { plugin: never; handlers: Record<string, Handler>; unloa
 	};
 	const plugin = {
 		app: {
-			workspace: { onLayoutReady: (callback: () => void) => callback() },
+			workspace: { onLayoutReady: (callback: () => void) => callback(), on },
 			vault: { on, getFiles: () => [], cachedRead: async () => "" },
 			metadataCache: { on },
 		},

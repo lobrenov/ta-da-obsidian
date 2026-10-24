@@ -3,11 +3,6 @@ import { LocalDate } from "../../core/model/localDate";
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
 
-/** Today's date on the device's calendar. */
-export function localToday(now: Date = new Date()): LocalDate {
-	return LocalDate.of(now.getFullYear(), now.getMonth() + 1, now.getDate()) as LocalDate;
-}
-
 /** `Fri`. */
 export function shortWeekday(date: LocalDate): string {
 	return (weekdays[date.weekday - 1] ?? "").slice(0, 3);
@@ -43,10 +38,4 @@ export function dayMonth(date: LocalDate, today: LocalDate): string {
 /** `Thursday 1 Oct`. */
 export function wideWeekdayDayMonth(date: LocalDate): string {
 	return `${weekdays[date.weekday - 1] ?? ""} ${date.day} ${shortMonth(date)}`;
-}
-
-/** `September`, or `September 2025` in another year. */
-export function monthTitle(date: LocalDate, today: LocalDate): string {
-	const name = months[date.month - 1] ?? "";
-	return date.year === today.year ? name : `${name} ${date.year}`;
 }

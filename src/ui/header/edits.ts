@@ -7,7 +7,6 @@ import { setStatus } from "../../core/writing/completion";
 import { clearProperty, setProperty } from "../../core/writing/frontmatterEditor";
 import { type Parent, setParent } from "../../core/writing/parent";
 import { addTag, removeTag } from "../../core/writing/tagEditor";
-import { trimBlanks } from "../../core/text";
 
 /** Sets a status; nothing when the file already has it. */
 export function statusEdit(status: Status, path: string, today: LocalDate): Edit {

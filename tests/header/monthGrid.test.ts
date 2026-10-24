@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LocalDate } from "../../src/core/model/localDate";
-import { monthGrid, monthTitle, weekdayLetter, weekdayOrder } from "../../src/ui/header/monthGrid";
+import { monthGrid, weekdayLetter, weekdayOrder } from "../../src/ui/header/monthGrid";
 
 const date = (text: string): LocalDate => LocalDate.parse(text) as LocalDate;
 
@@ -27,9 +27,8 @@ describe("monthGrid", () => {
 		expect(monthGrid(date("2026-06-01"), 2)[0]?.[0]?.toString()).toBe("2026-06-01");
 	});
 
-	it("orders weekday letters and titles the month", () => {
+	it("orders weekday letters", () => {
 		expect(weekdayOrder(2).map(weekdayLetter).join("")).toBe("MTWTFSS");
 		expect(weekdayOrder(1).map(weekdayLetter).join("")).toBe("SMTWTFS");
-		expect(monthTitle(date("2026-10-15"))).toBe("October 2026");
 	});
 });

@@ -1,23 +1,14 @@
-import { type Plugin, Setting } from "obsidian";
+import { Setting } from "obsidian";
+import type { NavigatorData, SettingsStore } from "../../settingsData";
 
-export interface NavigatorData {
-	/** Open the navigator in the left sidebar when Obsidian starts. */
-	openOnStartup: boolean;
-	/** Hide the list pane, leaving only the navigation pane. */
-	collapseListPane: boolean;
-}
-
-const defaults: NavigatorData = { openOnStartup: false, collapseListPane: false };
-
-/** The navigator's settings, kept under `navigator` in the plugin's `data.json` beside any other section. */
+/** The navigator's part of the shared settings, with a call-back for the view when it changes. */
 export class NavigatorSettings {
-	data: NavigatorData = { ...defaults };
-	/** Resolves once the saved settings are read. */
-	readonly ready: Promise<void>;
 	private readonly listeners = new Set<() => void>();
 
-	constructor(private readonly plugin: Plugin) {
-		this.ready = this.load();
+	constructor(private readonly store: SettingsStore) {}
+
+	get data(): NavigatorData {
+		return this.store.data.navigator;
 	}
 
 	/** Calls `listener` after a setting changes. Returns a function that stops listening. */
@@ -27,19 +18,9 @@ export class NavigatorSettings {
 	}
 
 	async update(change: Partial<NavigatorData>): Promise<void> {
-		this.data = { ...this.data, ...change };
-		const saved = ((await this.plugin.loadData()) ?? {}) as Record<string, unknown>;
-		await this.plugin.saveData({ ...saved, navigator: this.data });
+		const saved = this.store.updateNavigator(change);
 		for (const listener of [...this.listeners]) listener();
-	}
-
-	private async load(): Promise<void> {
-		const saved = (await this.plugin.loadData()) as { navigator?: Partial<NavigatorData> } | null;
-		const stored = saved?.navigator ?? {};
-		this.data = {
-			openOnStartup: typeof stored.openOnStartup === "boolean" ? stored.openOnStartup : defaults.openOnStartup,
-			collapseListPane: typeof stored.collapseListPane === "boolean" ? stored.collapseListPane : defaults.collapseListPane,
-		};
+		await saved;
 	}
 }
 

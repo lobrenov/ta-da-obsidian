@@ -27,11 +27,3 @@ const letters = ["S", "M", "T", "W", "T", "F", "S"] as const;
 export function weekdayLetter(weekday: number): string {
 	return letters[weekday - 1] ?? "";
 }
-
-export const monthNames = [
-	"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
-] as const;
-
-export function monthTitle(month: LocalDate): string {
-	return `${monthNames[month.month - 1]} ${month.year}`;
-}

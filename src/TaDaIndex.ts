@@ -5,6 +5,10 @@ import { parseItem } from "./core/parsing/parseItem";
 const readBatch = 64;
 /** How long after the last change `onChange` listeners are called. */
 const changeDelay = 150;
+/** How long after the last edit in an editor its text goes into the index. */
+const editDelay = 300;
+/** How long a late `changed` (Obsidian's autosave) can't replace the editor text the index already took. */
+const autosaveWindow = 2000;
 
 /**
  * Obsidian's side of `VaultIndex`: built from the vault's markdown files once the layout is ready, then patched as
@@ -21,6 +25,10 @@ export class TaDaIndex {
 	private readonly generations = new Map<string, number>();
 	private readonly listeners = new Set<() => void>();
 	private changeTimer: ReturnType<typeof setTimeout> | undefined;
+	/** Per path, the timer that will take an editor's latest text. */
+	private readonly editTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Per path, the editor text last seen and when. */
+	private readonly recentEdits = new Map<string, { text: string; at: number }>();
 
 	constructor(private readonly plugin: Plugin) {
 		this.ready = new Promise((resolve) => {
@@ -32,6 +40,8 @@ export class TaDaIndex {
 		this.plugin.register(() => {
 			this.unloaded = true;
 			clearTimeout(this.changeTimer);
+			for (const timer of this.editTimers.values()) clearTimeout(timer);
+			this.editTimers.clear();
 			this.listeners.clear();
 			this.resolveReady();
 		});
@@ -68,11 +78,37 @@ export class TaDaIndex {
 	}
 
 	private registerEvents(): void {
-		const { vault, metadataCache } = this.plugin.app;
+		const { vault, metadataCache, workspace } = this.plugin.app;
 		this.plugin.registerEvent(vault.on("create", (file) => void this.read(file)));
-		this.plugin.registerEvent(metadataCache.on("changed", (file, data) => this.apply(file, data)));
+		this.plugin.registerEvent(metadataCache.on("changed", (file, data) => this.saved(file, data)));
+		this.plugin.registerEvent(workspace.on("quick-preview", (file, data) => this.edited(file, data)));
 		this.plugin.registerEvent(vault.on("rename", (file, oldPath) => this.renamed(file, oldPath)));
 		this.plugin.registerEvent(vault.on("delete", (file) => this.deleted(file)));
+	}
+
+	/**
+	 * An open editor's text, which Obsidian sends on every edit, undo included. It goes into the index after the
+	 * edits pause, so the index follows the editor ahead of the file being saved.
+	 */
+	private edited(file: TFile, text: string): void {
+		if (!isMarkdown(file)) return;
+		const path = file.path;
+		clearTimeout(this.editTimers.get(path));
+		this.recentEdits.set(path, { text, at: Date.now() });
+		this.editTimers.set(
+			path,
+			setTimeout(() => {
+				this.editTimers.delete(path);
+				this.apply(file, text);
+			}, editDelay),
+		);
+	}
+
+	/** The file as saved. Just after an edit it can be older than the editor, so the editor's text stands. */
+	private saved(file: TFile, data: string): void {
+		const recent = this.recentEdits.get(file.path);
+		const fresh = recent !== undefined && Date.now() - recent.at < autosaveWindow;
+		this.apply(file, fresh ? recent.text : data);
 	}
 
 	/** Reads a file's text and replaces its item. */
@@ -93,7 +129,7 @@ export class TaDaIndex {
 	}
 
 	/** Replaces a file's item; a file that isn't a Ta Da file or note, or that can't be parsed, leaves the index. */
-	apply(file: TFile, text: string): void {
+	private apply(file: TFile, text: string): void {
 		if (!isMarkdown(file)) return;
 		this.generations.delete(file.path);
 		try {
@@ -124,6 +160,9 @@ export class TaDaIndex {
 	/** Drops a path from the index and cancels any read pending for it. */
 	private remove(path: string): void {
 		this.generations.delete(path);
+		clearTimeout(this.editTimers.get(path));
+		this.editTimers.delete(path);
+		this.recentEdits.delete(path);
 		this.index.remove(path);
 		this.changed();
 	}
