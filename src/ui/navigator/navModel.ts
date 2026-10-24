@@ -16,6 +16,8 @@ export interface NavItem {
 	icon: IconSpec;
 	count: number | null;
 	depth: number;
+	/** Space above the row, where a block of the Tasks tree begins: each area with its projects. */
+	gap: boolean;
 	/** An area, tag parent or folder reads in strong type. */
 	strong: boolean;
 	/** The row has children: whether they show. */
@@ -50,8 +52,8 @@ function tree(ctx: ListContext, mode: NavMode, expanded: Expanded): NavItem[] {
 		case "tasks": {
 			const rows: NavItem[] = looseProjects(index).map((entry) => projectItem(ctx, entry, 0));
 			for (const { area, projects } of areaProjects(index)) {
-				rows.push({ ...item(`area:${area.path}`, { kind: "area", path: area.path }, area.title, { type: "area" }, null), strong: true });
-				rows.push(...projects.map((entry) => projectItem(ctx, entry, 1)));
+				rows.push({ ...item(`area:${area.path}`, { kind: "area", path: area.path }, area.title, { type: "area" }, null), strong: true, gap: rows.length > 0 });
+				rows.push(...projects.map((entry) => projectItem(ctx, entry, 0)));
 			}
 			return rows;
 		}
@@ -90,7 +92,7 @@ function projectItem(ctx: ListContext, entry: ProjectProgress, depth: number): N
 }
 
 function item(id: string, domain: Domain, label: string, icon: IconSpec, count: number | null): NavItem {
-	return { id, domain, label, icon, count, depth: 0, strong: false, expanded: null };
+	return { id, domain, label, icon, count, depth: 0, strong: false, gap: false, expanded: null };
 }
 
 /** The ids of the tree rows above a domain, which open to show it. */

@@ -25,14 +25,14 @@ describe("Agenda day", () => {
 			"# scheduled",
 			"# -",
 			"    Message Max about a coat and a jacket | [Not Started]",
-			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
+			"    Resolve the cabin payback | [Doing] | 1/2 | deadline Today (overdue)",
 			"    Shift my physio appointment | [Blocked]",
 			"    Submit timesheet | [Not Started]",
-			"    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct",
+			"    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left",
 			"# project Atlas Billing 1 (Work)",
-			"    Create a system testing plan | [Not Started] | 0/4 | Deadline Today (overdue)",
+			"    Create a system testing plan | [Not Started] | 0/4 | deadline Today (overdue)",
 			"# project Game Jam - Starfall 1 (Game Jams)",
-			"    Update Dan’s website for Starfall | [Doing] | 1/3 | Deadline Thu 8 Oct",
+			"    Update Dan’s website for Starfall | [Doing] | 1/3 | deadline 6 days left",
 		]);
 	});
 
@@ -40,13 +40,13 @@ describe("Agenda day", () => {
 		const model = list(day, ctx, { groupings: { agenda: "Status" } });
 		expect(describeList(model).slice(2)).toEqual([
 			"# Doing 3",
-			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
-			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | Deadline Thu 8 Oct",
-			"    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct",
+			"    Resolve the cabin payback | [Doing] | 1/2 | deadline Today (overdue)",
+			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | deadline 6 days left",
+			"    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left",
 			"# Blocked 1",
 			"    Shift my physio appointment | [Blocked]",
 			"# Not Started 3",
-			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | Deadline Today (overdue)",
+			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | deadline Today (overdue)",
 			"    Message Max about a coat and a jacket | [Not Started]",
 			"    Submit timesheet | [Not Started]",
 		]);
@@ -69,7 +69,7 @@ describe("Agenda day", () => {
 			const selection = { kind: "day", date: LocalDate.parse(date) as LocalDate } as const;
 			return describeList(list(day, context(loadFixtureIndex("DesignVault"), today, { agenda: { selection, monthOpen: false } })));
 		};
-		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct"]);
+		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left"]);
 		expect(onDay("2026-10-03")[0]).toBe("# day Saturday 3 October (Tomorrow)");
 		expect(onDay("2026-10-01")).toEqual(["# day Thursday 1 October (Yesterday) {Nothing scheduled}"]);
 	});
@@ -105,14 +105,14 @@ describe("Agenda week", () => {
 			"    day | Sun 4",
 			"# Due this week",
 			"    Frontmatter schema for tasks and projects | [Done] | in Ta Da MVP",
-			"    Message Max about a coat and a jacket | [Not Started] | Today",
-			"    Shift my physio appointment | [Blocked] | Today",
-			"    Submit timesheet | [Not Started] | Today",
-			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | Today",
-			"    Update my claude.md files | [Doing] | 2/5 | Today",
-			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | Deadline Today (overdue)",
-			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
-			"    Update 2DS before the next session | [Not Started] | Sat 3 Oct",
+			"    Message Max about a coat and a jacket | [Not Started] | due Today",
+			"    Shift my physio appointment | [Blocked] | due Today",
+			"    Submit timesheet | [Not Started] | due Today",
+			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | due Today",
+			"    Update my claude.md files | [Doing] | 2/5 | due Today",
+			"    Create a system testing plan | [Not Started] | in Atlas Billing | 0/4 | deadline Today (overdue)",
+			"    Resolve the cabin payback | [Doing] | 1/2 | deadline Today (overdue)",
+			"    Update 2DS before the next session | [Not Started] | due Sat",
 		]);
 		expect(model.sections[2]?.header).toEqual({ style: "archive", title: "Due this week", note: null });
 	});
@@ -125,7 +125,7 @@ describe("Agenda week", () => {
 	it("lists a task on each of its dates in the week", () => {
 		const index = new VaultIndex([makeItem("Ta Da/tasks/Both.md", "type: task\nstatus: Doing\ndueDate: 2026-09-29\ndeadline: 2026-10-01")]);
 		const model = week(index);
-		expect(describeList(model).slice(-3)).toEqual(["# Due this week", "    Both | [Doing] | Tue 29 Sep (overdue)", "    Both | [Doing] | Deadline Thu 1 Oct (overdue)"]);
+		expect(describeList(model).slice(-3)).toEqual(["# Due this week", "    Both | [Doing] | due 29 Sep (overdue)", "    Both | [Doing] | deadline 1 day late (overdue)"]);
 		expect(model.sections[2]?.rows.map((row) => row.id)).toEqual(["Ta Da/tasks/Both.md#due", "Ta Da/tasks/Both.md#deadline"]);
 		expect(visiblePaths(model)).toEqual(["Ta Da/tasks/Both.md"]);
 	});
@@ -141,14 +141,14 @@ describe("Loose tasks", () => {
 		expect(model.groupList).toBe("loose");
 		expect(describeList(model)).toEqual([
 			"# Doing 2",
-			"    Resolve the cabin payback | [Doing] | 1/2 | Deadline Today (overdue)",
-			"    Update my claude.md files | [Doing] | 2/5 | Deadline Tue 6 Oct",
+			"    Resolve the cabin payback | [Doing] | 1/2 | deadline Today (overdue)",
+			"    Update my claude.md files | [Doing] | 2/5 | deadline Tue",
 			"# Blocked 1",
-			"    Shift my physio appointment | [Blocked] | Today",
+			"    Shift my physio appointment | [Blocked] | due Today",
 			"# Not Started 3",
-			"    Message Max about a coat and a jacket | [Not Started] | Today",
-			"    Submit timesheet | [Not Started] | Today",
-			"    Update 2DS before the next session | [Not Started] | Sat 3 Oct",
+			"    Message Max about a coat and a jacket | [Not Started] | due Today",
+			"    Submit timesheet | [Not Started] | due Today",
+			"    Update 2DS before the next session | [Not Started] | due Sat",
 		]);
 	});
 
@@ -183,11 +183,11 @@ describe("areas and projects", () => {
 			"# sub Garden 1",
 			"    Water the beds | [Done]",
 			"# sub Ta Da 2",
-			"    Both keys | [Not Started] | Thu 1 Oct (overdue)",
+			"    Both keys | [Not Started] | due 1 Oct (overdue)",
 			"    Build the sidebar | [Doing]",
 			"# area Work 0",
 			"# sub Payroll 1",
-			"    Run payroll | [Not Started] | Deadline Today (overdue)",
+			"    Run payroll | [Not Started] | deadline Today (overdue)",
 		]);
 	});
 
@@ -196,7 +196,7 @@ describe("areas and projects", () => {
 		expect(model.header.title).toBe("Personal");
 		expect(model.header.lines).toEqual(["2 projects · 2 tasks"]);
 		expect(model.header.file).toEqual({ path: "areas/Personal.md", label: "Open area file" });
-		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# -", "    Book a dentist | [Not Started]", "    Pay rent | [Not Started] | Today"]);
+		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# -", "    Book a dentist | [Not Started]", "    Pay rent | [Not Started] | due Today"]);
 		const index = new VaultIndex([
 			makeItem("Ta Da/areas/Home.md", "type: area"),
 			makeItem("Ta Da/tasks/Open.md", 'type: task\nstatus: Doing\narea: "[[Home]]"'),
@@ -213,7 +213,7 @@ describe("areas and projects", () => {
 		expect(model.groupList).toBe("project");
 		expect(model.grouping).toBe("Open");
 		expect(model.header.lines).toEqual(["Doing · 0 of 2 done"]);
-		expect(describeList(model)).toEqual(["# Open 2", "    Both keys | [Not Started] | Thu 1 Oct (overdue)", "    Build the sidebar | [Doing] | Today"]);
+		expect(describeList(model)).toEqual(["# Open 2", "    Both keys | [Not Started] | due 1 Oct (overdue)", "    Build the sidebar | [Doing] | due Today"]);
 	});
 
 	it("keeps a finished project's tasks under Completed, folded under Date", () => {
@@ -406,7 +406,7 @@ describe("search", () => {
 		]);
 		const model = list({ kind: "search", query: "garden" }, context(index, today));
 		expect(model.header.detail).toBe("3 results");
-		expect(describeList(model)).toEqual(["# -", "    project | Garden | card | 0 of 1 done · No area", "    note | Garden ideas | Notes", "    Water the garden | [Not Started] | in Garden"]);
+		expect(describeList(model)).toEqual(["# -", "    project | Garden | card | 0 of 1 done · No area", "    note | Garden ideas | Notes", "    Water the garden | [Not Started]"]);
 		expect(list({ kind: "search", query: "zzz" }, context(index, today)).empty).toBe("No results");
 	});
 });

@@ -27,9 +27,20 @@ export function anchorOf(selection: AgendaSelection): LocalDate {
 	return selection.kind === "day" ? selection.date : selection.week.firstDay.addingDays(3);
 }
 
-/** A day, or a week when a week is selected, moved by `offset`. */
-export function stepSelection(selection: AgendaSelection, offset: number): AgendaSelection {
-	return selection.kind === "day" ? { kind: "day", date: selection.date.addingDays(offset) } : { kind: "week", week: selection.week.addingWeeks(offset) };
+/**
+ * A day, or a week when a week is selected, moved by `offset`; with `byMonth`, by whole months instead. A day keeps
+ * its day of the month (the last day of a shorter month); a week moves to the one holding its Thursday, moved by the
+ * same months.
+ */
+export function stepSelection(selection: AgendaSelection, offset: number, byMonth = false): AgendaSelection {
+	if (selection.kind === "day") {
+		const { date } = selection;
+		return { kind: "day", date: byMonth ? (date.addingMonthsKeepingDay(offset) ?? date) : date.addingDays(offset) };
+	}
+	const { week } = selection;
+	if (!byMonth) return { kind: "week", week: week.addingWeeks(offset) };
+	const thursday = week.firstDay.addingDays(3);
+	return { kind: "week", week: (thursday.addingMonthsKeepingDay(offset) ?? week.firstDay).isoWeek };
 }
 
 /** A selection on the old today moves to the new one when the day changes. */
@@ -77,8 +88,8 @@ export interface StripModel {
 	monthOpen: boolean;
 	/** `October 2026`. */
 	title: string;
-	/** What ‹ and › step: `day` or `week`. */
-	unit: "day" | "week";
+	/** What ‹ and › step: a day, a week when a week is selected, or a month while the month is open. */
+	unit: "day" | "week" | "month";
 	/** The weekday initials over the days, Monday first. */
 	initials: string[];
 	rows: StripRow[];
@@ -111,7 +122,7 @@ export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDa
 			};
 		}),
 	}));
-	return { monthOpen, title: monthTitle(titleDate(selection, monthOpen)), unit: selection.kind === "week" ? "week" : "day", initials, rows };
+	return { monthOpen, title: monthTitle(titleDate(selection, monthOpen)), unit: monthOpen ? "month" : selection.kind === "week" ? "week" : "day", initials, rows };
 }
 
 /** The saved form of an Agenda state. */

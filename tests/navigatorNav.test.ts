@@ -25,9 +25,11 @@ describe("navigation pane", () => {
 		expect(buildNav(context(index, today), "tasks", new Set()).domains[0]?.count).toBe(1);
 	});
 
-	it("lists loose projects, then each area with its active projects and their open tasks", () => {
+	it("lists loose projects, then each area with its active projects at the same left edge, a gap before each area", () => {
 		const nav = buildNav(context(loadFixtureIndex("AreaVault"), today), "tasks", new Set());
-		expect(describeItems(nav.tree)).toEqual(["Lost 1", "Side quest 1", "Empty", "Personal", "  Ta Da 2", "Work", "  Payroll 1"]);
+		expect(describeItems(nav.tree)).toEqual(["Lost 1", "Side quest 1", "Empty", "Personal", "Ta Da 2", "Work", "Payroll 1"]);
+		expect(nav.tree.every((item) => item.depth === 0)).toBe(true);
+		expect(nav.tree.filter((item) => item.gap).map((item) => item.label)).toEqual(["Empty", "Personal", "Work"]);
 		expect(nav.tree.filter((item) => item.strong).map((item) => item.label)).toEqual(["Empty", "Personal", "Work"]);
 	});
 

@@ -326,8 +326,8 @@ export class NavigatorView extends ItemView {
 		this.save();
 	}
 
-	private stepAgenda(offset: number): void {
-		this.setAgenda({ selection: stepSelection(this.agenda.selection, offset) });
+	private stepAgenda(offset: number, byMonth = this.agenda.monthOpen): void {
+		this.setAgenda({ selection: stepSelection(this.agenda.selection, offset, byMonth) });
 	}
 
 	private toggleTask(row: TaskRowModel): void {
@@ -359,7 +359,7 @@ export class NavigatorView extends ItemView {
 			this.move(event.key === "ArrowDown" ? 1 : -1);
 		} else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && this.domain.kind === "agenda" && this.query.trim() === "") {
 			event.preventDefault();
-			this.stepAgenda(event.key === "ArrowRight" ? 1 : -1);
+			this.stepAgenda(event.key === "ArrowRight" ? 1 : -1, false);
 		} else if (event.key === "Enter" && this.selected !== null && this.paths.includes(this.selected)) {
 			event.preventDefault();
 			this.openPath(this.selected, event);
@@ -404,7 +404,7 @@ export class NavigatorView extends ItemView {
 	}
 
 	private navRow(parent: HTMLElement, item: NavItem, active: boolean, room: boolean): void {
-		const outer = parent.createDiv({ cls: "tree-item ta-da-nav-item" });
+		const outer = parent.createDiv({ cls: `tree-item ta-da-nav-item${item.gap ? " has-gap" : ""}` });
 		const self = outer.createDiv({ cls: `tree-item-self is-clickable${active ? " is-active" : ""}` });
 		self.style.setProperty("--ta-da-depth", String(item.depth));
 		if (item.expanded !== null) {
@@ -478,11 +478,16 @@ export class NavigatorView extends ItemView {
 		this.renderFilter(head, list);
 	}
 
-	/** The Group menu's button, on lists that have a Group choice. */
+	/** The Group pill, on lists that have a Group choice: `Group Status ▾`, opening the menu. */
 	private groupButton(parent: HTMLElement, list: ListModel): void {
 		const groupList = list.groupList;
 		if (!groupList) return;
-		this.iconButton(parent, "list", "Group", (event) => {
+		const pill = parent.createEl("button", { cls: "ta-da-pill ta-da-group-pill", attr: { "aria-label": `Group: ${list.grouping ?? ""}` } });
+		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "list");
+		pill.createSpan({ cls: "ta-da-pill-label", text: "Group" });
+		pill.createSpan({ cls: "ta-da-pill-value", text: list.grouping ?? "" });
+		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "chevron-down");
+		pill.addEventListener("click", (event) => {
 			const menu = new Menu();
 			for (const choice of groupChoices[groupList]) {
 				menu.addItem((entry) => entry.setTitle(choice).setChecked(choice === list.grouping).onClick(() => this.setGrouping(choice)));
@@ -500,7 +505,7 @@ export class NavigatorView extends ItemView {
 			const button = size.createEl("button", { cls: open === strip.monthOpen ? "is-active" : "", text: label, attr: { "aria-pressed": String(open === strip.monthOpen) } });
 			button.addEventListener("click", () => this.setAgenda({ monthOpen: open }));
 		}
-		const stepper = controls.createDiv({ cls: "ta-da-stepper", attr: { role: "group", "aria-label": "Move through days" } });
+		const stepper = controls.createDiv({ cls: "ta-da-stepper", attr: { role: "group", "aria-label": `Move through ${strip.unit}s` } });
 		const previous = stepper.createEl("button", { attr: { "aria-label": `Previous ${strip.unit}` } });
 		setIcon(previous, "chevron-left");
 		previous.addEventListener("click", () => this.stepAgenda(-1));
@@ -546,6 +551,7 @@ export class NavigatorView extends ItemView {
 		const pill = row.createEl("button", { cls: "ta-da-pill" });
 		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "list-filter");
 		pill.createSpan({ text: "Filter" });
+		if (!filter.tags.some((tag) => tag.picked)) pill.addClass("is-dashed");
 		pill.addEventListener("click", (event) => {
 			const menu = new Menu();
 			menu.addItem((entry) => entry.setTitle("Tags in this view").setIsLabel(true));
@@ -598,7 +604,7 @@ export class NavigatorView extends ItemView {
 				break;
 			}
 			case "project": {
-				const el = parent.createDiv({ cls: `ta-da-group-header is-parent is-link${header.sub ? " is-sub" : ""}` });
+				const el = parent.createDiv({ cls: `ta-da-group-header is-parent is-link` });
 				drawIcon(el.createSpan({ cls: "ta-da-group-icon" }), header.icon);
 				el.createSpan({ cls: "ta-da-group-title", text: header.title });
 				if (header.area) el.createSpan({ cls: "ta-da-group-area", text: header.area });
@@ -684,34 +690,22 @@ export class NavigatorView extends ItemView {
 		el.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: row.date } }));
 	}
 
+	/** A task on one line: its box, a date pill, the title, quiet glyphs, and the place at the right. */
 	private taskRow(parent: HTMLElement, row: TaskRowModel): HTMLElement {
 		const el = parent.createDiv({ cls: `ta-da-row is-task${row.closed ? " is-closed" : ""}` });
 		drawCheckbox(el, row.status, `${row.closed ? (row.status === "Done" ? "Mark not done" : "Reopen") : "Complete"}: ${row.title}`, (event) => {
 			event.stopPropagation();
 			this.toggleTask(row);
 		});
-		const main = el.createDiv({ cls: "ta-da-row-main" });
-		main.createSpan({ cls: "ta-da-row-title", text: row.title });
-		const hasMeta = row.place !== null || row.subtasks !== null || row.date !== null || row.tags > 0;
-		if (hasMeta) {
-			const meta = main.createDiv({ cls: "ta-da-row-meta" });
-			if (row.place) meta.createSpan({ text: row.place });
-			if (row.subtasks) {
-				const span = meta.createSpan({ cls: "ta-da-meta-item", attr: { "aria-label": `${row.subtasks.done} of ${row.subtasks.total} subtasks done` } });
-				metaIcon(span, "list-checks");
-				span.appendText(`${row.subtasks.done}/${row.subtasks.total}`);
-			}
-			if (row.tags > 0) {
-				const span = meta.createSpan({ cls: "ta-da-meta-item", attr: { "aria-label": row.tags === 1 ? "1 tag" : `${row.tags} tags` } });
-				metaIcon(span, "tag", "accent");
-				span.appendText(String(row.tags));
-			}
-			if (row.date) {
-				const span = meta.createSpan({ cls: `ta-da-meta-item is-date${row.date.overdue ? " is-overdue" : ""}` });
-				metaIcon(span, row.date.kind === "due" ? "calendar" : "flag", row.date.kind === "due" ? "due" : "deadline");
-				span.appendText(row.date.text);
-			}
+		if (row.date) el.createSpan({ cls: `ta-da-date-pill${row.date.overdue ? " is-overdue" : ""}`, text: row.date.text, attr: { "aria-label": row.date.tooltip } });
+		el.createSpan({ cls: "ta-da-row-title", text: row.title, attr: { title: row.title } });
+		if (row.note || row.subtasks || row.tags > 0) {
+			const glyphs = el.createSpan({ cls: "ta-da-glyphs" });
+			if (row.note) metaIcon(glyphs, "file-text").setAttribute("aria-label", "Has a note");
+			if (row.subtasks) metaIcon(glyphs, "list-checks").setAttribute("aria-label", `${row.subtasks.done} of ${row.subtasks.total} subtasks done`);
+			if (row.tags > 0) metaIcon(glyphs, "tag", "accent").setAttribute("aria-label", row.tags === 1 ? "1 tag" : `${row.tags} tags`);
 		}
+		if (row.place) el.createSpan({ cls: "ta-da-row-place", text: row.place, attr: { "aria-label": `In ${row.place}` } });
 		el.addEventListener("contextmenu", (event) => this.statusMenu(row.path, event));
 		return el;
 	}

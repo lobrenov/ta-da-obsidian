@@ -45,3 +45,19 @@ export function fullDate(date: LocalDate, today: LocalDate): string {
 	const text = `${weekdays[date.weekday - 1] ?? ""} ${date.day} ${months[date.month - 1] ?? ""}`;
 	return date.year === today.year ? text : `${text} ${date.year}`;
 }
+
+/** A task row's date, short: `Today`, the weekday for the next six days (`Thu`), else `29 Oct` (with the year when it isn't `today`'s). */
+export function rowLabel(date: LocalDate, today: LocalDate): string {
+	const days = today.daysTo(date);
+	if (days === 0) return "Today";
+	if (days >= 1 && days <= 6) return shortWeekday(date);
+	return dayMonth(date, today);
+}
+
+/** A deadline's distance: `Today`, `3 days left` or `1 day late`. */
+export function deadlineLabel(date: LocalDate, today: LocalDate): string {
+	const days = today.daysTo(date);
+	if (days === 0) return "Today";
+	const count = Math.abs(days);
+	return `${count} day${count === 1 ? "" : "s"} ${days > 0 ? "left" : "late"}`;
+}

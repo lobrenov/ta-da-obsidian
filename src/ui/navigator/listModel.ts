@@ -474,7 +474,7 @@ function searchList(domain: Extract<Domain, { kind: "search" }>, ctx: ListContex
 	const rows: ListRow[] = hits.map((item) => {
 		switch (item.properties.kind) {
 			case "task":
-				return taskRow(index, item, today, { dates: "elsewhere", place: true });
+				return taskRow(index, item, today, { dates: "elsewhere", place: false });
 			case "note":
 				return noteRow(item, true);
 			default:

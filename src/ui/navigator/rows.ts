@@ -6,7 +6,7 @@ import { type Item, subtasks as subtasksOf } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed, type Status } from "../../core/model/status";
 import { linkTitle } from "../../core/model/wikiLink";
-import { capitalised, relativeLabel } from "./dates";
+import { capitalised, deadlineLabel, relativeLabel, rowLabel } from "./dates";
 
 /** The colour a glyph takes, named as the design's tokens. The DOM layer maps them to Obsidian's variables. */
 export type Tint = "due" | "deadline" | "done" | "doing" | "blocked" | "accent" | "muted" | "link";
@@ -22,6 +22,8 @@ export interface RowDate {
 	kind: "due" | "deadline";
 	text: string;
 	overdue: boolean;
+	/** The kind and full date, for the pill's tooltip and the screen reader. */
+	tooltip: string;
 }
 
 export interface TaskRowModel {
@@ -35,6 +37,8 @@ export interface TaskRowModel {
 	/** The task's project or area, where the list's groups don't name it. */
 	place: string | null;
 	subtasks: { done: number; total: number } | null;
+	/** The body has more than checkboxes. */
+	note: boolean;
 	date: RowDate | null;
 	tags: number;
 }
@@ -120,31 +124,46 @@ export function taskRow(index: VaultIndex, task: Item, today: LocalDate, options
 		closed: isClosed(p.status),
 		place: options.place ? (index.parentOf(task)?.title ?? null) : null,
 		subtasks: subtasks.total > 0 ? subtasks : null,
+		note: task.hasNote,
 		date: rowDate(task, today, options),
 		tags: task.tags.length,
 	};
 }
 
 /**
- * A task's one date: the deadline when set, else the due date; closed tasks show none. The Agenda shows a due date
- * only when it's overdue. A week's entry shows its own kind and date.
+ * A task's one date, a pill before the title: the deadline when set, else the due date; closed tasks show none. The
+ * Agenda shows a due date only when it's overdue and reads a deadline as `Today`, `3 days left` or `1 day late`; a
+ * week's entry shows its own kind and date. Elsewhere the date is short (`Today`, `Thu`, `29 Oct`).
  */
 export function rowDate(task: Item, today: LocalDate, options: Pick<TaskRowOptions, "dates" | "entry">): RowDate | null {
 	const p = task.properties;
 	if (isClosed(p.status)) return null;
-	if (options.entry) return dateOf(options.entry.kind, options.entry.date, today);
-	if (p.deadline) return dateOf("deadline", p.deadline, today);
-	if (p.dueDate && (options.dates === "elsewhere" || p.dueDate.compare(today) < 0)) return dateOf("due", p.dueDate, today);
+	const agenda = options.dates === "agenda";
+	if (options.entry) return pillOf(options.entry.kind, options.entry.date, today, agenda);
+	if (p.deadline) return pillOf("deadline", p.deadline, today, agenda);
+	if (p.dueDate && (!agenda || p.dueDate.compare(today) < 0)) return pillOf("due", p.dueDate, today, agenda);
 	return null;
 }
 
-/** A date as a row shows it: a deadline reads `Deadline Tue 6 Oct`, a due date `Tue 6 Oct`. */
+/** The pill for a date: overdue when it's past, or a deadline is today. */
+function pillOf(kind: "due" | "deadline", date: LocalDate, today: LocalDate, agenda: boolean): RowDate {
+	const past = date.compare(today) < 0;
+	return {
+		kind,
+		text: agenda && kind === "deadline" ? deadlineLabel(date, today) : rowLabel(date, today),
+		overdue: past || (kind === "deadline" && date.equals(today)),
+		tooltip: `${kind === "deadline" ? "Deadline" : "Due"} ${relativeLabel(date, today)}${past ? ", overdue" : ""}`,
+	};
+}
+
+/** A date as a project's quiet line says it: a deadline reads `Deadline Tue 6 Oct`, a due date `Tue 6 Oct`. */
 export function dateOf(kind: "due" | "deadline", date: LocalDate, today: LocalDate): RowDate {
 	const label = capitalised(relativeLabel(date, today));
 	return {
 		kind,
 		text: kind === "deadline" ? `Deadline ${label}` : label,
 		overdue: date.compare(today) < 0 || (kind === "deadline" && date.equals(today)),
+		tooltip: `${kind === "deadline" ? "Deadline" : "Due"} ${relativeLabel(date, today)}`,
 	};
 }
 
@@ -166,7 +185,7 @@ export function lineRow(index: VaultIndex, project: Item, today: LocalDate): Par
 		variant: "line",
 		icon: projectIcon(index, project),
 		meta: null,
-		deadline: p.deadline && !isClosed(p.status) ? dateOf("deadline", p.deadline, today) : null,
+		deadline: p.deadline && !isClosed(p.status) ? { ...dateOf("deadline", p.deadline, today), text: capitalised(relativeLabel(p.deadline, today)) } : null,
 		open: total - done > 0 ? total - done : null,
 		tags: project.tags.length,
 	};

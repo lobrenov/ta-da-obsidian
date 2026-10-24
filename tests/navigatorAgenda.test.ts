@@ -102,6 +102,37 @@ describe("stepping", () => {
 		expect(stepSelection(week(2026, 40), -2)).toEqual(week(2026, 38));
 	});
 
+	it("steps a day by a month, keeping its day of the month, or the last day of a shorter month", () => {
+		expect(stepSelection(day("2026-10-14"), 1, true)).toEqual(day("2026-11-14"));
+		expect(stepSelection(day("2026-10-14"), -1, true)).toEqual(day("2026-09-14"));
+		expect(stepSelection(day("2026-01-31"), 1, true)).toEqual(day("2026-02-28"));
+		expect(stepSelection(day("2026-03-31"), -1, true)).toEqual(day("2026-02-28"));
+		expect(stepSelection(day("2026-12-15"), 1, true)).toEqual(day("2027-01-15"));
+		expect(stepSelection(day("2026-01-15"), -1, true)).toEqual(day("2025-12-15"));
+	});
+
+	it("steps a week by a month to the week holding its Thursday, moved by the same months", () => {
+		// Week 40 of 2026 has Thursday 1 Oct; a month on, Thursday 1 Nov is in week 44 (26 Oct to 1 Nov).
+		expect(stepSelection(week(2026, 40), 1, true)).toEqual(week(2026, 44));
+		expect(stepSelection(week(2026, 40), -1, true)).toEqual(week(2026, 36));
+		expect(stepSelection(week(2026, 53), 1, true)).toEqual(week(2027, 4));
+	});
+
+	it("shows the strip's month after stepping by a month", () => {
+		const stepped = stepSelection(day("2026-10-14"), 1, true);
+		expect(buildStrip(none, state(stepped, true), today).title).toBe("November 2026");
+		// A week's month is its Thursday's: week 44's Thursday is 29 Oct, so a week stepped from 1 Oct still shows October.
+		const weekStepped = stepSelection(week(2026, 40), 1, true);
+		expect(buildStrip(none, state(weekStepped, true), today).title).toBe("October 2026");
+		expect(buildStrip(none, state(stepSelection(weekStepped, 1, true), true), today).title).toBe("November 2026");
+	});
+
+	it("names a month as the unit of the arrows while the month is open", () => {
+		expect(buildStrip(none, state(day("2026-10-14"), true), today).unit).toBe("month");
+		expect(buildStrip(none, state(day("2026-10-14")), today).unit).toBe("day");
+		expect(buildStrip(none, state(week(2026, 40)), today).unit).toBe("week");
+	});
+
 	it("goes back to today's day", () => {
 		expect(agendaOn(today)).toEqual(state(day("2026-10-02")));
 	});
