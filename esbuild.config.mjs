@@ -39,6 +39,7 @@ const copyToVault = {
 			if (result.errors.length > 0 || !pluginFolder) return;
 			copyFileSync("main.js", join(pluginFolder, "main.js"));
 			copyFileSync("manifest.json", join(pluginFolder, "manifest.json"));
+			copyFileSync("styles.css", join(pluginFolder, "styles.css"));
 		});
 	},
 };

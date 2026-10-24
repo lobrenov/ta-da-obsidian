@@ -1,20 +1,31 @@
 import { Notice, Plugin, TFile } from "obsidian";
-import { LocalDate } from "./core/model/localDate";
 import { statuses } from "./core/model/status";
-import { parseItem } from "./core/parsing/parseItem";
-import { setStatus } from "./core/writing/completion";
+import { TaDaSettingTab } from "./settings";
+import { defaultSettings, resolveSettings, type TaDaSettings } from "./settingsData";
 import { TaDaIndex } from "./TaDaIndex";
+import { statusEdit } from "./ui/header/edits";
+import { registerHeader } from "./ui/header/registerHeader";
+import { today } from "./ui/header/today";
 import { Writer } from "./Writer";
 
 export default class TaDaPlugin extends Plugin {
 	taDaIndex!: TaDaIndex;
 	writer!: Writer;
+	override settings: TaDaSettings = { ...defaultSettings };
 
-	override onload(): void {
+	override async onload(): Promise<void> {
+		this.settings = resolveSettings(await this.loadData());
 		this.taDaIndex = new TaDaIndex(this);
 		this.taDaIndex.start();
 		this.writer = new Writer(this.app);
 		this.addStatusCommands();
+		const header = registerHeader(this, this.taDaIndex, this.writer, this.settings);
+		this.addSettingTab(
+			new TaDaSettingTab(this.app, this, this.settings, () => {
+				void this.saveData(this.settings);
+				header.refresh();
+			}),
+		);
 	}
 
 	/** One `Set status` command per status, on the active task or project file. */
@@ -32,9 +43,7 @@ export default class TaDaPlugin extends Plugin {
 					if (status === "Ongoing" && kind !== "project") return false;
 					if (!checking) {
 						this.writer
-							.apply(file, (text) =>
-								parseItem(text, file.path)?.properties.status === status ? null : setStatus(status, text, today()),
-							)
+							.apply(file, statusEdit(status, file.path, today()))
 							.catch((error: unknown) => {
 								new Notice(`Couldn't set the status: ${error instanceof Error ? error.message : String(error)}`);
 							});
@@ -44,9 +53,4 @@ export default class TaDaPlugin extends Plugin {
 			});
 		}
 	}
-}
-
-function today(): LocalDate {
-	const now = new Date();
-	return LocalDate.of(now.getFullYear(), now.getMonth() + 1, now.getDate()) as LocalDate;
 }
