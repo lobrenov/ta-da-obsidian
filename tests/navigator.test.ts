@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultDailyNoteNames } from "../src/core/index/dailyNotes";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { LocalDate } from "../src/core/model/localDate";
 import { trashedItems } from "../src/core/storage/trash";
@@ -22,6 +23,7 @@ describe("Agenda day", () => {
 		expect(model.groupList).toBe("agenda");
 		expect(describeList(model)).toEqual([
 			"# day Friday 2 October (Today)",
+			"    periodNote | Daily note | 2026-10-02.md | Standup ran long; the release moves to Tuesday. | 1/3",
 			"# scheduled",
 			"# -",
 			"    Message Max about a coat and a jacket | [Not Started]",
@@ -38,7 +40,7 @@ describe("Agenda day", () => {
 
 	it("names each task's place under Status and Open, where no group names it", () => {
 		const model = list(day, ctx, { groupings: { agenda: "Status" } });
-		expect(describeList(model).slice(2)).toEqual([
+		expect(describeList(model).slice(3)).toEqual([
 			"# Doing 3",
 			"    Resolve the cabin payback | [Doing] | 1/2 | deadline Today (overdue)",
 			"    Update Dan’s website for Starfall | [Doing] | in Game Jam - Starfall | 1/3 | deadline 6 days left",
@@ -59,7 +61,7 @@ describe("Agenda day", () => {
 			makeItem("Ta Da/tasks/Due.md", "type: task\nstatus: Not Started\ndueDate: 2026-10-02"),
 		]);
 		const status = list(day, context(index, today), { groupings: { agenda: "Status" } });
-		expect(describeList(status).slice(2)).toEqual(["# Not Started 1", "    Due | [Not Started]", "+ quiet Done 1", "    Finished | [Done]"]);
+		expect(describeList(status).slice(3)).toEqual(["# Not Started 1", "    Due | [Not Started]", "+ quiet Done 1", "    Finished | [Done]"]);
 		const opened = list(day, context(index, today), { groupings: { agenda: "Status" }, folds: new Set(["agenda|Status: Done"]) });
 		expect(opened.sections.slice(2).map((section) => section.folded)).toEqual([false, false]);
 	});
@@ -69,14 +71,17 @@ describe("Agenda day", () => {
 			const selection = { kind: "day", date: LocalDate.parse(date) as LocalDate } as const;
 			return describeList(list(day, context(loadFixtureIndex("DesignVault"), today, { agenda: { selection, monthOpen: false } })));
 		};
-		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left"]);
+		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "    periodNote | Daily note | create | 2026-10-06.md", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left"]);
 		expect(onDay("2026-10-03")[0]).toBe("# day Saturday 3 October (Tomorrow)");
-		expect(onDay("2026-10-01")).toEqual(["# day Thursday 1 October (Yesterday) {Nothing scheduled}"]);
+		expect(onDay("2026-10-01")).toEqual([
+			"# day Thursday 1 October (Yesterday) {Nothing scheduled}",
+			"    periodNote | Daily note | 2026-10-01.md | Two tab bar options sketched; Other stays as the fifth tab. | 1 open | 1/2",
+		]);
 	});
 
 	it("says nothing is scheduled on an empty day", () => {
 		const model = list(day, context(new VaultIndex(), today));
-		expect(describeList(model)).toEqual(["# day Friday 2 October (Today) {Nothing scheduled}"]);
+		expect(describeList(model)).toEqual(["# day Friday 2 October (Today) {Nothing scheduled}", "    periodNote | Daily note | create | 2026-10-02.md"]);
 		expect(model.filter).toBeNull();
 	});
 
@@ -95,12 +100,13 @@ describe("Agenda week", () => {
 		expect(model.filter).toBeNull();
 		expect(describeList(model)).toEqual([
 			"# week Week 40 28 Sep – 4 Oct (this week)",
+			"    periodNote | Week note | 2026-W40.md | 1/3",
 			"# -",
 			"    day | Mon 28",
 			"    day | Tue 29",
 			"    day | Wed 30",
-			"    day | Thu 1",
-			"    day | Fri 2 | 7 due | dot | today",
+			"    day | Thu 1 | ring",
+			"    day | Fri 2 | 7 due | dot | ring | today",
 			"    day | Sat 3 | 1 due | dot",
 			"    day | Sun 4",
 			"# Due this week",
@@ -119,7 +125,26 @@ describe("Agenda week", () => {
 
 	it("has no file in a day's row, so the arrow keys pass it", () => {
 		const model = week(loadFixtureIndex("DesignVault"));
-		expect(visibleRows(model).every((row) => row.type === "task")).toBe(true);
+		expect(visibleRows(model).every((row) => row.type === "task" || row.type === "periodNote")).toBe(true);
+	});
+
+	it("opens the week's note from its row, or offers to create it where the folder is", () => {
+		const model = week(new VaultIndex());
+		expect(model.sections[0]?.rows).toMatchObject([{ type: "periodNote", path: null, name: "Week note", target: "Periodic Notes/Weekly Notes/2026-W40.md", file: "2026-W40.md" }]);
+		const found = week(loadFixtureIndex("DesignVault"));
+		expect(found.sections[0]?.rows).toMatchObject([{ type: "periodNote", path: "Periodic Notes/Weekly Notes/2026-W40.md" }]);
+		expect(visiblePaths(found)).toContain("Periodic Notes/Weekly Notes/2026-W40.md");
+	});
+
+	it("leaves out the week note's row when week notes are off, and looks in the settings' folder", () => {
+		const index = loadFixtureIndex("DesignVault");
+		const selection = { kind: "week", week: today.isoWeek } as const;
+		const off = list({ kind: "agenda" }, context(index, today, { agenda: { selection, monthOpen: false }, notes: { names: defaultDailyNoteNames, weekNotes: false } }));
+		expect(off.sections[0]?.rows).toEqual([]);
+		const elsewhere = { dailyFolder: "Journal", weekFolder: "Weeks" };
+		const moved = list({ kind: "agenda" }, context(index, today, { agenda: { selection, monthOpen: false }, notes: { names: elsewhere, weekNotes: true } }));
+		expect(moved.sections[0]?.rows).toMatchObject([{ path: null, target: "Weeks/2026-W40.md" }]);
+		expect(describeList(moved).filter((line) => line.includes("ring"))).toEqual([]);
 	});
 
 	it("lists a task on each of its dates in the week", () => {
@@ -170,6 +195,7 @@ describe("areas and projects", () => {
 	it("groups the Agenda by area, each area's projects under it, and a project's missing area beside its name", () => {
 		expect(describeList(list({ kind: "agenda" }, ctx))).toEqual([
 			"# day Friday 2 October (Today)",
+			"    periodNote | Daily note | create | 2026-10-02.md",
 			"# scheduled",
 			"# -",
 			"    Buy milk | [Not Started]",
@@ -320,7 +346,7 @@ describe("tag filter", () => {
 		]);
 		const onDay = { kind: "day", date: date("2026-10-05") } as const;
 		const agenda = list({ kind: "agenda" }, context(dated, today, { agenda: { selection: onDay, monthOpen: false } }), { picked: new Set(["x"]) });
-		expect(describeList(agenda).slice(2)).toEqual(["# -", "    A | [Not Started] | 1 tag"]);
+		expect(describeList(agenda).slice(3)).toEqual(["# -", "    A | [Not Started] | 1 tag"]);
 		expect(agenda.filter).toMatchObject({ shown: 1, total: 2 });
 		const area = list({ kind: "area", path: "Ta Da/areas/Home.md" }, context(dated, today), { picked: new Set(["x"]) });
 		expect(describeList(area)).toEqual(["# -", "    project | P | line"]);

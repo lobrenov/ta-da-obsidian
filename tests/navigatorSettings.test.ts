@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveData, SettingsStore } from "../src/settingsData";
+import { cleanedFolder, defaultDailyNotes, resolveData, SettingsStore } from "../src/settingsData";
 import { readGroupings } from "../src/ui/navigator/domain";
 import { maxParallelReads, readTrash } from "../src/TaDaTrash";
 
@@ -26,7 +26,7 @@ describe("SettingsStore", () => {
 		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: true } });
 		const store = new SettingsStore(plugin);
 		await store.load();
-		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false } });
+		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false }, dailyNotes: defaultDailyNotes });
 	});
 
 	it("keeps the one data object, so what holds it sees a loaded or changed value", async () => {
@@ -47,7 +47,7 @@ describe("SettingsStore", () => {
 		const header = store.save();
 		const navigator = store.updateNavigator({ openOnStartup: true });
 		await Promise.all([header, navigator]);
-		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false } });
+		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false }, dailyNotes: defaultDailyNotes });
 	});
 
 	it("writes one at a time, the last write holding the latest state, even when an earlier write is slower", async () => {
@@ -57,8 +57,17 @@ describe("SettingsStore", () => {
 		const second = store.updateNavigator({ collapseListPane: true });
 		await Promise.all([first, second]);
 		expect(writes).toHaveLength(2);
-		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: true, collapseListPane: true } });
+		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: true, collapseListPane: true }, dailyNotes: defaultDailyNotes });
 		expect(disk()).toEqual(writes[1]);
+	});
+
+	it("saves the daily notes' settings with the rest", async () => {
+		const { plugin, disk } = makePlugin();
+		const store = new SettingsStore(plugin);
+		await store.load();
+		await store.updateDailyNotes({ weekNotes: false, dailyTemplate: "T.md" });
+		expect(store.data.dailyNotes).toEqual({ ...defaultDailyNotes, weekNotes: false, dailyTemplate: "T.md" });
+		expect(disk()).toEqual(store.data);
 	});
 
 	it("keeps saving after a save fails", async () => {
@@ -71,10 +80,23 @@ describe("SettingsStore", () => {
 
 describe("resolveData", () => {
 	it("gives defaults for nothing saved and for a wrong type", () => {
-		const defaults = { hideProperties: true, navigator: { openOnStartup: false, collapseListPane: false } };
+		const defaults = { hideProperties: true, navigator: { openOnStartup: false, collapseListPane: false }, dailyNotes: defaultDailyNotes };
 		expect(resolveData(null)).toEqual(defaults);
 		expect(resolveData({ navigator: "x" })).toEqual(defaults);
 		expect(resolveData({ navigator: { openOnStartup: "yes" } })).toEqual(defaults);
+		expect(resolveData({ dailyNotes: "x" })).toEqual(defaults);
+		expect(resolveData({ dailyNotes: { dailyFolder: 3, weekNotes: "no", dailyTemplate: 4, weekFolder: null } })).toEqual(defaults);
+	});
+
+	it("reads the daily notes' settings, tidying folders and reading an empty template as none", () => {
+		const saved = { dailyNotes: { dailyFolder: " /Journal/ ", dailyTemplate: "Templates/Day.md", weekNotes: false, weekFolder: "", weekTemplate: "" } };
+		expect(resolveData(saved).dailyNotes).toEqual({ dailyFolder: "Journal", dailyTemplate: "Templates/Day.md", weekNotes: false, weekFolder: "", weekTemplate: null });
+	});
+
+	it("cleans a typed folder of surrounding spaces and slashes", () => {
+		expect(cleanedFolder("  //Periodic Notes/Daily Notes/ ")).toBe("Periodic Notes/Daily Notes");
+		expect(cleanedFolder(" / ")).toBe("");
+		expect(cleanedFolder("A B/C")).toBe("A B/C");
 	});
 });
 

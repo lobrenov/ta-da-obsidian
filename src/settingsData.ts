@@ -20,14 +20,50 @@ export interface NavigatorData {
 
 export const defaultNavigator: NavigatorData = { openOnStartup: false, collapseListPane: false };
 
-/** Everything `data.json` holds: the header's settings and the navigator's, under `navigator`. */
+/** Settings ▸ Daily notes: the folders daily and week notes live in, whether week notes show, and the notes new ones start from, by path. */
+export interface DailyNotesData {
+	dailyFolder: string;
+	dailyTemplate: string | null;
+	weekNotes: boolean;
+	weekFolder: string;
+	weekTemplate: string | null;
+}
+
+export const defaultDailyNotes: DailyNotesData = {
+	dailyFolder: "Periodic Notes/Daily Notes",
+	dailyTemplate: null,
+	weekNotes: true,
+	weekFolder: "Periodic Notes/Weekly Notes",
+	weekTemplate: null,
+};
+
+/** A typed folder without surrounding whitespace or slashes; empty is the vault's top level. */
+export function cleanedFolder(text: string): string {
+	return text.replace(/^[\s/]+|[\s/]+$/g, "");
+}
+
+/** Everything `data.json` holds: the header's settings, the navigator's under `navigator` and the notes' under `dailyNotes`. */
 export interface TaDaData extends TaDaSettings {
 	navigator: NavigatorData;
+	dailyNotes: DailyNotesData;
+}
+
+function resolveDailyNotes(saved: unknown): DailyNotesData {
+	const stored = typeof saved === "object" && saved !== null ? (saved as Partial<Record<keyof DailyNotesData, unknown>>) : {};
+	const folder = (value: unknown, fallback: string): string => (typeof value === "string" ? cleanedFolder(value) : fallback);
+	const template = (value: unknown): string | null => (typeof value === "string" && value !== "" ? value : null);
+	return {
+		dailyFolder: folder(stored.dailyFolder, defaultDailyNotes.dailyFolder),
+		dailyTemplate: template(stored.dailyTemplate),
+		weekNotes: typeof stored.weekNotes === "boolean" ? stored.weekNotes : defaultDailyNotes.weekNotes,
+		weekFolder: folder(stored.weekFolder, defaultDailyNotes.weekFolder),
+		weekTemplate: template(stored.weekTemplate),
+	};
 }
 
 /** The saved data over the defaults; a section or value of the wrong type gives its default. */
 export function resolveData(saved: unknown): TaDaData {
-	const data = typeof saved === "object" && saved !== null ? (saved as { navigator?: unknown }) : {};
+	const data = typeof saved === "object" && saved !== null ? (saved as { navigator?: unknown; dailyNotes?: unknown }) : {};
 	const stored = typeof data.navigator === "object" && data.navigator !== null ? (data.navigator as Partial<Record<keyof NavigatorData, unknown>>) : {};
 	return {
 		...resolveSettings(saved),
@@ -35,6 +71,7 @@ export function resolveData(saved: unknown): TaDaData {
 			openOnStartup: typeof stored.openOnStartup === "boolean" ? stored.openOnStartup : defaultNavigator.openOnStartup,
 			collapseListPane: typeof stored.collapseListPane === "boolean" ? stored.collapseListPane : defaultNavigator.collapseListPane,
 		},
+		dailyNotes: resolveDailyNotes(data.dailyNotes),
 	};
 }
 
@@ -49,7 +86,7 @@ export interface DataPlugin {
  * holds it sees every change; every save writes all of it, one at a time, in the order asked.
  */
 export class SettingsStore {
-	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator } };
+	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator }, dailyNotes: { ...defaultDailyNotes } };
 	private queue: Promise<void> = Promise.resolve();
 
 	constructor(private readonly plugin: DataPlugin) {}
@@ -58,6 +95,7 @@ export class SettingsStore {
 		const loaded = resolveData(await this.plugin.loadData());
 		this.data.hideProperties = loaded.hideProperties;
 		this.data.navigator = loaded.navigator;
+		this.data.dailyNotes = loaded.dailyNotes;
 	}
 
 	/** Writes the whole of `data` after any save already waiting. */
@@ -69,6 +107,11 @@ export class SettingsStore {
 
 	updateNavigator(change: Partial<NavigatorData>): Promise<void> {
 		this.data.navigator = { ...this.data.navigator, ...change };
+		return this.save();
+	}
+
+	updateDailyNotes(change: Partial<DailyNotesData>): Promise<void> {
+		this.data.dailyNotes = { ...this.data.dailyNotes, ...change };
 		return this.save();
 	}
 }

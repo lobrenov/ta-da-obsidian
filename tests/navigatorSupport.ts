@@ -1,3 +1,4 @@
+import { defaultDailyNoteNames } from "../src/core/index/dailyNotes";
 import type { LocalDate } from "../src/core/model/localDate";
 import type { VaultIndex } from "../src/core/index/vaultIndex";
 import { buildList, type ListContext, type ListModel, type ListOptions, type SectionHeader } from "../src/ui/navigator/listModel";
@@ -6,7 +7,7 @@ import type { ListRow } from "../src/ui/navigator/rows";
 import { agendaOn } from "../src/ui/navigator/agenda";
 
 export function context(index: VaultIndex, today: LocalDate, extra: Partial<ListContext> = {}): ListContext {
-	return { index, today, trash: [], folders: new Set(), agenda: agendaOn(today), ...extra };
+	return { index, today, trash: [], folders: new Set(), agenda: agendaOn(today), notes: { names: defaultDailyNoteNames, weekNotes: true }, ...extra };
 }
 
 export function options(extra: Partial<ListOptions> = {}): ListOptions {
@@ -56,8 +57,10 @@ function rowText(row: ListRow): string {
 			return [row.type, row.title, row.variant, row.meta, row.deadline?.text, row.open === null ? null : `${row.open} open`].filter((part) => part !== null && part !== undefined).join(" | ");
 		case "note":
 			return ["note", row.title, row.folder].filter((part) => part !== null).join(" | ");
+		case "periodNote":
+			return ["periodNote", row.name, row.path === null ? "create" : null, row.file, row.summary, row.open > 0 ? `${row.open} open` : null, row.subtasks ? `${row.subtasks.done}/${row.subtasks.total}` : null].filter((part) => part !== null).join(" | ");
 		case "day":
-			return ["day", row.label, row.summary || null, row.hasOpenTasks ? "dot" : null, row.today ? "today" : null].filter((part) => part !== null).join(" | ");
+			return ["day", row.label, row.summary || null, row.hasOpenTasks ? "dot" : null, row.hasOpenBoxes ? "ring" : null, row.today ? "today" : null].filter((part) => part !== null).join(" | ");
 		case "logged":
 		case "trashed":
 			return [row.type, row.kind, row.title, `[${row.status}]`, row.meta, row.date].filter((part) => part !== null).join(" | ");

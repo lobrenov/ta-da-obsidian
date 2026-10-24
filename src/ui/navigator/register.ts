@@ -10,7 +10,7 @@ import { NavigatorView, navigatorViewType } from "./NavigatorView";
  * explorer), and opening on startup when asked. Returns its settings, for the plugin's settings tab.
  */
 export function registerNavigator(plugin: Plugin & { taDaIndex: TaDaIndex; writer: Writer }, store: SettingsStore): NavigatorSettings {
-	const settings = new NavigatorSettings(store);
+	const settings = new NavigatorSettings(store, () => plugin.taDaIndex.index);
 	plugin.registerView(navigatorViewType, (leaf) => new NavigatorView(leaf, { taDaIndex: plugin.taDaIndex, writer: plugin.writer, settings }));
 
 	const open = (reveal: boolean): void => {

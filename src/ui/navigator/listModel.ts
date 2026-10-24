@@ -1,5 +1,6 @@
 import { type Grouping, listSections, type ListSection, TagFilter } from "../../core/index/grouping";
 import type { TaskGroup } from "../../core/index/queries";
+import { dailyNote, openCheckboxCount, pathForDate, pathForWeek, weekNote } from "../../core/index/dailyNotes";
 import { agendaDay, agendaWeek, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
 import { folderTree, type FolderNode, notesIn } from "../../core/index/noteQueries";
 import { search as searchIndex } from "../../core/index/queries";
@@ -13,7 +14,7 @@ import { tagLeaf } from "../../core/model/tag";
 import { type TrashedItem, contentsOf } from "../../core/storage/trash";
 import { folderOf } from "../../core/storage/vault";
 import { linkTitle } from "../../core/model/wikiLink";
-import { buildStrip, type AgendaState, type StripModel, weekOf } from "./agenda";
+import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel, weekOf } from "./agenda";
 import { dayMonth, fullDate, shortWeekday } from "./dates";
 import { type Domain, domainKey, type GroupedList, groupingOf, type Groupings } from "./domain";
 import { logbookGroups, logbookItems, logbookRow } from "./logbook";
@@ -25,6 +26,7 @@ import {
 	lineRow,
 	type ListRow,
 	linkedArea,
+	type PeriodNoteRowModel,
 	noteRow,
 	projectIcon,
 	type TaskRowOptions,
@@ -40,6 +42,8 @@ export interface ListContext {
 	folders: ReadonlySet<string>;
 	/** The Agenda's day or week, and whether its strip shows the month. */
 	agenda: AgendaState;
+	/** Where daily and week notes live, and whether week notes show. */
+	notes: NoteSettings;
 }
 
 export interface ListOptions {
@@ -156,7 +160,7 @@ export function visiblePaths(list: ListModel): string[] {
 /** The Agenda: a day's tasks, or a week's days and what's due in it, under the strip. */
 function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const { selection } = ctx.agenda;
-	const strip = buildStrip(ctx.index, ctx.agenda, ctx.today);
+	const strip = buildStrip(ctx.index, ctx.agenda, ctx.today, ctx.notes);
 	const base = { domain: { kind: "agenda" } as Domain, header: { ...noHeader, title: "Agenda", icon: { type: "icon", name: "calendar", tint: "due" } as IconSpec }, strip, empty: null };
 	if (selection.kind === "week") {
 		return { ...base, groupList: null, grouping: null, filter: null, sections: weekSections(ctx, selection.week) };
@@ -167,7 +171,7 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("agenda", options.groupings);
 	const relative = ["Today", "Tomorrow", "Yesterday"][[0, 1, -1].indexOf(today.daysTo(selection.date))] ?? null;
-	const title = plain("agenda:day", [], { style: "dayTitle", title: fullDate(selection.date, today), relative });
+	const title = plain("agenda:day", [periodNoteRow(ctx, selection)], { style: "dayTitle", title: fullDate(selection.date, today), relative });
 	const sections = [title];
 	if (all.length === 0) {
 		title.message = "Nothing scheduled";
@@ -179,13 +183,37 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	return { ...base, groupList: "agenda", grouping, filter: filterModel(all, options.picked, tasks.length), sections };
 }
 
+/** The row for a day's or week's note: the note when there is one, else the row that creates it. */
+function periodNoteRow(ctx: ListContext, selection: AgendaSelection): PeriodNoteRowModel {
+	const { index, today, notes } = ctx;
+	const day = selection.kind === "day";
+	const target = selection.kind === "day" ? pathForDate(notes.names, selection.date) : pathForWeek(notes.names, selection.week);
+	const note = selection.kind === "day" ? dailyNote(index, selection.date, notes.names) : weekNote(index, selection.week, notes.names);
+	const open = note ? openCheckboxCount(note) : 0;
+	const boxes = note ? subtasksOf(note) : null;
+	return {
+		type: "periodNote",
+		id: `note:${target}`,
+		path: note?.path ?? null,
+		name: day ? "Daily note" : "Week note",
+		file: target.split("/").pop() ?? target,
+		target,
+		period: day ? "day" : "week",
+		selection,
+		summary: note?.summary ?? null,
+		open: selection.kind === "day" && selection.date.compare(today) < 0 ? open : 0,
+		subtasks: boxes && boxes.total > 0 ? boxes : null,
+	};
+}
+
 /** A week: a row for each day, then the entries due or at their deadline in it. */
 function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	const { index, today } = ctx;
 	const entries = agendaWeek(index, week);
-	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay);
+	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, ctx.notes.names);
 	const days = week.days.map((date): ListRow => {
 		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
+		const note = dailyNote(index, date, ctx.notes.names);
 		return {
 			type: "day",
 			id: `day:${date.toString()}`,
@@ -195,10 +223,14 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 			summary: due > 0 ? `${due} due` : "",
 			today: date.equals(today),
 			hasOpenTasks: marks.get(date.toString())?.hasOpenTasks === true,
+			hasOpenBoxes: marks.get(date.toString())?.hasOpenBoxes === true,
+			note: note ? (note.summary ?? "") : "No note",
+			hasNote: note !== null,
 		};
 	});
+	const selection: AgendaSelection = { kind: "week", week };
 	const sections = [
-		plain("agenda:week", [], { style: "weekTitle", title: `Week ${week.week}`, range: `${dayMonth(week.firstDay, today)} – ${dayMonth(week.days[6] ?? week.firstDay, today)}`, thisWeek: week.equals(today.isoWeek) }),
+		plain("agenda:week", ctx.notes.weekNotes ? [periodNoteRow(ctx, selection)] : [], { style: "weekTitle", title: `Week ${week.week}`, range: `${dayMonth(week.firstDay, today)} – ${dayMonth(week.days[6] ?? week.firstDay, today)}`, thisWeek: week.equals(today.isoWeek) }),
 		plain("agenda:days", days),
 	];
 	if (entries.length > 0) {

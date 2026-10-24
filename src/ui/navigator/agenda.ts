@@ -1,3 +1,4 @@
+import { type DailyNoteNames, weekNote } from "../../core/index/dailyNotes";
 import { dayMarks } from "../../core/index/queries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { ISOWeek, LocalDate } from "../../core/model/localDate";
@@ -5,6 +6,12 @@ import { monthTitle } from "../dates";
 
 /** The Agenda's period: a day or an ISO week. */
 export type AgendaSelection = { kind: "day"; date: LocalDate } | { kind: "week"; week: ISOWeek };
+
+/** Where daily and week notes live, and whether week notes show. */
+export interface NoteSettings {
+	names: DailyNoteNames;
+	weekNotes: boolean;
+}
 
 /** The Agenda's selection, and whether its strip shows the month or just the selected week. */
 export interface AgendaState {
@@ -68,7 +75,9 @@ export interface DayCell {
 	faded: boolean;
 	/** An open task is due or at its deadline that day. */
 	hasOpenTasks: boolean;
-	/** For the screen reader: `Today, Fri 2 Oct, tasks due`. */
+	/** The day's daily note has unchecked boxes: the strip's ring. */
+	hasOpenBoxes: boolean;
+	/** For the screen reader: `Today, Fri 2, open items in the note, tasks due`. */
 	aria: string;
 }
 
@@ -76,6 +85,8 @@ export interface WeekCell {
 	week: ISOWeek;
 	label: string;
 	selected: boolean;
+	/** Week notes are on and the week has one: its number shows in the link colour. */
+	hasNote: boolean;
 }
 
 export interface StripRow {
@@ -99,18 +110,24 @@ const initials = ["M", "T", "W", "T", "F", "S", "S"];
 const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** The strip: the selected week's row, or every week of the month's rows when the month is open. */
-export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDate): StripModel {
+export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDate, notes: NoteSettings): StripModel {
 	const { selection, monthOpen } = state;
 	const anchor = anchorOf(selection);
 	const weeks = monthOpen ? anchor.isoWeeksOfMonth : [weekOf(selection)];
 	const first = weeks[0]?.firstDay ?? anchor;
 	const last = weeks[weeks.length - 1]?.days[6] ?? anchor;
-	const marks = dayMarks(index, first, last);
+	const marks = dayMarks(index, first, last, notes.names);
 	const rows = weeks.map((week): StripRow => ({
-		week: { week, label: String(week.week), selected: selection.kind === "week" && selection.week.equals(week) },
+		week: {
+			week,
+			label: String(week.week),
+			selected: selection.kind === "week" && selection.week.equals(week),
+			hasNote: notes.weekNotes && weekNote(index, week, notes.names) !== null,
+		},
 		days: week.days.map((date): DayCell => {
 			const isToday = date.equals(today);
 			const hasOpenTasks = marks.get(date.toString())?.hasOpenTasks === true;
+			const hasOpenBoxes = marks.get(date.toString())?.hasOpenBoxes === true;
 			return {
 				date,
 				label: String(date.day),
@@ -118,7 +135,8 @@ export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDa
 				today: isToday,
 				faded: date.month !== anchor.month || date.compare(today) < 0,
 				hasOpenTasks,
-				aria: `${isToday ? "Today, " : ""}${weekdayNames[date.weekday - 1]} ${date.day}${hasOpenTasks ? ", tasks due" : ""}`,
+				hasOpenBoxes,
+				aria: `${isToday ? "Today, " : ""}${weekdayNames[date.weekday - 1]} ${date.day}${hasOpenBoxes ? ", open items in the note" : ""}${hasOpenTasks ? ", tasks due" : ""}`,
 			};
 		}),
 	}));

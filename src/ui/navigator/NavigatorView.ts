@@ -27,7 +27,8 @@ import {
 } from "./domain";
 import { buildList, type ListContext, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
-import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, TaskRowModel } from "./rows";
+import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
+import { createPeriodNote } from "./periodNotes";
 import { moveSelection } from "./selection";
 import type { NavigatorSettings } from "./navigatorSettings";
 
@@ -117,7 +118,12 @@ export class NavigatorView extends ItemView {
 		// Every listener is added before the first await, so closing the view during one removes them all.
 		this.build();
 		this.applyCollapse();
-		this.register(this.deps.settings.onChange(() => this.applyCollapse()));
+		this.register(
+			this.deps.settings.onChange(() => {
+				this.applyCollapse();
+				this.refresh();
+			}),
+		);
 		this.register(this.deps.taDaIndex.onChange(() => this.refresh()));
 		this.registerEvent(this.app.workspace.on("file-open", (file) => this.select(file?.path ?? null, true)));
 		this.registerEvent(
@@ -186,7 +192,8 @@ export class NavigatorView extends ItemView {
 				.map((folder) => folder.path)
 				.filter((path) => isNotePath(`${path}/x.md`)),
 		);
-		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders, agenda: this.agenda };
+		const { dailyNotes } = this.deps.settings;
+		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders, agenda: this.agenda, notes: { names: this.deps.settings.names, weekNotes: dailyNotes.weekNotes } };
 	}
 
 	/** Whether the Trash count or list is on screen: the navigation pane shows when wide, or when the list isn't showing. */
@@ -521,7 +528,7 @@ export class NavigatorView extends ItemView {
 		for (const initial of ["W", ...strip.initials]) initials.createSpan({ text: initial });
 		for (const row of strip.rows) {
 			const line = grid.createDiv({ cls: "ta-da-strip-row" });
-			const week = line.createEl("button", { cls: `ta-da-strip-cell is-week${row.week.selected ? " is-selected" : ""}`, attr: { "aria-label": `Week ${row.week.label}` } });
+			const week = line.createEl("button", { cls: `ta-da-strip-cell is-week${row.week.selected ? " is-selected" : ""}${row.week.hasNote ? " has-note" : ""}`, attr: { "aria-label": `Week ${row.week.label}${row.week.hasNote ? ", note" : ""}` } });
 			week.createSpan({ cls: "ta-da-strip-number", text: row.week.label });
 			week.addEventListener("click", () => this.setAgenda({ selection: { kind: "week", week: row.week.week } }));
 			for (const day of row.days) {
@@ -530,8 +537,7 @@ export class NavigatorView extends ItemView {
 					attr: { "aria-label": day.aria },
 				});
 				cell.createSpan({ cls: "ta-da-strip-number", text: day.label });
-				const dots = cell.createSpan({ cls: "ta-da-strip-dots" });
-				if (day.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
+				this.dots(cell, day);
 				cell.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: day.date } }));
 			}
 		}
@@ -581,8 +587,8 @@ export class NavigatorView extends ItemView {
 		const el = parent.createDiv({ cls: "ta-da-section" });
 		if (section.header) this.renderSectionHeader(el, section, section.header, list);
 		if (section.folded) return;
-		if (section.message) el.createDiv({ cls: "ta-da-message", text: section.message });
 		for (const row of section.rows) this.renderRow(el, row);
+		if (section.message) el.createDiv({ cls: "ta-da-message", text: section.message });
 	}
 
 	private renderSectionHeader(parent: HTMLElement, section: SectionModel, header: SectionHeader, list: ListModel): void {
@@ -671,6 +677,10 @@ export class NavigatorView extends ItemView {
 			case "day":
 				this.dayRow(parent, row);
 				return;
+			case "periodNote":
+				el = this.periodNoteRow(parent, row);
+				if (row.path === null) return;
+				break;
 		}
 		if (row.path === null) return;
 		const path = row.path;
@@ -680,14 +690,61 @@ export class NavigatorView extends ItemView {
 		el.addEventListener("click", (event) => this.openPath(path, event));
 	}
 
-	/** A day in a week's list: clicking it picks the day. */
+	/** A day in a week's list: its note's first paragraph, what's due, and its dots. Clicking it picks the day. */
 	private dayRow(parent: HTMLElement, row: AgendaDayRowModel): void {
 		const el = parent.createDiv({ cls: `ta-da-row is-day${row.today ? " is-today" : ""}`, attr: { role: "button", tabindex: "-1" } });
 		el.createSpan({ cls: "ta-da-day-label", text: row.label });
+		el.createSpan({ cls: `ta-da-day-note${row.hasNote ? "" : " is-none"}`, text: row.note });
 		el.createSpan({ cls: "ta-da-day-summary", text: row.summary });
-		const dots = el.createSpan({ cls: "ta-da-strip-dots" });
-		if (row.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
+		this.dots(el, row);
 		el.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: row.date } }));
+	}
+
+	/** A day's or week's note: its name, file and first paragraph; or, with no note, the row that creates it. */
+	private periodNoteRow(parent: HTMLElement, row: PeriodNoteRowModel): HTMLElement {
+		const day = row.period === "day";
+		if (row.path === null) {
+			const label = day ? "Start this day’s note" : "Start the week note";
+			const el = parent.createDiv({ cls: "ta-da-row is-note-start", attr: { role: "button", tabindex: "-1", "aria-label": label } });
+			setIcon(el.createSpan({ cls: "ta-da-row-icon" }), "plus");
+			el.createSpan({ cls: "ta-da-note-start-label", text: label });
+			el.createSpan({ cls: "ta-da-note-file", text: row.file });
+			el.addEventListener("click", () => void this.createNote(row));
+			return el;
+		}
+		const el = parent.createDiv({ cls: "ta-da-row is-period-note" });
+		setIcon(el.createSpan({ cls: "ta-da-row-icon is-note-icon" }), day ? "file-text" : "calendar");
+		const main = el.createDiv({ cls: "ta-da-row-main" });
+		main.createSpan({ cls: "ta-da-row-title", text: row.name });
+		const meta = main.createDiv({ cls: "ta-da-row-meta is-single" });
+		meta.createSpan({ cls: "ta-da-note-file", text: row.file });
+		if (row.summary) {
+			meta.createSpan({ text: "·" });
+			meta.createSpan({ cls: "ta-da-note-summary", text: row.summary });
+		}
+		if (row.open > 0) {
+			const badge = el.createSpan({ cls: "ta-da-open-badge", attr: { "aria-label": `${row.open} open` } });
+			badge.createSpan({ cls: "ta-da-dot" });
+			badge.appendText(`${row.open} open`);
+		} else if (row.subtasks) {
+			el.createSpan({ cls: "ta-da-note-boxes", text: `${row.subtasks.done}/${row.subtasks.total}` });
+		}
+		return el;
+	}
+
+	/** Creates a day's or week's note from its template and opens it. */
+	private async createNote(row: PeriodNoteRowModel): Promise<void> {
+		const { dailyNotes } = this.deps.settings;
+		const template = row.period === "day" ? dailyNotes.dailyTemplate : dailyNotes.weekTemplate;
+		const path = await createPeriodNote(this.app, row.target, template, this.today);
+		if (path !== null) this.openPath(path);
+	}
+
+	/** The ring for a day's unchecked boxes, then the dot for open tasks. */
+	private dots(parent: HTMLElement, marks: { hasOpenBoxes: boolean; hasOpenTasks: boolean }): void {
+		const dots = parent.createSpan({ cls: "ta-da-strip-dots" });
+		if (marks.hasOpenBoxes) dots.createSpan({ cls: "ta-da-dot is-ring" });
+		if (marks.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
 	}
 
 	/** A task on one line: its box, a date pill, the title, quiet glyphs, and the place at the right. */

@@ -6,6 +6,7 @@ import { type Item, subtasks as subtasksOf } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed, type Status } from "../../core/model/status";
 import { linkTitle } from "../../core/model/wikiLink";
+import type { AgendaSelection } from "./agenda";
 import { capitalised, deadlineLabel, relativeLabel, rowLabel } from "./dates";
 
 /** The colour a glyph takes, named as the design's tokens. The DOM layer maps them to Obsidian's variables. */
@@ -96,9 +97,36 @@ export interface AgendaDayRowModel {
 	summary: string;
 	today: boolean;
 	hasOpenTasks: boolean;
+	/** The day's daily note has unchecked boxes. */
+	hasOpenBoxes: boolean;
+	/** The daily note's first paragraph, or `No note`. */
+	note: string;
+	hasNote: boolean;
 }
 
-export type ListRow = TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel;
+/**
+ * A day's or week's note: opens the note at `path`, or with no note (`path` null) creates it at `target`. `open` is the
+ * unchecked boxes of a past day's note, which the row shows; otherwise `subtasks` shows.
+ */
+export interface PeriodNoteRowModel {
+	type: "periodNote";
+	id: string;
+	path: string | null;
+	/** `Daily note` or `Week note`. */
+	name: string;
+	/** The note's file name, `2026-10-02.md`. */
+	file: string;
+	/** The note's path, where it is or would be made. */
+	target: string;
+	period: "day" | "week";
+	/** The date or week the note is for. */
+	selection: AgendaSelection;
+	summary: string | null;
+	open: number;
+	subtasks: { done: number; total: number } | null;
+}
+
+export type ListRow = TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel | PeriodNoteRowModel;
 
 /** Which date a list shows. The Agenda shows a due date only when overdue; other lists show the date itself. */
 export type DateRule = "agenda" | "elsewhere";

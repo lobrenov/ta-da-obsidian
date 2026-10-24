@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dailyNote, dateAtPath, defaultDailyNoteNames, openCheckboxCount } from "../src/core/index/dailyNotes";
+import { dailyNote, dateAtPath, defaultDailyNoteNames, openCheckboxCount, pathForDate, pathForWeek, weekAtPath, weekNote } from "../src/core/index/dailyNotes";
 import * as q from "../src/core/index/queries";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { type Item, isLogged } from "../src/core/model/item";
@@ -309,11 +309,11 @@ describe("daily notes", () => {
 		]) {
 			expect(dateAtPath(names, path), path).toBeNull();
 		}
-		expect(dateAtPath({ dailyFolder: "" }, "2026-10-02.md")?.toString()).toBe("2026-10-02");
+		expect(dateAtPath({ dailyFolder: "", weekFolder: "Weeks" }, "2026-10-02.md")?.toString()).toBe("2026-10-02");
 	});
 
 	it("finds the note at the exact path", () => {
-		const names = { dailyFolder: "Journal" };
+		const names = { dailyFolder: "Journal", weekFolder: "Weeks" };
 		const index = new VaultIndex([daily("Journal/2026-10-02.md"), daily("Journal/2026-10-03 renamed.md"), daily("Periodic Notes/Daily Notes/2026-10-01.md")]);
 		expect(dailyNote(index, today, names)?.path).toBe("Journal/2026-10-02.md");
 		expect(dailyNote(index, date("2026-10-03"), names)).toBeNull();
@@ -324,13 +324,65 @@ describe("daily notes", () => {
 	it("keeps the real path when the folder's case differs", () => {
 		const index = new VaultIndex([daily("periodic notes/DAILY notes/2026-10-02.md")]);
 		expect(dailyNote(index, today)?.path).toBe("periodic notes/DAILY notes/2026-10-02.md");
-		expect(dailyNote(index, today, { dailyFolder: "PERIODIC notes/daily NOTES" })?.path).toBe("periodic notes/DAILY notes/2026-10-02.md");
-		expect(dailyNote(index, today, { dailyFolder: "Other" })).toBeNull();
+		expect(dailyNote(index, today, { dailyFolder: "PERIODIC notes/daily NOTES", weekFolder: "Weeks" })?.path).toBe("periodic notes/DAILY notes/2026-10-02.md");
+		expect(dailyNote(index, today, { dailyFolder: "Other", weekFolder: "Weeks" })).toBeNull();
 	});
 
 	it("is never a typed file", () => {
 		const task = makeItem("Periodic Notes/Daily Notes/2026-10-02.md", "type: task\nstatus: Doing");
 		expect(dailyNote(new VaultIndex([task]), today)).toBeNull();
+	});
+
+	it("names the paths of days and weeks, from the default folders", () => {
+		const names = defaultDailyNoteNames;
+		expect(pathForDate(names, today)).toBe("Periodic Notes/Daily Notes/2026-10-02.md");
+		expect(pathForWeek(names, new ISOWeek(2026, 40))).toBe("Periodic Notes/Weekly Notes/2026-W40.md");
+		expect(pathForWeek(names, new ISOWeek(2026, 3))).toBe("Periodic Notes/Weekly Notes/2026-W03.md");
+	});
+
+	it("reads its own paths back in any folder, and no other", () => {
+		const week = new ISOWeek(2026, 40);
+		for (const names of [
+			defaultDailyNoteNames,
+			{ dailyFolder: "Journal/2026", weekFolder: "Weeks" },
+			{ dailyFolder: "Notes", weekFolder: "Notes" },
+			{ dailyFolder: "", weekFolder: "" },
+		]) {
+			expect(dateAtPath(names, pathForDate(names, today))?.equals(today)).toBe(true);
+			expect(weekAtPath(names, pathForWeek(names, week))?.equals(week)).toBe(true);
+			expect(weekAtPath(names, pathForDate(names, today))).toBeNull();
+			expect(dateAtPath(names, pathForWeek(names, week))).toBeNull();
+		}
+	});
+
+	it("reads only well-formed week names", () => {
+		const names = defaultDailyNoteNames;
+		for (const name of ["2027-W53", "2026-W00", "2026-W4", "2026-w40", "2026-W+1", "2026-10-02", "2026-W40 plan"]) {
+			expect(weekAtPath(names, `Periodic Notes/Weekly Notes/${name}.md`), name).toBeNull();
+		}
+		expect(weekAtPath(names, "Periodic Notes/Weekly Notes/Sub/2026-W40.md")).toBeNull();
+		expect(weekAtPath(names, "Other/2026-W40.md")).toBeNull();
+		expect(weekAtPath(names, "PERIODIC NOTES/WEEKLY NOTES/2026-W40.md")?.week).toBe(40);
+		expect(weekAtPath(names, "Periodic Notes/Weekly Notes/2026-W53.md")?.week).toBe(53);
+	});
+
+	it("finds a week note at the exact path, and a daily note beside it in the same folder", () => {
+		const names = { dailyFolder: "Journal", weekFolder: "Journal" };
+		const week = new ISOWeek(2026, 40);
+		const index = new VaultIndex([daily("Journal/2026-10-02.md"), daily("Journal/2026-W40.md"), daily("Journal/2026-W41 renamed.md"), daily("Periodic Notes/Weekly Notes/2026-W39.md")]);
+		expect(weekNote(index, week, names)?.path).toBe("Journal/2026-W40.md");
+		expect(dailyNote(index, today, names)?.path).toBe("Journal/2026-10-02.md");
+		expect(weekNote(index, new ISOWeek(2026, 41), names)).toBeNull();
+		expect(weekNote(index, week)).toBeNull();
+		expect(weekNote(index, new ISOWeek(2026, 39))?.title).toBe("2026-W39");
+	});
+
+	it("finds a week note in the folder in any case, and never a typed file", () => {
+		const week = new ISOWeek(2026, 40);
+		const index = new VaultIndex([daily("periodic NOTES/weekly notes/2026-W40.md")]);
+		expect(weekNote(index, week)?.path).toBe("periodic NOTES/weekly notes/2026-W40.md");
+		const task = makeItem("Periodic Notes/Weekly Notes/2026-W40.md", "type: task\nstatus: Doing");
+		expect(weekNote(new VaultIndex([task]), week)).toBeNull();
 	});
 
 	it("counts unchecked boxes", () => {
@@ -356,6 +408,9 @@ describe("daily notes", () => {
 			"2026-10-04": { hasOpenTasks: true, hasOpenBoxes: false },
 		});
 		expect(q.dayMarks(index, today, today.addingDays(-1)).size).toBe(0);
+		const elsewhere = q.dayMarks(index, today, date("2026-10-08"), { dailyFolder: "Journal", weekFolder: "Weeks" });
+		expect(Object.keys(Object.fromEntries(elsewhere))).toEqual(["2026-10-02", "2026-10-04"]);
+		expect(elsewhere.get("2026-10-02")?.hasOpenBoxes).toBe(false);
 	});
 });
 
