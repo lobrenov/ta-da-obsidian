@@ -1,0 +1,123 @@
+import { type Plugin, TFile, TFolder, type TAbstractFile } from "obsidian";
+import { VaultIndex } from "./core/index/vaultIndex";
+import { parseItem } from "./core/parsing/parseItem";
+
+const readBatch = 64;
+
+/**
+ * Obsidian's side of `VaultIndex`: built from the vault's markdown files once the layout is ready, then patched as
+ * files are created, change, are renamed or are deleted.
+ */
+export class TaDaIndex {
+	readonly index = new VaultIndex();
+	/** Resolves once every file has been read, or the plugin unloaded first. */
+	readonly ready: Promise<void>;
+	private resolveReady: () => void = () => undefined;
+	private unloaded = false;
+	private lastGeneration = 0;
+	/** The latest change seen for each path with a read pending, so a slow read never overwrites a newer change. */
+	private readonly generations = new Map<string, number>();
+
+	constructor(private readonly plugin: Plugin) {
+		this.ready = new Promise((resolve) => {
+			this.resolveReady = resolve;
+		});
+	}
+
+	start(): void {
+		this.plugin.register(() => {
+			this.unloaded = true;
+			this.resolveReady();
+		});
+		this.plugin.app.workspace.onLayoutReady(() => {
+			if (this.unloaded) return;
+			this.registerEvents();
+			void this.build();
+		});
+	}
+
+	private async build(): Promise<void> {
+		const files = this.plugin.app.vault.getFiles().filter(isMarkdown);
+		for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
+			await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
+		}
+		this.resolveReady();
+	}
+
+	private registerEvents(): void {
+		const { vault, metadataCache } = this.plugin.app;
+		this.plugin.registerEvent(vault.on("create", (file) => void this.read(file)));
+		this.plugin.registerEvent(metadataCache.on("changed", (file, data) => this.apply(file, data)));
+		this.plugin.registerEvent(vault.on("rename", (file, oldPath) => this.renamed(file, oldPath)));
+		this.plugin.registerEvent(vault.on("delete", (file) => this.deleted(file)));
+	}
+
+	/** Reads a file's text and replaces its item. */
+	private async read(file: TAbstractFile): Promise<void> {
+		if (!(file instanceof TFile) || !isMarkdown(file)) return;
+		const path = file.path;
+		const generation = ++this.lastGeneration;
+		this.generations.set(path, generation);
+		let text: string;
+		try {
+			text = await this.plugin.app.vault.cachedRead(file);
+		} catch {
+			return;
+		}
+		if (this.generations.get(path) !== generation) return;
+		this.generations.delete(path);
+		this.apply(file, text);
+	}
+
+	/** Replaces a file's item; a file that isn't a Ta Da file or note, or that can't be parsed, leaves the index. */
+	private apply(file: TFile, text: string): void {
+		if (!isMarkdown(file)) return;
+		this.generations.delete(file.path);
+		try {
+			const item = parseItem(text, file.path);
+			if (item) this.index.update(item);
+			else this.index.remove(file.path);
+		} catch {
+			this.index.remove(file.path);
+		}
+	}
+
+	private renamed(file: TAbstractFile, oldPath: string): void {
+		if (file instanceof TFolder) {
+			this.removeUnder(oldPath);
+			for (const child of markdownFilesIn(file)) void this.read(child);
+		} else {
+			this.remove(oldPath);
+			void this.read(file);
+		}
+	}
+
+	private deleted(file: TAbstractFile): void {
+		if (file instanceof TFolder) this.removeUnder(file.path);
+		else this.remove(file.path);
+	}
+
+	/** Drops a path from the index and cancels any read pending for it. */
+	private remove(path: string): void {
+		this.generations.delete(path);
+		this.index.remove(path);
+	}
+
+	private removeUnder(folder: string): void {
+		const prefix = `${folder}/`;
+		for (const path of [...this.index.items.keys(), ...this.generations.keys()]) {
+			if (path.startsWith(prefix)) this.remove(path);
+		}
+	}
+}
+
+function isMarkdown(file: TFile): boolean {
+	return file.extension.toLowerCase() === "md";
+}
+
+function markdownFilesIn(folder: TFolder): TFile[] {
+	return folder.children.flatMap((child) => {
+		if (child instanceof TFolder) return markdownFilesIn(child);
+		return child instanceof TFile && isMarkdown(child) ? [child] : [];
+	});
+}
