@@ -13,7 +13,6 @@ function actions() {
 		openStatus: vi.fn<(anchor: HTMLElement) => void>(),
 		openParent: vi.fn<(anchor: HTMLElement) => void>(),
 		openDate: vi.fn<(key: "dueDate" | "deadline", anchor: HTMLElement) => void>(),
-		openRepeat: vi.fn<(anchor: HTMLElement) => void>(),
 		openAddTag: vi.fn<(anchor: HTMLElement) => void>(),
 		removeTag: vi.fn<(name: string) => void>(),
 		toggleProperties: vi.fn<() => boolean>(() => true),
@@ -32,7 +31,7 @@ describe("buildHeader", () => {
 	it("draws the chips, tags and summary", () => {
 		const header = buildHeader(document, model, actions(), false);
 		const chips = [...header.querySelectorAll(".ta-da-chip")].map((chip) => chip.textContent);
-		expect(chips).toEqual(["Doing", "Nowhere", "Due Today", "Deadline", "Repeat"]);
+		expect(chips).toEqual(["Doing", "Nowhere", "Due Today", "Deadline"]);
 		expect(header.querySelector(".is-parent")?.classList.contains("is-unresolved")).toBe(true);
 		expect(header.querySelector(".is-deadline")?.classList.contains("is-missing")).toBe(true);
 		const tags = [...header.querySelectorAll(".ta-da-tag")].map((tag) => tag.textContent);
@@ -50,14 +49,12 @@ describe("buildHeader", () => {
 		chip("parent").click();
 		chip("dueDate").click();
 		chip("deadline").click();
-		chip("repeat").click();
 		expect(a.openStatus).toHaveBeenCalledWith(chip("status"));
 		expect(a.openParent).toHaveBeenCalledWith(chip("parent"));
 		expect(a.openDate.mock.calls).toEqual([
 			["dueDate", chip("dueDate")],
 			["deadline", chip("deadline")],
 		]);
-		expect(a.openRepeat).toHaveBeenCalledWith(chip("repeat"));
 	});
 
 	it("adds and removes tags", () => {
@@ -82,11 +79,11 @@ describe("buildHeader", () => {
 	});
 
 	it("puts file content in as text, never as markup", () => {
-		const hostile = makeItem("Ta Da/tasks/Hostile.md", 'type: task\nproject: "[[<img src=x onerror=alert(1)>]]"\nrepeat: "<b>x</b>"\ntags: ["<i>t</i>"]');
+		const hostile = makeItem("Ta Da/tasks/Hostile.md", 'type: task\nproject: "[[<img src=x onerror=alert(1)>]]"\ntags: ["<i>t</i>"]');
 		const hostileModel = buildHeaderModel(hostile, new VaultIndex([hostile]), today);
 		if (!hostileModel) throw new Error("no model");
 		const header = buildHeader(document, hostileModel, actions(), false);
 		expect(header.querySelector("img, b, i")).toBeNull();
-		expect(header.textContent).toContain("<b>x</b>");
+		expect(header.textContent).toContain("<img src=x onerror=alert(1)>");
 	});
 });

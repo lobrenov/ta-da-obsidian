@@ -14,7 +14,6 @@ const noActions = {
 	openStatus: () => undefined,
 	openParent: () => undefined,
 	openDate: () => undefined,
-	openRepeat: () => undefined,
 	openAddTag: () => undefined,
 	removeTag: () => undefined,
 	toggleProperties: () => false,

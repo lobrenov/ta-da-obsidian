@@ -6,7 +6,6 @@ export interface HeaderActions {
 	openStatus(anchor: HTMLElement): void;
 	openParent(anchor: HTMLElement): void;
 	openDate(key: "dueDate" | "deadline", anchor: HTMLElement): void;
-	openRepeat(anchor: HTMLElement): void;
 	openAddTag(anchor: HTMLElement): void;
 	removeTag(name: string): void;
 	/** Shows or hides Obsidian's Properties for the file; returns whether they're shown now. */
@@ -16,11 +15,13 @@ export interface HeaderActions {
 /** Draws the header: the chip row, the tag row and the quiet line. Live Preview and Reading view both use this. */
 export function buildHeader(doc: Document, model: HeaderModel, actions: HeaderActions, propertiesShown: boolean): HTMLElement {
 	const header = element(doc, "div", `ta-da-header is-${model.kind}`, undefined, { contenteditable: "false" });
+	const inner = element(doc, "div", "ta-da-header-inner");
+	header.appendChild(inner);
 	const chips = element(doc, "div", "ta-da-header-chips");
 	for (const chip of model.chips) chips.appendChild(buildChip(doc, chip, actions));
 	chips.appendChild(element(doc, "span", "ta-da-grow"));
 	chips.appendChild(buildPropertiesButton(doc, actions, propertiesShown));
-	header.appendChild(chips);
+	inner.appendChild(chips);
 
 	const tags = element(doc, "div", "ta-da-header-tags");
 	for (const tag of model.tags) tags.appendChild(buildTag(doc, tag, actions));
@@ -29,7 +30,7 @@ export function buildHeader(doc: Document, model: HeaderModel, actions: HeaderAc
 	add.addEventListener("click", () => actions.openAddTag(add));
 	tags.appendChild(add);
 	if (model.summary !== "") tags.appendChild(element(doc, "span", "ta-da-summary", model.summary));
-	header.appendChild(tags);
+	inner.appendChild(tags);
 	return header;
 }
 
@@ -55,7 +56,7 @@ function buildChip(doc: Document, chip: Chip, actions: HeaderActions): HTMLEleme
 	if ("missing" in chip && chip.missing) classes.push("is-missing");
 	if (chip.kind === "parent" && chip.unresolved) classes.push("is-unresolved");
 	if (chip.kind === "dueDate" || chip.kind === "deadline") classes.push(`tone-${chip.tone}`);
-	const button = element(doc, "button", classes.join(" "), undefined, { type: "button", "aria-haspopup": chip.kind === "repeat" ? "dialog" : "menu" });
+	const button = element(doc, "button", classes.join(" "), undefined, { type: "button", "aria-haspopup": "menu" });
 	switch (chip.kind) {
 		case "status":
 			button.appendChild(statusBox(doc, chip.status));
@@ -69,9 +70,6 @@ function buildChip(doc: Document, chip: Chip, actions: HeaderActions): HTMLEleme
 		case "deadline":
 			button.appendChild(icon(doc, "flag"));
 			break;
-		case "repeat":
-			button.appendChild(icon(doc, "repeat"));
-			break;
 	}
 	button.appendChild(element(doc, "span", "ta-da-chip-label", chip.label));
 	if (chip.kind === "status") button.appendChild(icon(doc, "chevronDown", 10, 2.2));
@@ -84,8 +82,6 @@ function buildChip(doc: Document, chip: Chip, actions: HeaderActions): HTMLEleme
 			case "dueDate":
 			case "deadline":
 				return actions.openDate(chip.kind, button);
-			case "repeat":
-				return actions.openRepeat(button);
 		}
 	});
 	return button;

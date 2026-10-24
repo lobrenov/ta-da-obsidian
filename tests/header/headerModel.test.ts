@@ -23,10 +23,10 @@ describe("dateLabel", () => {
 });
 
 describe("buildHeaderModel", () => {
-	it("draws a task's chips: status, project, dates, repeat", () => {
+	it("draws a task's chips: status, project, dates", () => {
 		const task = makeItem(
 			"Ta Da/tasks/Write.md",
-			'type: task\nstatus: Doing\nproject: "[[Ta Da MVP]]"\ndueDate: 2026-10-02\ndeadline: 2026-10-06\nrepeat: Weekly · Fri\ncreatedDate: 2026-09-28\ntags: [dev]',
+			'type: task\nstatus: Doing\nproject: "[[Ta Da MVP]]"\ndueDate: 2026-10-02\ndeadline: 2026-10-06\ncreatedDate: 2026-09-28\ntags: [dev]',
 			"- [x] one\n- [ ] two\n",
 		);
 		const model = buildHeaderModel(task, index, today);
@@ -35,7 +35,6 @@ describe("buildHeaderModel", () => {
 			{ kind: "parent", label: "Ta Da MVP", icon: "ring", missing: false, unresolved: false },
 			{ kind: "dueDate", label: "Due Today", missing: false, tone: "due" },
 			{ kind: "deadline", label: "Deadline Tue 6 Oct", missing: false, tone: "deadline" },
-			{ kind: "repeat", label: "Weekly · Fri", missing: false },
 		]);
 		expect(model?.tags).toEqual([{ name: "dev", inFrontmatter: true }]);
 		expect(model?.summary).toBe("1/2 subtasks · Created Mon 28 Sep");
@@ -49,7 +48,6 @@ describe("buildHeaderModel", () => {
 			{ kind: "parent", label: "Project", icon: "ring", missing: true, unresolved: false },
 			{ kind: "dueDate", label: "Due", missing: true, tone: "muted" },
 			{ kind: "deadline", label: "Deadline", missing: true, tone: "muted" },
-			{ kind: "repeat", label: "Repeat", missing: true },
 		]);
 	});
 

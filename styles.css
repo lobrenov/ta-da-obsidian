@@ -9,17 +9,21 @@
 
 /* Header */
 
+/* The space below the divider is padding on the outer element: CodeMirror ignores a block widget's margin. */
 .ta-da-header {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	margin: 0 0 var(--size-4-3);
-	padding-bottom: 14px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 16px;
 	font-size: var(--font-ui-small);
 	line-height: 1.45;
 	color: var(--text-normal);
 	user-select: none;
+}
+
+.ta-da-header-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .ta-da-header-chips,
@@ -88,8 +92,7 @@
 	text-decoration: line-through;
 }
 
-.ta-da-chip.is-parent .ta-da-icon,
-.ta-da-chip.is-repeat .ta-da-icon {
+.ta-da-chip.is-parent .ta-da-icon {
 	color: var(--text-muted);
 }
 
@@ -272,12 +275,6 @@
 	color: var(--text-normal);
 }
 
-/* Reading view */
-
-.ta-da-header-host {
-	margin-bottom: var(--size-4-3);
-}
-
 /* Menus */
 
 .menu-item.ta-da-current {
@@ -421,19 +418,6 @@
 
 .ta-da-date-quick .ta-da-date-clear {
 	margin-left: auto;
-}
-
-/* Repeat */
-
-.ta-da-repeat-input {
-	width: 100%;
-}
-
-.ta-da-repeat-buttons {
-	display: flex;
-	justify-content: flex-end;
-	gap: 8px;
-	margin-top: 12px;
 }
 
 /* Navigator */

@@ -218,7 +218,7 @@ export class NavigatorView extends ItemView {
 		this.save();
 	}
 
-	private open(path: string, event?: MouseEvent | KeyboardEvent): void {
+	private openPath(path: string, event?: MouseEvent | KeyboardEvent): void {
 		const file = this.app.vault.getFileByPath(path);
 		if (!file) return;
 		this.select(path, false);
@@ -293,7 +293,7 @@ export class NavigatorView extends ItemView {
 			this.move(event.key === "ArrowDown" ? 1 : -1);
 		} else if (event.key === "Enter" && this.selected !== null && this.paths.includes(this.selected)) {
 			event.preventDefault();
-			this.open(this.selected, event);
+			this.openPath(this.selected, event);
 		}
 	}
 
@@ -383,7 +383,7 @@ export class NavigatorView extends ItemView {
 		if (header.detail) title.createSpan({ cls: "ta-da-list-detail", text: header.detail });
 		const actions = title.createDiv({ cls: "ta-da-list-actions" });
 		const file = header.file;
-		if (file) this.iconButton(actions, "file-text", file.label, () => this.open(file.path));
+		if (file) this.iconButton(actions, "file-text", file.label, () => this.openPath(file.path));
 		if (list.groupList) {
 			const grouping = list.grouping;
 			this.iconButton(actions, "list", "Group", (event) => {
@@ -528,7 +528,7 @@ export class NavigatorView extends ItemView {
 		const els = this.rowEls.get(path) ?? [];
 		els.push(el);
 		this.rowEls.set(path, els);
-		el.addEventListener("click", (event) => this.open(path, event));
+		el.addEventListener("click", (event) => this.openPath(path, event));
 	}
 
 	private taskRow(parent: HTMLElement, row: TaskRowModel): HTMLElement {

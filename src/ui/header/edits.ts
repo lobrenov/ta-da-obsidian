@@ -23,12 +23,6 @@ export function dateEdit(key: "dueDate" | "deadline", date: LocalDate | null): E
 	return (text) => (date ? setProperty(key, { kind: "date", value: date }, text) : clearProperty(key, text));
 }
 
-/** Sets `repeat` to the typed text, or empties it when that's blank. */
-export function repeatEdit(value: string): Edit {
-	const trimmed = trimBlanks(value);
-	return (text) => (trimmed === "" ? clearProperty("repeat", text) : setProperty("repeat", { kind: "text", value: trimmed }, text));
-}
-
 /** Adds a tag by its typed name; nothing for a name with no tag in it. */
 export function addTagEdit(name: string): Edit {
 	const tag = readTag(name);

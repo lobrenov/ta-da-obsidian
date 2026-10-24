@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LocalDate } from "../../src/core/model/localDate";
-import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit, statusEdit } from "../../src/ui/header/edits";
+import { addTagEdit, dateEdit, parentEdit, removeTagEdit, statusEdit } from "../../src/ui/header/edits";
 
 const today = LocalDate.parse("2026-10-02") as LocalDate;
 const path = "Ta Da/tasks/X.md";
@@ -35,12 +35,6 @@ describe("header edits, text in and text out", () => {
 		expect(dateEdit("dueDate", LocalDate.parse("2026-12-25"))(task)).toBe(task.replace("2026-10-05", "2026-12-25"));
 		expect(dateEdit("dueDate", null)(task)).toBe(task.replace("dueDate: 2026-10-05", "dueDate:"));
 		expect(dateEdit("deadline", LocalDate.parse("2026-11-01"))(task)).toContain("deadline: 2026-11-01\n---");
-	});
-
-	it("sets repeat text, trimmed, and clears it when blank", () => {
-		expect(repeatEdit("  Weekly · Fri ")(task)).toContain("repeat: Weekly · Fri\n---");
-		const withRepeat = task.replace("---\nBody", "repeat: Daily\n---\nBody");
-		expect(repeatEdit("   ")(withRepeat)).toContain("repeat:\n---");
 	});
 
 	it("adds and removes a tag, keeping the list's style", () => {

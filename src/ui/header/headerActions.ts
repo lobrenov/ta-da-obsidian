@@ -6,10 +6,10 @@ import type { Edit, Writer } from "../../Writer";
 import type { HeaderActions } from "./buildHeader";
 import { parentChoices, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";
-import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit, statusEdit } from "./edits";
+import { addTagEdit, dateEdit, parentEdit, removeTagEdit, statusEdit } from "./edits";
 import { type HeaderModel, statusChoices } from "./headerModel";
 import { dayOrderOf, firstWeekdayOf } from "./locale";
-import { DateModal, ParentModal, RepeatModal, TagModal } from "./modals";
+import { DateModal, ParentModal, TagModal } from "./modals";
 
 /** What the header needs from the plugin. */
 export interface HeaderHost {
@@ -74,9 +74,6 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 				(date) => write(dateEdit(key, date)),
 			);
 			open(modal, anchor);
-		},
-		openRepeat(anchor) {
-			open(new RepeatModal(host.app, model.repeat, (value) => write(repeatEdit(value))), anchor);
 		},
 		openAddTag() {
 			const onFile = model.tags.filter((tag) => tag.inFrontmatter).map((tag) => tag.name);

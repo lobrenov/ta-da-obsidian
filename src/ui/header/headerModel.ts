@@ -14,8 +14,7 @@ export type DateTone = "due" | "deadline" | "muted";
 export type Chip =
 	| { kind: "status"; status: Status; label: string }
 	| { kind: "parent"; label: string; icon: "ring" | "cube"; missing: boolean; unresolved: boolean }
-	| { kind: "dueDate" | "deadline"; label: string; missing: boolean; tone: DateTone }
-	| { kind: "repeat"; label: string; missing: boolean };
+	| { kind: "dueDate" | "deadline"; label: string; missing: boolean; tone: DateTone };
 
 export interface TagChip {
 	name: string;
@@ -30,7 +29,6 @@ export interface HeaderModel {
 	parent: Parent | null;
 	dueDate: string | null;
 	deadline: string | null;
-	repeat: string | null;
 	chips: Chip[];
 	tags: TagChip[];
 	/** The quiet line: subtasks and the created day. */
@@ -53,7 +51,7 @@ export function dateLabel(date: LocalDate, today: LocalDate): string {
 export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalDate): HeaderModel | null {
 	const { kind, status } = item.properties;
 	if (kind === "note") return null;
-	const { project, area, dueDate, deadline, repeatRule, createdDate } = item.properties;
+	const { project, area, dueDate, deadline, createdDate } = item.properties;
 	const parent: Parent | null = project
 		? { kind: "project", title: linkTitle(project) }
 		: area
@@ -85,7 +83,6 @@ export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalD
 			const tone: DateTone = closed ? "muted" : date.compare(today) < 0 ? "deadline" : key === "dueDate" ? "due" : "deadline";
 			chips.push({ kind: key, label: `${name} ${dateLabel(date, today)}`, missing: false, tone });
 		}
-		chips.push(repeatRule === null ? { kind: "repeat", label: "Repeat", missing: true } : { kind: "repeat", label: repeatRule, missing: false });
 	}
 	const parts: string[] = [];
 	const { done, total } = subtasks(item);
@@ -97,7 +94,6 @@ export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalD
 		parent,
 		dueDate: dueDate?.toString() ?? null,
 		deadline: deadline?.toString() ?? null,
-		repeat: repeatRule,
 		chips,
 		tags: item.tags.map((use) => ({ name: use.tag.name, inFrontmatter: use.inFrontmatter })),
 		summary: parts.join(" · "),
