@@ -824,14 +824,21 @@ export class NavigatorView extends ItemView {
 		return el;
 	}
 
-	/** A Logbook or Trash row: drawn as a task's or project's, never written. */
+	/** A Logbook or Trash row, drawn as a task's or project's. A logged task's box reopens it, as the Mac's; nothing else writes. */
 	private archiveRow(parent: HTMLElement, row: ArchiveRowModel): HTMLElement {
 		const el = parent.createDiv({ cls: `ta-da-row is-archive${row.status === "Done" || row.status === "Cancelled" ? " is-closed" : ""}${row.path === null ? " is-static" : ""}` });
 		if (row.kind === "area") drawIcon(el.createSpan({ cls: "ta-da-row-icon" }), { type: "area" });
 		else if (row.kind === "note") setIcon(el.createSpan({ cls: "ta-da-row-icon is-note-icon" }), "file-text");
 		else if (row.kind === "project") {
 			drawIcon(el.createSpan({ cls: `ta-da-row-icon${row.status === "Cancelled" ? " is-muted" : " is-done"}` }), { type: "ring", fraction: 1, ongoing: false });
-		} else drawCheckbox(el, row.status, row.title, null);
+		} else {
+			const file = row.type === "logged" && row.path !== null ? this.app.vault.getFileByPath(row.path) : null;
+			const closed = row.status === "Done" || row.status === "Cancelled";
+			drawCheckbox(el, row.status, file ? `${closed ? (row.status === "Done" ? "Mark not done" : "Reopen") : "Complete"}: ${row.title}` : row.title, file ? (event) => {
+				event.stopPropagation();
+				this.deps.status.toggle(file);
+			} : null);
+		}
 		const main = el.createDiv({ cls: "ta-da-row-main" });
 		main.createSpan({ cls: `ta-da-row-title${row.kind === "task" ? "" : " is-strong"}`, text: row.title });
 		const meta = main.createDiv({ cls: "ta-da-row-meta" });

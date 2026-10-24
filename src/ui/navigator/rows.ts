@@ -71,7 +71,7 @@ export interface NoteRowModel {
 	folder: string | null;
 }
 
-/** A Logbook or Trash row. Neither writes. `path` is null for a file the vault can't open (in `.trash/`). */
+/** A Logbook or Trash row. Only a logged task's box writes. `path` is null for a file the vault can't open (in `.trash/`). */
 export interface ArchiveRowModel {
 	type: "logged" | "trashed";
 	id: string;
