@@ -33,3 +33,19 @@ export function uniqueTags(tags: Tag[]): Tag[] {
 		return true;
 	});
 }
+
+/** The last segment of a tag's name, for example `Garden` for `Home/Garden`. */
+export function tagLeaf(tag: Tag): string {
+	return tag.name.slice(tag.name.lastIndexOf("/") + 1);
+}
+
+/** The tag one level up, spelled as this one; null for a top-level tag. */
+export function tagParent(tag: Tag): Tag | null {
+	const slash = tag.name.lastIndexOf("/");
+	return slash < 0 ? null : readTag(tag.name.slice(0, slash));
+}
+
+/** Whether `other` nests under `tag`, at any depth. A tag isn't its own ancestor. */
+export function isTagAncestor(tag: Tag, other: Tag): boolean {
+	return other.path.startsWith(`${tag.path}/`);
+}
