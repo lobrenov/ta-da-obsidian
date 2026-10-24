@@ -1,7 +1,7 @@
 import { type Checkbox, checkboxState } from "../model/checkbox";
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
 
 /**
  * Changes one checkbox by replacing only the character between its brackets. Null when `marker` isn't in the

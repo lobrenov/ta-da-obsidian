@@ -40,5 +40,10 @@ export function compareCodeUnits(a: string, b: string): number {
 
 /** A name's identity: canonically equivalent spellings match, as Swift's `String` equality does, ignoring case. */
 export function identityKey(text: string): string {
-	return text.normalize("NFC").toLowerCase();
+	return lowercased(text.normalize("NFC"));
+}
+
+/** Swift's `lowercased()`: each scalar on its own, with no context rules such as final sigma. */
+export function lowercased(text: string): string {
+	return Array.from(text, (scalar) => scalar.toLowerCase()).join("");
 }

@@ -190,3 +190,11 @@ describe("Parent", () => {
 		expect(setParent({ kind: "area", title: "Work" }, project)).toBe('---\ntype: project\nstatus: Doing\narea: "[[Work]]"\n---\n');
 	});
 });
+
+describe("ChecklistEditor and a byte order mark", () => {
+	it("keeps the BOM", () => {
+		const text = "﻿- [ ] a\n";
+		// The BOM is three UTF-8 bytes, so the marker is at column 6 of the first line.
+		expect(click({ marker: " ", lineIndex: 0, column: 6, state: "open" }, text)).toBe("﻿- [x] a\n");
+	});
+});

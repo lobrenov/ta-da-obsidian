@@ -1,8 +1,12 @@
 import { type App, type Editor, MarkdownView, normalizePath, type TFile } from "obsidian";
 import { lineChange } from "./core/writing/lineChange";
-import { filename } from "./core/writing/fileNaming";
+import { filename, sanitise } from "./core/writing/fileNaming";
 
-/** Computes a file's new text from its current text; null leaves the file alone. */
+/**
+ * Computes a file's new text from its current text; null leaves the file alone. The edit must locate its target inside
+ * the text it's given (a key, a checkbox by its line and marker), not trust positions from the index: it may run again
+ * on newer text, and the editor's text can be ahead of the index.
+ */
 export type Edit = (text: string) => string | null;
 
 /**
@@ -12,14 +16,13 @@ export type Edit = (text: string) => string | null;
  */
 export class Writer {
 	private readonly queues = new Map<TFile, Promise<void>>();
-
 	constructor(private readonly app: App) {}
 
 	/** Resolves to whether the file's text changed. */
 	apply(file: TFile, edit: Edit): Promise<boolean> {
 		return this.enqueue(file, async () => {
 			const view = this.openView(file);
-			return view ? applyToEditor(view.editor, edit) : this.applyToFile(file, edit);
+			return view ? this.applyToEditor(file, view.editor, edit) : this.applyToFile(file, edit);
 		});
 	}
 
@@ -28,9 +31,9 @@ export class Writer {
 		return this.enqueue(file, async () => {
 			const folder = file.parent;
 			if (!folder) return file.path;
-			const names = new Set(folder.children.map((child) => child.name));
-			names.delete(file.name);
-			const name = filename(title, names, file.extension);
+			const names = new Set(folder.children.map((child) => normalizePath(child.name)));
+			names.delete(normalizePath(file.name));
+			const name = filename(normalizePath(sanitise(title)), names, file.extension);
 			if (name === file.name) return file.path;
 			await this.app.fileManager.renameFile(file, normalizePath(`${folder.path}/${name}`));
 			return file.path;
@@ -51,6 +54,8 @@ export class Writer {
 	}
 
 	private openView(file: TFile): MarkdownView | null {
+		const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (active?.file === file) return active;
 		for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
 			if (leaf.view instanceof MarkdownView && leaf.view.file === file) return leaf.view;
 		}
@@ -70,14 +75,13 @@ export class Writer {
 		});
 		return wrote;
 	}
-}
 
-function applyToEditor(editor: Editor, edit: Edit): boolean {
-	const before = editor.getValue();
-	const after = edit(before);
-	if (after === null) return false;
-	const change = lineChange(before, after);
-	if (!change) return false;
-	editor.transaction({ changes: [change] });
-	return true;
+	private applyToEditor(file: TFile, editor: Editor, edit: Edit): boolean {
+		const before = editor.getValue();
+		const after = edit(before);
+		const change = after === null ? null : lineChange(before, after);
+		if (!change) return false;
+		editor.transaction({ changes: [change] });
+		return true;
+	}
 }

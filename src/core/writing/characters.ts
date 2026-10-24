@@ -1,4 +1,6 @@
-import { isWhitespaceUnit } from "../text";
+import { isWhitespaceUnit, lowercased } from "../text";
+
+export { lowercased };
 
 /*
  * Swift's `Character` is an extended grapheme cluster, and its `isWhitespace`, `isNewline` and `isLetter` read the
@@ -85,9 +87,4 @@ export function splitOnCharacter(text: string, separator: string): string[] {
 	}
 	if (current !== "") pieces.push(current);
 	return pieces;
-}
-
-/** Swift's `lowercased()`: each scalar on its own, with no context rules such as final sigma. */
-export function lowercased(text: string): string {
-	return Array.from(text, (scalar) => scalar.toLowerCase()).join("");
 }

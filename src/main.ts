@@ -1,6 +1,7 @@
-import { Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 import { LocalDate } from "./core/model/localDate";
 import { statuses } from "./core/model/status";
+import { parseItem } from "./core/parsing/parseItem";
 import { setStatus } from "./core/writing/completion";
 import { TaDaIndex } from "./TaDaIndex";
 import { Writer } from "./Writer";
@@ -24,17 +25,24 @@ export default class TaDaPlugin extends Plugin {
 				name: `Set status: ${status.toLowerCase()}`,
 				checkCallback: (checking) => {
 					const file = this.app.workspace.getActiveFile();
-					if (!(file instanceof TFile) || !this.isTaskOrProject(file)) return false;
-					if (!checking) void this.writer.apply(file, (text) => setStatus(status, text, today()));
+					const item = file instanceof TFile ? this.taDaIndex.index.items.get(file.path) : undefined;
+					if (!(file instanceof TFile) || !item) return false;
+					const { kind } = item.properties;
+					if (kind !== "task" && kind !== "project") return false;
+					if (status === "Ongoing" && kind !== "project") return false;
+					if (!checking) {
+						this.writer
+							.apply(file, (text) =>
+								parseItem(text, file.path)?.properties.status === status ? null : setStatus(status, text, today()),
+							)
+							.catch((error: unknown) => {
+								new Notice(`Couldn't set the status: ${error instanceof Error ? error.message : String(error)}`);
+							});
+					}
 					return true;
 				},
 			});
 		}
-	}
-
-	private isTaskOrProject(file: TFile): boolean {
-		const kind = this.taDaIndex.index.items.get(file.path)?.properties.kind;
-		return kind === "task" || kind === "project";
 	}
 }
 

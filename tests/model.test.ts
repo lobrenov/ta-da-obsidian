@@ -222,3 +222,11 @@ describe("Item paths", () => {
 		expect(parseItem(text, "tasks/x.md")).toBeNull();
 	});
 });
+
+describe("identityKey", () => {
+	it("lowercases per scalar, with no final sigma", async () => {
+		const { identityKey } = await import("../src/core/text");
+		expect(identityKey("ΟΔΟΣ")).toBe("οδοσ");
+		expect(identityKey("Café")).toBe(identityKey("Café"));
+	});
+});
