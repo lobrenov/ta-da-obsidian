@@ -448,29 +448,28 @@
 	gap: 12px;
 }
 
+/* As the Agenda's Week | Month switch. */
 .ta-da-new-switch {
 	display: flex;
 	align-self: flex-start;
 	gap: 2px;
 	padding: 2px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-secondary);
+	border-radius: 6px;
+	background: var(--background-modifier-hover);
 }
 
-.ta-da-new-kind {
+.ta-da-new-switch button.ta-da-new-kind {
 	height: 22px;
 	padding: 0 10px;
-	border-radius: 6px;
+	border-radius: 4px;
 	background: transparent;
 	box-shadow: none;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
 }
 
-.ta-da-new-kind.is-on {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+.ta-da-new-switch button.ta-da-new-kind.is-on {
+	background: var(--background-primary);
 	font-weight: var(--font-semibold);
 }
 
