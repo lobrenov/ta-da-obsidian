@@ -25,9 +25,9 @@ export default class TaDaPlugin extends Plugin {
 		this.writer = new Writer(this.app);
 		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday);
 		this.addStatusCommands();
-		registerCommands(this);
+		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
-		const navigator = registerNavigator(this, this.store);
+		const navigator = registerNavigator(this, this.store, newTask);
 		this.addSettingTab(
 			new TaDaSettingTab(
 				this.app,

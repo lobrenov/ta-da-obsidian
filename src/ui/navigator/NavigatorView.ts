@@ -1,4 +1,4 @@
-import { debounce, ItemView, Keymap, Menu, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
+import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
 import type { Grouping } from "../../core/index/grouping";
 import type { LocalDate } from "../../core/model/localDate";
 import { statuses } from "../../core/model/status";
@@ -29,6 +29,7 @@ import { buildList, type ListContext, type ListModel, type SectionHeader, type S
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
+import { currentPhoneTab, type PhoneTab, phoneTabs } from "./phone";
 import { moveSelection } from "./selection";
 import type { NavigatorSettings } from "./navigatorSettings";
 
@@ -42,6 +43,8 @@ export interface NavigatorDeps {
 	writer: Writer;
 	status: StatusActions;
 	settings: NavigatorSettings;
+	/** Opens the New task window; the phone top bar's button. */
+	newTask: () => void;
 }
 
 const noPicked: ReadonlySet<string> = new Set();
@@ -80,6 +83,9 @@ export class NavigatorView extends ItemView {
 	private listHeadEl!: HTMLElement;
 	private listBodyEl!: HTMLElement;
 	private collapseEl!: HTMLElement;
+	/** The phone's top bar back button and bottom bar tabs. */
+	private phoneBackEl: HTMLElement | null = null;
+	private readonly phoneTabEls = new Map<PhoneTab, HTMLElement>();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -154,6 +160,10 @@ export class NavigatorView extends ItemView {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("ta-da-navigator");
+		if (Platform.isPhone) {
+			root.addClass("is-phone");
+			this.buildTopBar(root);
+		}
 
 		const nav = root.createDiv({ cls: "ta-da-nav-pane" });
 		const search = nav.createDiv({ cls: "search-input-container ta-da-search" });
@@ -166,10 +176,89 @@ export class NavigatorView extends ItemView {
 		this.listPaneEl.addEventListener("keydown", (event) => this.onListKey(event));
 		this.listHeadEl = this.listPaneEl.createDiv({ cls: "ta-da-list-head" });
 		this.listBodyEl = this.listPaneEl.createDiv({ cls: "ta-da-list-body" });
+		if (Platform.isPhone) this.buildBottomBar(root);
 
 		this.collapseEl = this.addAction("panel-left-close", "Hide list pane", () => {
 			void this.deps.settings.update({ collapseListPane: !this.deps.settings.data.collapseListPane });
 		});
+	}
+
+	/** The phone's top bar: back (‹ Ta Da) at the left, Search and New task at the right. */
+	private buildTopBar(root: HTMLElement): void {
+		const bar = root.createDiv({ cls: "ta-da-phone-top" });
+		const back = bar.createEl("button", { cls: "ta-da-phone-back", attr: { type: "button", "aria-label": "Back" } });
+		setIcon(back.createSpan({ cls: "ta-da-phone-back-icon" }), "chevron-left");
+		back.createSpan({ text: "Ta Da" });
+		back.addEventListener("click", () => this.phoneBack());
+		this.phoneBackEl = back;
+		bar.createSpan({ cls: "ta-da-phone-top-space" });
+		this.iconButton(bar, "search", "Search", () => this.phoneSearch());
+		bar.lastElementChild?.addClass("ta-da-phone-button");
+		this.iconButton(bar, "plus", "New task", () => this.deps.newTask());
+		bar.lastElementChild?.addClass("ta-da-phone-button");
+	}
+
+	/** The phone's bottom bar: a tab each for Agenda, Projects and Files, the icon above the label. */
+	private buildBottomBar(root: HTMLElement): void {
+		const bar = root.createEl("nav", { cls: "ta-da-phone-tabs", attr: { "aria-label": "Ta Da" } });
+		for (const tab of phoneTabs) {
+			const button = bar.createEl("button", { cls: "ta-da-phone-tab", attr: { type: "button" } });
+			setIcon(button.createSpan({ cls: "ta-da-phone-tab-icon" }), tab.icon);
+			button.createSpan({ text: tab.label });
+			button.addEventListener("click", () => this.openPhoneTab(tab.id));
+			this.phoneTabEls.set(tab.id, button);
+		}
+	}
+
+	/** Marks the current tab, shows the back button when something sits over the navigation pane, and shows the search field above search results. */
+	private updatePhone(): void {
+		if (!Platform.isPhone) return;
+		const searching = this.query.trim() !== "";
+		this.contentEl.toggleClass("is-searching", searching);
+		this.phoneBackEl?.toggleClass("is-hidden", !this.showingList && !searching);
+		const current = currentPhoneTab({ domain: this.domain, query: this.query, showingList: this.showingList });
+		for (const [id, el] of this.phoneTabEls) {
+			if (id === current) el.setAttribute("aria-current", "page");
+			else el.removeAttribute("aria-current");
+		}
+	}
+
+	private openPhoneTab(tab: PhoneTab): void {
+		switch (tab) {
+			case "agenda":
+				this.show({ kind: "agenda" });
+				break;
+			case "projects":
+				this.query = "";
+				this.searchEl.value = "";
+				this.showingList = false;
+				this.mode = "tasks";
+				this.maybeRefreshTrash();
+				this.refresh();
+				this.save();
+				break;
+			case "files": {
+				const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0];
+				if (explorer) void this.app.workspace.revealLeaf(explorer);
+				break;
+			}
+		}
+	}
+
+	/** Back to the navigation pane, clearing a search. */
+	private phoneBack(): void {
+		this.query = "";
+		this.searchEl.value = "";
+		this.showingList = false;
+		this.maybeRefreshTrash();
+		this.refresh();
+	}
+
+	/** The navigation pane, with the search field focused. */
+	private phoneSearch(): void {
+		this.showingList = false;
+		this.refresh();
+		this.searchEl.focus();
 	}
 
 	private applyCollapse(): void {
@@ -237,6 +326,7 @@ export class NavigatorView extends ItemView {
 		}
 		if (!list) return;
 		this.contentEl.toggleClass("is-showing-list", this.showingList);
+		this.updatePhone();
 		this.renderNav(ctx);
 		this.renderList(list);
 	}
@@ -268,7 +358,7 @@ export class NavigatorView extends ItemView {
 
 	private search(query: string): void {
 		this.query = query;
-		if (query.trim() !== "") this.showingList = true;
+		if (query.trim() !== "" && !Platform.isPhone) this.showingList = true;
 		this.refresh();
 	}
 

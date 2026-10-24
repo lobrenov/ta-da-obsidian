@@ -742,6 +742,152 @@
 	}
 }
 
+/* Phone: always one pane, between a top bar and a bottom bar of tabs. The Back button moves to the top bar. */
+.ta-da-navigator.is-phone {
+	flex-direction: column;
+	overflow-x: hidden;
+}
+
+.ta-da-navigator.is-phone .ta-da-nav-pane,
+.ta-da-navigator.is-phone .ta-da-list-pane {
+	display: flex;
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 0;
+	border-right: 0;
+}
+
+.ta-da-navigator.is-phone:not(.is-showing-list) .ta-da-list-pane,
+.ta-da-navigator.is-phone.is-showing-list .ta-da-nav-pane {
+	display: none;
+}
+
+/* Searching: the search field stays above the results. */
+.ta-da-navigator.is-phone.is-searching .ta-da-nav-pane {
+	display: flex;
+	flex: none;
+	padding-bottom: 0;
+}
+
+.ta-da-navigator.is-phone.is-searching .ta-da-list-pane {
+	display: flex;
+}
+
+.ta-da-navigator.is-phone.is-searching .ta-da-nav-body {
+	display: none;
+}
+
+.ta-da-navigator.is-phone .ta-da-list-back {
+	display: none;
+}
+
+.ta-da-navigator.is-phone .ta-da-list-head {
+	padding-top: 0;
+}
+
+.ta-da-navigator.is-phone .ta-da-list-title {
+	font-size: calc(var(--font-ui-large) * 1.3);
+}
+
+.ta-da-navigator .ta-da-phone-top {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+	padding: 0 var(--size-4-2);
+}
+
+.ta-da-navigator .ta-da-phone-top-space {
+	flex: 1 1 auto;
+}
+
+.ta-da-navigator .ta-da-phone-back {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	height: 44px;
+	padding: 0 var(--size-4-1);
+	background: transparent;
+	box-shadow: none;
+	color: var(--ta-da-accent);
+}
+
+.ta-da-navigator .ta-da-phone-back.is-hidden {
+	visibility: hidden;
+}
+
+.ta-da-navigator .ta-da-phone-back-icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.ta-da-navigator .ta-da-phone-button {
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+}
+
+.ta-da-navigator .ta-da-phone-button svg {
+	width: 20px;
+	height: 20px;
+}
+
+.ta-da-navigator .ta-da-phone-tabs {
+	display: grid;
+	flex: none;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	padding: var(--size-4-1) var(--size-4-2) calc(var(--size-4-1) + env(safe-area-inset-bottom));
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.ta-da-navigator .ta-da-phone-tab {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	min-height: 44px;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-navigator .ta-da-phone-tab[aria-current="page"] {
+	color: var(--ta-da-accent);
+}
+
+.ta-da-navigator .ta-da-phone-tab-icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+/* Touch targets: rows are at least 44px tall, and the checkbox's hit area is 44px around its drawn box. */
+.ta-da-navigator.is-phone .ta-da-row,
+.ta-da-navigator.is-phone .ta-da-nav-item .tree-item-self {
+	box-sizing: border-box;
+	align-items: center;
+	min-height: 44px;
+}
+
+.ta-da-navigator.is-phone .ta-da-list-button {
+	width: 44px;
+	height: 44px;
+}
+
+.ta-da-navigator.is-phone .ta-da-checkbox {
+	position: relative;
+	margin: 0;
+}
+
+.ta-da-navigator.is-phone .ta-da-checkbox::after {
+	content: "";
+	position: absolute;
+	inset: -14px;
+}
+
 .ta-da-navigator .ta-da-list-head {
 	display: flex;
 	flex: none;

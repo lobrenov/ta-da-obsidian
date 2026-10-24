@@ -14,7 +14,8 @@ import { type StatusActions, statusItem } from "./ui/statusActions";
 export type CommandsPlugin = Plugin & { taDaIndex: TaDaIndex; writer: Writer; statusActions: StatusActions };
 
 /** New task, Complete, and Move to project or area. None has a default hotkey. */
-export function registerCommands(plugin: CommandsPlugin): void {
+/** Returns the New task action, for the phone navigator's button. */
+export function registerCommands(plugin: CommandsPlugin): { newTask: () => void } {
 	const { app } = plugin;
 	const index = plugin.taDaIndex.index;
 	const host = { app, index, today: localToday };
@@ -24,17 +25,14 @@ export function registerCommands(plugin: CommandsPlugin): void {
 		return file instanceof TFile && item ? { file, kind: item.properties.kind as "task" | "project" } : null;
 	};
 
-	plugin.addCommand({
-		id: "new-task",
-		name: "New task",
-		callback: () => {
-			const view = app.workspace
-				.getLeavesOfType(navigatorViewType)
-				.map((leaf) => leaf.view)
-				.find((candidate): candidate is NavigatorView => candidate instanceof NavigatorView && candidate.containerEl.isShown());
-			new NewTaskModal(app, host, prefillDraft(view?.newTaskContext() ?? null, index)).open();
-		},
-	});
+	const newTask = (): void => {
+		const view = app.workspace
+			.getLeavesOfType(navigatorViewType)
+			.map((leaf) => leaf.view)
+			.find((candidate): candidate is NavigatorView => candidate instanceof NavigatorView && candidate.containerEl.isShown());
+		new NewTaskModal(app, host, prefillDraft(view?.newTaskContext() ?? null, index)).open();
+	};
+	plugin.addCommand({ id: "new-task", name: "New task", callback: newTask });
 
 	plugin.addCommand({
 		id: "complete",
@@ -65,4 +63,6 @@ export function registerCommands(plugin: CommandsPlugin): void {
 			return true;
 		},
 	});
+
+	return { newTask };
 }
