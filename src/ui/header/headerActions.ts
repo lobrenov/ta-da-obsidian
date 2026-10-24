@@ -1,4 +1,4 @@
-import { type App, type Modal, Menu, type MenuItem, Notice, type TFile } from "obsidian";
+import { type App, type Modal, Menu, type MenuItem, Notice, Platform, type TFile } from "obsidian";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { LocalDate } from "../../core/model/localDate";
 import type { Status } from "../../core/model/status";
@@ -31,7 +31,7 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 			new Notice(`Couldn't save the change: ${error instanceof Error ? error.message : String(error)}`);
 		});
 	};
-	/** Opens a modal with the chip that opened it marked `is-open` until it closes. */
+	/** Opens a modal below the chip that opened it (above when there's no room), with the chip marked `is-open` until it closes. */
 	const open = (modal: Modal, anchor: HTMLElement): void => {
 		anchor.classList.add("is-open");
 		const onClose = modal.onClose.bind(modal);
@@ -40,6 +40,7 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 			anchor.classList.remove("is-open");
 		};
 		modal.open();
+		if (!Platform.isPhone) placeBelow(modal, anchor);
 	};
 
 	return {
@@ -77,14 +78,17 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 			);
 			open(modal, anchor);
 		},
-		openAddTag() {
+		openAddTag(anchor) {
 			const onFile = model.tags.filter((tag) => tag.inFrontmatter).map((tag) => tag.name);
 			const vaultTags = host.index.carriedTags;
-			new TagModal(
-				host.app,
-				(query) => tagChoices(vaultTags, onFile, query),
-				(choice) => write(choice.current ? removeTagEdit(choice.name) : addTagEdit(choice.name)),
-			).open();
+			open(
+				new TagModal(
+					host.app,
+					(query) => tagChoices(vaultTags, onFile, query),
+					(choice) => write(choice.current ? removeTagEdit(choice.name) : addTagEdit(choice.name)),
+				),
+				anchor,
+			);
 		},
 		removeTag(name) {
 			write(removeTagEdit(name));
@@ -93,6 +97,20 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 			return host.toggleProperties(file.path);
 		},
 	};
+}
+
+/** Moves an open modal to the anchor's left edge, below it, or above it when it doesn't fit; kept 8px inside the window. */
+function placeBelow(modal: Modal, anchor: HTMLElement): void {
+	const win = anchor.ownerDocument.defaultView;
+	if (!win) return;
+	const chip = anchor.getBoundingClientRect();
+	const box = modal.modalEl.getBoundingClientRect();
+	const margin = 8;
+	const left = Math.max(margin, Math.min(chip.left, win.innerWidth - box.width - margin));
+	const below = chip.bottom + 4;
+	const top = below + box.height <= win.innerHeight - margin ? below : Math.max(margin, chip.top - 4 - box.height);
+	modal.containerEl.classList.add("ta-da-anchored");
+	modal.modalEl.setCssProps({ "--ta-da-modal-left": `${left}px`, "--ta-da-modal-top": `${top}px` });
 }
 
 /**

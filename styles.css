@@ -364,6 +364,12 @@
 	margin-bottom: 10px;
 }
 
+.ta-da-date-quick button {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0 8px;
+}
+
 .ta-da-date-nav {
 	display: flex;
 	align-items: center;
@@ -421,8 +427,13 @@
 	background: var(--interactive-accent-hover);
 }
 
-.ta-da-date-quick .ta-da-date-clear {
-	margin-left: auto;
+/* A menu opened from a header chip sits by the chip. */
+
+.modal-container.ta-da-anchored .modal {
+	position: fixed;
+	left: var(--ta-da-modal-left);
+	top: var(--ta-da-modal-top);
+	margin: 0;
 }
 
 /* Navigator */
@@ -446,6 +457,12 @@
 	padding: 0;
 	overflow-x: auto;
 	overflow-y: hidden;
+}
+
+/* Obsidian pads every view's content; the navigator's panes carry their own padding. */
+.workspace-leaf-content[data-type="ta-da-navigator"] .view-content {
+	padding: 0;
+	overflow: hidden;
 }
 
 /* Icons and their colours */
@@ -744,8 +761,9 @@
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
-	min-height: 30px;
-	padding: 0 var(--size-4-3);
+	min-height: 34px;
+	margin-bottom: var(--size-4-1);
+	padding: var(--size-4-1) var(--size-4-3);
 	border-bottom: 1px solid var(--background-modifier-border);
 	color: var(--text-normal);
 	font-size: 15px;
@@ -813,6 +831,7 @@
 
 .ta-da-navigator .ta-da-row {
 	display: flex;
+	margin-bottom: 2px;
 	align-items: flex-start;
 	gap: var(--size-4-2);
 	padding: 7px var(--size-4-3);
@@ -1155,7 +1174,7 @@
 }
 
 .ta-da-navigator .ta-da-section .ta-da-filter {
-	padding: var(--size-4-1) var(--size-4-3);
+	padding: var(--size-4-1) var(--size-4-3) var(--size-4-2);
 }
 
 .ta-da-navigator .ta-da-row.is-day {
