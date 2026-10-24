@@ -4,6 +4,7 @@ import { statuses } from "./core/model/status";
 import { parseItem } from "./core/parsing/parseItem";
 import { setStatus } from "./core/writing/completion";
 import { TaDaIndex } from "./TaDaIndex";
+import { registerNavigator } from "./ui/navigator/register";
 import { Writer } from "./Writer";
 
 export default class TaDaPlugin extends Plugin {
@@ -13,8 +14,9 @@ export default class TaDaPlugin extends Plugin {
 	override onload(): void {
 		this.taDaIndex = new TaDaIndex(this);
 		this.taDaIndex.start();
-		this.writer = new Writer(this.app);
+		this.writer = new Writer(this.app, (file, text) => this.taDaIndex.apply(file, text));
 		this.addStatusCommands();
+		registerNavigator(this);
 	}
 
 	/** One `Set status` command per status, on the active task or project file. */

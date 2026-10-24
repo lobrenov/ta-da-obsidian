@@ -3,6 +3,8 @@ import { VaultIndex } from "./core/index/vaultIndex";
 import { parseItem } from "./core/parsing/parseItem";
 
 const readBatch = 64;
+/** How long after the last change `onChange` listeners are called. */
+const changeDelay = 150;
 
 /**
  * Obsidian's side of `VaultIndex`: built from the vault's markdown files once the layout is ready, then patched as
@@ -17,6 +19,8 @@ export class TaDaIndex {
 	private lastGeneration = 0;
 	/** The latest change seen for each path with a read pending, so a slow read never overwrites a newer change. */
 	private readonly generations = new Map<string, number>();
+	private readonly listeners = new Set<() => void>();
+	private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(private readonly plugin: Plugin) {
 		this.ready = new Promise((resolve) => {
@@ -27,6 +31,8 @@ export class TaDaIndex {
 	start(): void {
 		this.plugin.register(() => {
 			this.unloaded = true;
+			clearTimeout(this.changeTimer);
+			this.listeners.clear();
 			this.resolveReady();
 		});
 		this.plugin.app.workspace.onLayoutReady(() => {
@@ -36,12 +42,29 @@ export class TaDaIndex {
 		});
 	}
 
+	/**
+	 * Calls `listener` once, shortly after the last of a run of changes to the index (a file read, changed, renamed or
+	 * deleted). Returns a function that stops listening.
+	 */
+	onChange(listener: () => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	}
+
+	private changed(): void {
+		clearTimeout(this.changeTimer);
+		this.changeTimer = setTimeout(() => {
+			for (const listener of [...this.listeners]) listener();
+		}, changeDelay);
+	}
+
 	private async build(): Promise<void> {
 		const files = this.plugin.app.vault.getFiles().filter(isMarkdown);
 		for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
 			await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
 		}
 		this.resolveReady();
+		this.changed();
 	}
 
 	private registerEvents(): void {
@@ -70,7 +93,7 @@ export class TaDaIndex {
 	}
 
 	/** Replaces a file's item; a file that isn't a Ta Da file or note, or that can't be parsed, leaves the index. */
-	private apply(file: TFile, text: string): void {
+	apply(file: TFile, text: string): void {
 		if (!isMarkdown(file)) return;
 		this.generations.delete(file.path);
 		try {
@@ -80,6 +103,7 @@ export class TaDaIndex {
 		} catch {
 			this.index.remove(file.path);
 		}
+		this.changed();
 	}
 
 	private renamed(file: TAbstractFile, oldPath: string): void {
@@ -101,6 +125,7 @@ export class TaDaIndex {
 	private remove(path: string): void {
 		this.generations.delete(path);
 		this.index.remove(path);
+		this.changed();
 	}
 
 	private removeUnder(folder: string): void {
@@ -108,6 +133,7 @@ export class TaDaIndex {
 		for (const path of [...this.index.items.keys(), ...this.generations.keys()]) {
 			if (path.startsWith(prefix)) this.remove(path);
 		}
+		this.changed();
 	}
 }
 

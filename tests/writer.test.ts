@@ -37,7 +37,7 @@ interface Fake {
 }
 
 /** An `App` with a vault that holds `texts`, and no open views unless `views` gives them. */
-function makeApp(options: { read?: (file: FakeFile) => Promise<string>; current?: string; active?: unknown; leaves?: unknown[] } = {}): Fake {
+function makeApp(options: { read?: (file: FakeFile) => Promise<string>; current?: string; active?: unknown; leaves?: unknown[]; onWritten?: (file: FakeFile, text: string) => void } = {}): Fake {
 	const process = vi.fn(async (_file: FakeFile, fn: (text: string) => string) => fn(options.current ?? "base"));
 	const renameFile = vi.fn(async () => undefined);
 	const app = {
@@ -49,7 +49,7 @@ function makeApp(options: { read?: (file: FakeFile) => Promise<string>; current?
 		},
 	};
 	// The fake has only what Writer uses.
-	return { writer: new Writer(app as never), process, renameFile };
+	return { writer: new Writer(app as never, options.onWritten as never), process, renameFile };
 }
 
 describe("Writer", () => {
@@ -130,6 +130,21 @@ describe("Writer", () => {
 			changes: [{ from: { line: 1, ch: 10 }, to: { line: 1, ch: 13 }, text: "ne" }],
 		});
 		expect(fake.process).not.toHaveBeenCalled();
+	});
+
+	it("tells onWritten the new text after a write through process, and after one through the editor", async () => {
+		const written: string[] = [];
+		const file = makeFile("a.md");
+		await makeApp({ onWritten: (_file, text) => written.push(text) }).writer.apply(file as never, (text) => `${text}+`);
+		const view = Object.assign(newView(), { file, editor: { getValue: () => "one", transaction: vi.fn() } });
+		await makeApp({ active: view, onWritten: (_file, text) => written.push(text) }).writer.apply(file as never, () => "two");
+		expect(written).toEqual(["base+", "two"]);
+	});
+
+	it("doesn't tell onWritten when nothing changed", async () => {
+		const onWritten = vi.fn();
+		await makeApp({ onWritten }).writer.apply(makeFile("a.md") as never, () => null);
+		expect(onWritten).not.toHaveBeenCalled();
 	});
 
 	it("finds an open view among the leaves when the active one shows another file", async () => {

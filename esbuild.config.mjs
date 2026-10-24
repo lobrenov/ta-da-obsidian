@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import { builtinModules } from "node:module";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -39,6 +39,7 @@ const copyToVault = {
 			if (result.errors.length > 0 || !pluginFolder) return;
 			copyFileSync("main.js", join(pluginFolder, "main.js"));
 			copyFileSync("manifest.json", join(pluginFolder, "manifest.json"));
+			if (existsSync("styles.css")) copyFileSync("styles.css", join(pluginFolder, "styles.css"));
 		});
 	},
 };
