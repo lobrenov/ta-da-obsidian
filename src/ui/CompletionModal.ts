@@ -47,7 +47,8 @@ export class CompletionModal extends Modal {
 				this.close();
 				this.answer(status);
 			});
-			if (primary) button.focus();
+			// After `Modal.open`, which focuses the first button once `onOpen` returns.
+			if (primary) this.contentEl.win.setTimeout(() => button.focus());
 		}
 	}
 

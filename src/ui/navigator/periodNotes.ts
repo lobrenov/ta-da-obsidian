@@ -25,7 +25,18 @@ export function folderOfPath(path: string): string {
  * taken in the folder, in any case, is never numbered: that file's path resolves instead. Resolves to null when it
  * couldn't be made.
  */
-export async function createPeriodNote(app: App, target: string, templatePath: string | null, today: LocalDate): Promise<string | null> {
+export function createPeriodNote(app: App, target: string, templatePath: string | null, today: LocalDate): Promise<string | null> {
+	const pending = creating.get(target);
+	if (pending) return pending;
+	const made = makePeriodNote(app, target, templatePath, today).finally(() => creating.delete(target));
+	creating.set(target, made);
+	return made;
+}
+
+/** Notes being made, by target path, so a second click waits for the first. */
+const creating = new Map<string, Promise<string | null>>();
+
+async function makePeriodNote(app: App, target: string, templatePath: string | null, today: LocalDate): Promise<string | null> {
 	const { vault } = app;
 	const folder = existingCasing(folderOfPath(target), vault.getAllFolders(true).map((entry) => entry.path));
 	const filename = target.slice(target.lastIndexOf("/") + 1);

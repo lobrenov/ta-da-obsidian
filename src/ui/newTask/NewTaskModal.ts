@@ -21,9 +21,10 @@ export class NewTaskModal extends Modal {
 	private draft: QuickEntryDraft;
 	private switchEl!: HTMLElement;
 	private titleInput!: HTMLInputElement;
-	private headerEl!: HTMLElement;
+	private chipsEl!: HTMLElement;
 	private fileEl!: HTMLElement;
 	private createButton!: HTMLButtonElement;
+	private creating = false;
 
 	constructor(
 		app: App,
@@ -49,7 +50,7 @@ export class NewTaskModal extends Modal {
 			event.preventDefault();
 			void this.create();
 		});
-		this.headerEl = element(doc, "div", "ta-da-header ta-da-new-header");
+		this.chipsEl = element(doc, "div", "ta-da-header ta-da-new-header");
 		this.fileEl = element(doc, "div", "ta-da-new-file");
 		const footer = element(doc, "div", "ta-da-new-footer");
 		footer.appendChild(element(doc, "span", "ta-da-grow"));
@@ -58,9 +59,10 @@ export class NewTaskModal extends Modal {
 		this.createButton = footer.appendChild(element(doc, "button", "mod-cta", "Create", { type: "button" }));
 		this.createButton.addEventListener("click", () => void this.create());
 
-		this.contentEl.append(this.switchEl, this.titleInput, this.headerEl, this.fileEl, footer);
+		this.contentEl.append(this.switchEl, this.titleInput, this.chipsEl, this.fileEl, footer);
 		this.draw();
-		this.titleInput.focus();
+		// After `Modal.open`, which focuses the first button once `onOpen` returns.
+		this.contentEl.win.setTimeout(() => this.titleInput.focus());
 	}
 
 	override onClose(): void {
@@ -70,7 +72,8 @@ export class NewTaskModal extends Modal {
 	private change(change: (draft: QuickEntryDraft) => void): void {
 		change(this.draft);
 		this.draw();
-		this.titleInput.focus();
+		// After `Modal.open`, which focuses the first button once `onOpen` returns.
+		this.contentEl.win.setTimeout(() => this.titleInput.focus());
 	}
 
 	private draw(): void {
@@ -138,7 +141,7 @@ export class NewTaskModal extends Modal {
 					}),
 			),
 		);
-		this.headerEl.replaceChildren(inner);
+		this.chipsEl.replaceChildren(inner);
 	}
 
 	/** The file it will write, and a warning when its name is taken and gets a number. */
@@ -171,7 +174,9 @@ export class NewTaskModal extends Modal {
 	}
 
 	private async create(): Promise<void> {
-		if (this.draft.title.trim() === "") return;
+		if (this.draft.title.trim() === "" || this.creating) return;
+		this.creating = true;
+		this.createButton.disabled = true;
 		const { vault, workspace } = this.app;
 		const placement = this.place();
 		try {
@@ -185,6 +190,8 @@ export class NewTaskModal extends Modal {
 			await workspace.getLeaf(false).openFile(file);
 		} catch (error) {
 			new Notice(`Couldn't create the file: ${error instanceof Error ? error.message : String(error)}`);
+			this.creating = false;
+			this.draw();
 		}
 	}
 }
