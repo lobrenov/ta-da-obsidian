@@ -16,7 +16,11 @@ export type Edit = (text: string) => string | null;
  */
 export class Writer {
 	private readonly queues = new Map<TFile, Promise<void>>();
-	constructor(private readonly app: App) {}
+	/** `onWritten` hears each change at once, with the file's new text, ahead of Obsidian's own index of it. */
+	constructor(
+		private readonly app: App,
+		private readonly onWritten: (file: TFile, text: string) => void = () => undefined,
+	) {}
 
 	/** Resolves to whether the file's text changed. */
 	apply(file: TFile, edit: Edit): Promise<boolean> {
@@ -66,22 +70,25 @@ export class Writer {
 		const base = await this.app.vault.read(file);
 		const next = edit(base);
 		if (next === null || next === base) return false;
-		let wrote = false;
+		let written: string | null = null;
 		await this.app.vault.process(file, (current) => {
 			const text = current === base ? next : edit(current);
 			if (text === null || text === current) return current;
-			wrote = true;
+			written = text;
 			return text;
 		});
-		return wrote;
+		if (written === null) return false;
+		this.onWritten(file, written);
+		return true;
 	}
 
 	private applyToEditor(file: TFile, editor: Editor, edit: Edit): boolean {
 		const before = editor.getValue();
 		const after = edit(before);
 		const change = after === null ? null : lineChange(before, after);
-		if (!change) return false;
+		if (after === null || !change) return false;
 		editor.transaction({ changes: [change] });
+		this.onWritten(file, after);
 		return true;
 	}
 }

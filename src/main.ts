@@ -6,6 +6,7 @@ import { TaDaIndex } from "./TaDaIndex";
 import { statusEdit } from "./ui/header/edits";
 import { registerHeader } from "./ui/header/registerHeader";
 import { today } from "./ui/header/today";
+import { registerNavigator } from "./ui/navigator/register";
 import { Writer } from "./Writer";
 
 export default class TaDaPlugin extends Plugin {
@@ -17,15 +18,27 @@ export default class TaDaPlugin extends Plugin {
 		this.settings = resolveSettings(await this.loadData());
 		this.taDaIndex = new TaDaIndex(this);
 		this.taDaIndex.start();
-		this.writer = new Writer(this.app);
+		this.writer = new Writer(this.app, (file, text) => this.taDaIndex.apply(file, text));
 		this.addStatusCommands();
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.settings);
+		const navigator = registerNavigator(this);
 		this.addSettingTab(
-			new TaDaSettingTab(this.app, this, this.settings, () => {
-				void this.saveData(this.settings);
-				header.refresh();
-			}),
+			new TaDaSettingTab(
+				this.app,
+				this,
+				this.settings,
+				() => {
+					void this.saveSettings();
+					header.refresh();
+				},
+				navigator,
+			),
 		);
+	}
+
+	/** Saves the header's settings beside the navigator's, which `data.json` keeps under `navigator`. */
+	private async saveSettings(): Promise<void> {
+		await this.saveData({ ...((await this.loadData()) ?? {}), ...this.settings });
 	}
 
 	/** One `Set status` command per status, on the active task or project file. */

@@ -1,5 +1,6 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import type { TaDaSettings } from "./settingsData";
+import { displayNavigatorSettings, type NavigatorSettings } from "./ui/navigator/navigatorSettings";
 
 export class TaDaSettingTab extends PluginSettingTab {
 	constructor(
@@ -7,6 +8,7 @@ export class TaDaSettingTab extends PluginSettingTab {
 		plugin: Plugin,
 		private readonly settings: TaDaSettings,
 		private readonly changed: () => void,
+		private readonly navigator: NavigatorSettings,
 	) {
 		super(app, plugin);
 	}
@@ -22,5 +24,6 @@ export class TaDaSettingTab extends PluginSettingTab {
 					this.changed();
 				}),
 			);
+		displayNavigatorSettings(this.containerEl, this.navigator);
 	}
 }
