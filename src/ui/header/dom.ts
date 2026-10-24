@@ -16,6 +16,8 @@ export const iconPaths = {
 	chevronLeft: "M15 18l-6-6 6-6",
 	chevronRight: "M9 18l6-6-6-6",
 	check: "M20 6L9 17l-5-5",
+	file: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v4a2 2 0 0 0 2 2h4",
+	alert: "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 8v4M12 16h.01",
 } as const;
 
 export type IconName = keyof typeof iconPaths;

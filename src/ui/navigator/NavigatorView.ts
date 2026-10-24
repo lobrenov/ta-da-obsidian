@@ -8,7 +8,7 @@ import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
 import type { Writer } from "../../Writer";
 import { agendaOn, type AgendaState, type StripModel, readAgenda, rolledOver, stepSelection, writeAgenda } from "./agenda";
-import { applyStatus } from "./actions";
+import type { StatusActions } from "../statusActions";
 import { localToday } from "../dates";
 import { drawCheckbox, drawIcon, metaIcon } from "./dom";
 import {
@@ -40,6 +40,7 @@ export const navigatorViewType = "ta-da-navigator";
 export interface NavigatorDeps {
 	taDaIndex: TaDaIndex;
 	writer: Writer;
+	status: StatusActions;
 	settings: NavigatorSettings;
 }
 
@@ -183,6 +184,11 @@ export class NavigatorView extends ItemView {
 	/** The domain the list pane shows: the search, while the field has text. */
 	private effectiveDomain(): Domain {
 		return this.query.trim() === "" ? this.domain : { kind: "search", query: this.query };
+	}
+
+	/** What a new task is prefilled from: the list shown, and the Agenda's selection. */
+	newTaskContext(): { domain: Domain; selection: AgendaState["selection"] } {
+		return { domain: this.effectiveDomain(), selection: this.agenda.selection };
 	}
 
 	private context(): ListContext {
@@ -339,7 +345,7 @@ export class NavigatorView extends ItemView {
 
 	private toggleTask(row: TaskRowModel): void {
 		const file = this.app.vault.getFileByPath(row.path);
-		if (file) applyStatus(this.deps.writer, file, row.closed ? "Not Started" : "Done", this.today);
+		if (file) this.deps.status.set(file, row.closed ? "Not Started" : "Done");
 	}
 
 	/** The status menu on a task or project row. */
@@ -353,7 +359,7 @@ export class NavigatorView extends ItemView {
 		const menu = new Menu();
 		for (const status of statuses) {
 			if (status === "Ongoing" && kind !== "project") continue;
-			menu.addItem((entry) => entry.setTitle(sentence(status)).setChecked(status === current).onClick(() => applyStatus(this.deps.writer, file, status, this.today)));
+			menu.addItem((entry) => entry.setTitle(sentence(status)).setChecked(status === current).onClick(() => this.deps.status.set(file, status)));
 		}
 		menu.showAtMouseEvent(event);
 	}
