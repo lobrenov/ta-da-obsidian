@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { LocalDate } from "../src/core/model/localDate";
 import { readTag, type Tag } from "../src/core/model/tag";
@@ -14,9 +13,9 @@ import * as frontmatter from "../src/core/writing/frontmatterEditor";
 import * as newFile from "../src/core/writing/newFile";
 import { type Parent, setParent } from "../src/core/writing/parent";
 import * as tagEditor from "../src/core/writing/tagEditor";
+import { taDaRepo } from "./taDaRepo";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const writesPath = resolve(repoRoot, "../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/writes.json");
+const writesPath = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/writes.json");
 
 interface WriteCase {
 	name: string;

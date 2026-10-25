@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { checkboxState } from "../src/core/model/checkbox";
 import { LocalDate } from "../src/core/model/localDate";
@@ -13,10 +12,10 @@ import { Lines } from "../src/core/writing/lines";
 import { setParent } from "../src/core/writing/parent";
 import { taskMarkers } from "../src/core/model/checkbox";
 import { changedLines } from "./changedLines";
+import { taDaRepo } from "./taDaRepo";
 
 const today = LocalDate.parse("2026-10-02") as LocalDate;
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const designVault = resolve(repoRoot, "../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/DesignVault");
+const designVault = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/DesignVault");
 
 describe("Lines", () => {
 	it.each(["", "a", "a\n", "a\nb", "a\r\nb\r\n", "\n\n", "Ünï\r\ncödé 🙂\n"])("round-trips %j", (text) => {

@@ -10,7 +10,7 @@ Ta Da's tasks, projects and areas inside Obsidian, over the same vault as the Ta
 - **Commands**: New task, Complete, Move to project or area, Set status (one per status), Open Ta Da: Agenda, Open Ta Da: Tasks, Open Ta Da: Tags. None has a default hotkey.
 - **Status rules**, as in the apps: closing a project with open tasks asks first; reopening a task reopens its Done or Cancelled project; reopening a logged file moves it, and its logged project, out of the Logbook.
 
-Files are created where the apps create them, in `Ta Da/` at the vault's top level. Logging, moving a vault into `Ta Da/`, Calendar events and reminders stay with the apps.
+Files are created where the apps create them, in `Ta Da/` at the vault's top level. Logging, Calendar events and reminders stay with the apps.
 
 ## Install
 By hand: copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins/ta-da/`, then turn on Ta Da in Settings ▸ Community plugins.

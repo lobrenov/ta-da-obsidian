@@ -182,12 +182,12 @@ describe("Checkbox", () => {
 
 describe("Item paths", () => {
 	it("knows note paths", () => {
-		for (const path of ["Note.md", "A/B/Note.MD", "Meetings/tasks/Note.md", ".trash/Note.md", ".trash/Meetings/Note.md"]) {
+		for (const path of ["Note.md", "A/B/Note.MD", "Meetings/tasks/Note.md", "tasks/Note.md", "attachments/Note.md", ".trash/Note.md", ".trash/Meetings/Note.md"]) {
 			expect(isNotePath(path), path).toBe(true);
 		}
 		for (const path of [
-			"tasks/Note.md", "Projects/Note.md", "areas/x/Note.md", "attachments/Note.md", ".logbook/2026-10/Note.md",
-			".obsidian/Note.md", "A/.hidden/Note.md", ".Note.md", "Note.txt", ".trash/attachments/Note.md",
+			"Ta Da/tasks/Note.md", "ta da/projects/Note.md", "Ta Da/logbook/2026-10/Note.md", ".logbook/2026-10/Note.md",
+			".obsidian/Note.md", "A/.hidden/Note.md", ".Note.md", "Note.txt", ".trash/Ta Da/attachments/Note.md",
 		]) {
 			expect(isNotePath(path), path).toBe(false);
 		}
@@ -195,13 +195,12 @@ describe("Item paths", () => {
 
 	it("keeps Ta Da's folder out of notes", () => {
 		expect(isNotePath("Ta Da/Readme.md") || isNotePath("ta da/deep/Readme.md")).toBe(false);
-		expect(isNotePath("tasks/Readme.md")).toBe(false);
 		expect(isNotePath("Ta Da 2/Readme.md")).toBe(true);
 	});
 
 	it("finds the logbook in any case", () => {
-		expect(isLoggedPath("ta da/logbook/2026-10/X.md") && isLoggedPath(".logbook/2026-10/X.md")).toBe(true);
-		expect(isLoggedPath("Ta Da/tasks/X.md") || isLoggedPath("Logbook/X.md")).toBe(false);
+		expect(isLoggedPath("ta da/logbook/2026-10/X.md") && isLoggedPath("Ta Da/Logbook/2026-10/X.md")).toBe(true);
+		expect(isLoggedPath("Ta Da/tasks/X.md") || isLoggedPath(".logbook/X.md") || isLoggedPath("Logbook/X.md")).toBe(false);
 	});
 
 	it("takes a title from the last path component", () => {
@@ -219,7 +218,7 @@ describe("Item paths", () => {
 	])("reads untyped %j as a note only at note paths", (text) => {
 		expect(parseItem(text, "x.md")?.properties.kind).toBe("note");
 		expect(parseItem(text, "Meetings/x.md")?.properties.kind).toBe("note");
-		expect(parseItem(text, "tasks/x.md")).toBeNull();
+		expect(parseItem(text, "Ta Da/tasks/x.md")).toBeNull();
 	});
 });
 

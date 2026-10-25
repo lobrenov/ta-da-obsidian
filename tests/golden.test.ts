@@ -1,14 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { WikiLink } from "../src/core/model/wikiLink";
 import { scanBody } from "../src/core/parsing/bodyScanner";
 import { splitFrontmatter } from "../src/core/parsing/frontmatterSplitter";
+import { taDaRepo } from "./taDaRepo";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 /** The Ta Da repo's fixture vaults, beside this repo, and what its body scanner read from them. */
-const fixtures = resolve(repoRoot, "../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures");
+const fixtures = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures");
 const goldenFile = join(fixtures, "BodyScans.txt");
 
 const linkText = (link: WikiLink): string => link.target + (link.heading ? `#${link.heading}` : "") + (link.alias ? `|${link.alias}` : "");

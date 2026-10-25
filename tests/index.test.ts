@@ -98,24 +98,24 @@ describe("VaultIndex", () => {
 		const completed = "status: Done\ncompletedDate: 2026-09-30";
 		const index = new VaultIndex([
 			makeItem("projects/Kombi.md", "type: project\nstatus: Doing"),
-			makeItem(".logbook/2026-09/Kombi.md", `type: project\n${completed}`),
-			makeItem(".logbook/2026-09/Sold.md", `type: project\n${completed}`),
+			makeItem("Ta Da/logbook/2026-09/Kombi.md", `type: project\n${completed}`),
+			makeItem("Ta Da/logbook/2026-09/Sold.md", `type: project\n${completed}`),
 			makeItem("tasks/Open.md", 'type: task\nstatus: Doing\nproject: "[[Kombi]]"'),
 			makeItem("tasks/Closed.md", 'type: task\nstatus: Done\nproject: "[[Kombi]]"'),
-			makeItem(".logbook/2026-09/Photos.md", `type: task\n${completed}\nproject: "[[Kombi]]"`),
-			makeItem(".logbook/2026-09/Listing.md", `type: task\n${completed}\nproject: "[[Sold]]"`),
+			makeItem("Ta Da/logbook/2026-09/Photos.md", `type: task\n${completed}\nproject: "[[Kombi]]"`),
+			makeItem("Ta Da/logbook/2026-09/Listing.md", `type: task\n${completed}\nproject: "[[Sold]]"`),
 		]);
-		expect(isLogged(index.get(".logbook/2026-09/Photos.md") as Item)).toBe(true);
-		expect(index.itemsTitled("Kombi").map((item) => item.path)).toEqual(["projects/Kombi.md", ".logbook/2026-09/Kombi.md"]);
+		expect(isLogged(index.get("Ta Da/logbook/2026-09/Photos.md") as Item)).toBe(true);
+		expect(index.itemsTitled("Kombi").map((item) => item.path)).toEqual(["projects/Kombi.md", "Ta Da/logbook/2026-09/Kombi.md"]);
 		expect(titles(index.projects)).toEqual(["Kombi"]);
 		expect(new Set(titles(index.logged))).toEqual(new Set(["Kombi", "Sold", "Photos", "Listing"]));
 		const kombi = index.get("projects/Kombi.md") as Item;
-		const sold = index.get(".logbook/2026-09/Sold.md") as Item;
+		const sold = index.get("Ta Da/logbook/2026-09/Sold.md") as Item;
 		expect(titles(index.tasksIn(kombi))).toEqual(["Closed", "Open"]);
 		expect(titles(index.tasksIn(kombi, true))).toEqual(["Closed", "Open", "Photos"]);
 		expect(titles(index.openTasksIn(kombi))).toEqual(["Open"]);
 		expect(titles(index.tasksIn(sold, true))).toEqual(["Listing"]);
-		expect(index.parentOf(index.get(".logbook/2026-09/Listing.md") as Item)?.path).toBe(sold.path);
+		expect(index.parentOf(index.get("Ta Da/logbook/2026-09/Listing.md") as Item)?.path).toBe(sold.path);
 		const progress = q.progress(index, kombi);
 		expect([progress.done, progress.total]).toEqual([2, 3]);
 		expect(q.search(index, "photos")).toEqual([]);
@@ -141,7 +141,7 @@ describe("VaultIndex", () => {
 	});
 
 	it("leaves logged files out of tags", () => {
-		const logged = makeItem(".logbook/tasks/Old.md", "type: task\nstatus: Done\ntags: [old]");
+		const logged = makeItem("Ta Da/logbook/tasks/Old.md", "type: task\nstatus: Done\ntags: [old]");
 		const index = new VaultIndex([logged]);
 		expect(index.carriedTags).toEqual([]);
 		index.remove(logged.path);
@@ -154,11 +154,11 @@ describe("VaultIndex", () => {
 			makeItem("Ark.md", "tags: []"),
 			makeItem("Meetings/Ark.md", "tags: []"),
 			makeItem("projects/Ark.md", "type: project\nstatus: Doing"),
-			makeItem(".logbook/2026-09/Ark.md", "type: task\nstatus: Done"),
+			makeItem("Ta Da/logbook/2026-09/Ark.md", "type: task\nstatus: Done"),
 		]);
-		expect(index.itemsTitled("ark").map((item) => item.path)).toEqual(["projects/Ark.md", "Ark.md", "Meetings/Ark.md", ".logbook/2026-09/Ark.md"]);
+		expect(index.itemsTitled("ark").map((item) => item.path)).toEqual(["projects/Ark.md", "Ark.md", "Meetings/Ark.md", "Ta Da/logbook/2026-09/Ark.md"]);
 		index.update(makeItem("Ark.md", "type: area"));
-		expect(index.itemsTitled("Ark").map((item) => item.path)).toEqual(["Ark.md", "projects/Ark.md", "Meetings/Ark.md", ".logbook/2026-09/Ark.md"]);
+		expect(index.itemsTitled("Ark").map((item) => item.path)).toEqual(["Ark.md", "projects/Ark.md", "Meetings/Ark.md", "Ta Da/logbook/2026-09/Ark.md"]);
 	});
 
 	it("never files notes or makes them parents", () => {

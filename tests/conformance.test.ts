@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { TagFilter, groupings, listSections, type ListSection } from "../src/core/index/grouping";
@@ -13,10 +12,10 @@ import { parseItem } from "../src/core/parsing/parseItem";
 import { contentsOf, tasksOf, trashedItems, type TrashedItem } from "../src/core/storage/trash";
 import { compareCodeUnits } from "../src/core/text";
 import { itemJson } from "./itemJson";
+import { taDaRepo } from "./taDaRepo";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 /** Swift's exports and the fixture vault: the Ta Da repo's `Conformance` folder, beside this repo. */
-const conformanceFolder = resolve(repoRoot, "../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance");
+const conformanceFolder = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance");
 
 const vaultFolders: Record<string, string> = {
 	DesignVault: resolve(conformanceFolder, "../DesignVault"),
@@ -83,8 +82,8 @@ function parseVault(name: string): { items: Item[]; index: VaultIndex; trashed: 
 	if (!folder) throw new Error(`No folder for vault ${name}`);
 	const items: Item[] = [];
 	const files = [...readVault(folder)].sort(([a], [b]) => compareCodeUnits(a, b));
-	// The index follows `Vault.markdownPaths()`: hidden folders are left out, except the old `.logbook/`.
-	const indexed = (path: string): boolean => !path.split("/").some((part, at) => part.startsWith(".") && !(at === 0 && part === ".logbook" && path.includes("/")));
+	// The index follows `Vault.markdownPaths()`: hidden folders are left out.
+	const indexed = (path: string): boolean => !path.split("/").some((part) => part.startsWith("."));
 	for (const [path, text] of files.filter(([path]) => indexed(path))) {
 		const item = parseItem(text, path);
 		if (item) items.push(item);

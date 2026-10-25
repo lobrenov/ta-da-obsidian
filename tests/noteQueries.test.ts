@@ -28,8 +28,8 @@ describe("note queries on NoteVault", () => {
 			"Work/Clients/Brief.md",
 		]);
 		expect(index.get("Typed/Task elsewhere.md")?.properties.kind).toBe("task");
-		expect(index.get("tasks/Untyped in tasks.md")).toBeUndefined();
-		expect(index.get("attachments/Untyped in attachments.md")).toBeUndefined();
+		expect(index.get("Ta Da/tasks/Untyped in tasks.md")).toBeUndefined();
+		expect(index.get("Ta Da/attachments/Untyped in attachments.md")).toBeUndefined();
 	});
 
 	it("rolls note counts up the folder tree and sorts by name", () => {
