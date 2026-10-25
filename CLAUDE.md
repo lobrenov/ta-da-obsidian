@@ -3,7 +3,7 @@
 Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the same vault as the Ta Da Mac and iPhone apps. Desktop and mobile. Proof of concept.
 
 - Repo: https://github.com/lobrenov/ta-da-obsidian (private; `origin`)
-- Ta Da repo, cloned beside this one at `../Ta Da`: the build plan (`docs/build plans/Obsidian POC.md`, or `docs/archive/build plans/` once complete), the file format (`docs/file-format.md`, the source of truth) and the architecture (`docs/architecture.md`, Obsidian section).
+- Ta Da repo, cloned beside this one at `../Ta Da`: the build plan (`docs/archive/build plans/Obsidian POC.md`), the file format (`docs/file-format.md`, the source of truth) and the architecture (`docs/architecture.md`, Obsidian section).
 - Design: the canvas's Obsidian POC page, https://claude.ai/artifact/A7c33hg9HUKz41u3wbki3V.
 
 ## Commands
