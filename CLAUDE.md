@@ -16,7 +16,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - `src/TaDaIndex.ts`: `VaultIndex` built from the vault's markdown on layout ready, patched on file and editor changes.
 - `src/Writer.ts`: every write to a file's text, one queue per file.
 - `src/ui/header/`: the Ta Da header on task, project and area files (Live Preview widget and Reading view post-processor) and its menus.
-- `src/ui/navigator/`: the left-sidebar navigator view, its domains, lists and settings.
+- `src/ui/navigator/`: the Agenda, Tasks and Tags views (one `NavigatorView` class, three kinds in `views.ts`), their domains, lists and settings.
 - `src/ui/newTask/`: the New task modal.
 - `src/commands.ts`: New task, Complete, Move to project or area. Set status commands are in `src/main.ts`.
 - `src/ui/statusActions.ts`: every status change, with the apps' rules.

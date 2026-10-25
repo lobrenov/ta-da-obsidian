@@ -11,21 +11,13 @@ export type Domain =
 	| { kind: "area"; path: string }
 	/** A tag's path, or null for Untagged. */
 	| { kind: "tag"; path: string | null }
-	/** A notes folder; `""` is Loose, the top level. */
-	| { kind: "folder"; path: string }
 	| { kind: "search"; query: string };
-
-/** The navigation pane's Tasks | Tags | Notes switch. */
-export type NavMode = "tasks" | "tags" | "notes";
-
-export const navModes: readonly NavMode[] = ["tasks", "tags", "notes"];
 
 /** A key that names a domain: for the fold, tag filter and selection state kept per list. */
 export function domainKey(domain: Domain): string {
 	switch (domain.kind) {
 		case "project":
 		case "area":
-		case "folder":
 			return `${domain.kind}:${domain.path}`;
 		case "tag":
 			return `tag:${domain.path ?? ""}`;
@@ -38,21 +30,6 @@ export function domainKey(domain: Domain): string {
 
 export function sameDomain(a: Domain, b: Domain): boolean {
 	return domainKey(a) === domainKey(b);
-}
-
-/** The navigation mode a domain sits under. */
-export function modeOf(domain: Domain): NavMode | null {
-	switch (domain.kind) {
-		case "project":
-		case "area":
-			return "tasks";
-		case "tag":
-			return "tags";
-		case "folder":
-			return "notes";
-		default:
-			return null;
-	}
 }
 
 /** The lists with a Group choice. Every project shares one. */
@@ -106,7 +83,6 @@ export function readDomain(value: unknown): Domain | null {
 			return { kind: "agenda" };
 		case "project":
 		case "area":
-		case "folder":
 			return typeof path === "string" ? { kind, path } : null;
 		case "tag":
 			return typeof path === "string" || path === null ? { kind, path } : null;

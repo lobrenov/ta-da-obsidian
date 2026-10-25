@@ -7,7 +7,7 @@ import type { ListRow } from "../src/ui/navigator/rows";
 import { agendaOn } from "../src/ui/navigator/agenda";
 
 export function context(index: VaultIndex, today: LocalDate, extra: Partial<ListContext> = {}): ListContext {
-	return { index, today, trash: [], folders: new Set(), agenda: agendaOn(today), notes: { names: defaultDailyNoteNames, weekNotes: true }, ...extra };
+	return { index, today, trash: [], agenda: agendaOn(today), notes: { names: defaultDailyNoteNames, weekNotes: true }, ...extra };
 }
 
 export function options(extra: Partial<ListOptions> = {}): ListOptions {

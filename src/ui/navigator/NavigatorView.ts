@@ -2,7 +2,6 @@ import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResu
 import type { Grouping } from "../../core/index/grouping";
 import type { LocalDate } from "../../core/model/localDate";
 import { statuses } from "../../core/model/status";
-import { isNotePath } from "../../core/model/item";
 import type { TrashedItem } from "../../core/storage/trash";
 import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
@@ -18,9 +17,6 @@ import {
 	type GroupedList,
 	groupedListOf,
 	type Groupings,
-	modeOf,
-	type NavMode,
-	navModes,
 	readDomain,
 	readGroupings,
 	sameDomain,
@@ -29,34 +25,33 @@ import { buildList, type ListContext, type ListModel, type SectionHeader, type S
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
-import { currentPhoneTab, type PhoneTab, phoneTabs } from "./phone";
 import { moveSelection } from "./selection";
+import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
+import { defaultDomain, offersDomain, type ViewKind, viewSpecs } from "./views";
 
 /** The width below which one pane shows at a time; the same as the container query in `styles.css`. */
 const narrowBelow = 520;
-
-export const navigatorViewType = "ta-da-navigator";
 
 export interface NavigatorDeps {
 	taDaIndex: TaDaIndex;
 	writer: Writer;
 	status: StatusActions;
 	settings: NavigatorSettings;
-	/** Opens the New task window; the phone top bar's button. */
-	newTask: () => void;
+	/** Opens the New task window, filled from what the view shows; each view's header button. */
+	newTask: (context: NewTaskContext) => void;
 }
 
 const noPicked: ReadonlySet<string> = new Set();
 
 /**
- * The Ta Da navigator in a sidebar leaf: a navigation pane (search, the domains, and the Tasks | Tags | Notes tree)
- * beside a list pane. The models in `listModel.ts` and `navModel.ts` decide what's shown; this class draws them.
+ * One of the Ta Da views in a sidebar leaf. Agenda is a list pane; Tasks and Tags are a navigation pane (search and
+ * the view's rows) beside a list pane. The models in `listModel.ts` and `navModel.ts` decide what's shown; this class
+ * draws them.
  */
 export class NavigatorView extends ItemView {
-	private domain: Domain = { kind: "agenda" };
+	private domain: Domain;
 	private agenda: AgendaState = agendaOn(localToday());
-	private mode: NavMode = "tasks";
 	private groupings: Groupings = {};
 	/** The tags picked in each list's filter, for the session. */
 	private readonly picked = new Map<string, Set<string>>();
@@ -74,47 +69,48 @@ export class NavigatorView extends ItemView {
 	private trashStale = true;
 	private readonly scheduleTrash = debounce(() => void this.refreshTrash(), 1000, true);
 	/** In the narrow layout, whether the list pane (not the navigation pane) is showing. */
-	private showingList = false;
+	private showingList: boolean;
 	private readonly rowEls = new Map<string, HTMLElement[]>();
 
-	private searchEl!: HTMLInputElement;
-	private navBodyEl!: HTMLElement;
+	/** Null in the Agenda, which has no navigation pane. */
+	private searchEl: HTMLInputElement | null = null;
+	private navBodyEl: HTMLElement | null = null;
 	private listPaneEl!: HTMLElement;
 	private listHeadEl!: HTMLElement;
 	private listBodyEl!: HTMLElement;
-	private collapseEl!: HTMLElement;
-	/** The phone's top bar back button and bottom bar tabs. */
-	private phoneBackEl: HTMLElement | null = null;
-	private readonly phoneTabEls = new Map<PhoneTab, HTMLElement>();
+	private collapseEl: HTMLElement | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
 		private readonly deps: NavigatorDeps,
+		readonly kind: ViewKind,
 	) {
 		super(leaf);
 		this.navigation = false;
+		this.domain = defaultDomain(kind);
+		this.showingList = kind === "agenda";
 	}
 
 	override getViewType(): string {
-		return navigatorViewType;
+		return viewSpecs[this.kind].type;
 	}
 
 	override getDisplayText(): string {
-		return "Ta Da";
+		return viewSpecs[this.kind].title;
 	}
 
 	override getIcon(): string {
-		return "circle-check";
+		return viewSpecs[this.kind].icon;
 	}
 
 	override getState(): Record<string, unknown> {
-		return { domain: this.domain, mode: this.mode, groupings: this.groupings, agenda: writeAgenda(this.agenda) };
+		return { domain: this.domain, groupings: this.groupings, agenda: writeAgenda(this.agenda) };
 	}
 
 	override async setState(state: unknown, result: ViewStateResult): Promise<void> {
-		const saved = (typeof state === "object" && state !== null ? state : {}) as { domain?: unknown; mode?: unknown; groupings?: unknown; agenda?: unknown };
-		this.domain = readDomain(saved.domain) ?? this.domain;
-		if (typeof saved.mode === "string" && (navModes as readonly string[]).includes(saved.mode)) this.mode = saved.mode as NavMode;
+		const saved = (typeof state === "object" && state !== null ? state : {}) as { domain?: unknown; groupings?: unknown; agenda?: unknown };
+		const domain = readDomain(saved.domain);
+		if (domain && offersDomain(this.kind, domain)) this.domain = domain;
 		this.groupings = readGroupings(saved.groupings);
 		this.agenda = readAgenda(saved.agenda, localToday());
 		await super.setState(state, result);
@@ -145,7 +141,8 @@ export class NavigatorView extends ItemView {
 		await this.deps.taDaIndex.ready;
 		if (this.closed) return;
 		this.opened = true;
-		await this.refreshTrash();
+		if (this.kind === "tasks") await this.refreshTrash();
+		else this.refresh();
 	}
 
 	override async onClose(): Promise<void> {
@@ -159,104 +156,51 @@ export class NavigatorView extends ItemView {
 	private build(): void {
 		const root = this.contentEl;
 		root.empty();
-		root.addClass("ta-da-navigator");
-		if (Platform.isPhone) {
-			root.addClass("is-phone");
-			this.buildTopBar(root);
-		}
+		root.addClass("ta-da-navigator", `is-${this.kind}`);
+		if (Platform.isPhone) root.addClass("is-phone");
 
-		const nav = root.createDiv({ cls: "ta-da-nav-pane" });
-		const search = nav.createDiv({ cls: "search-input-container ta-da-search" });
-		this.searchEl = search.createEl("input", { attr: { type: "search", placeholder: "Search tasks and notes", spellcheck: "false" } });
-		this.searchEl.addEventListener("input", () => this.search(this.searchEl.value));
-		this.searchEl.addEventListener("keydown", (event) => this.onSearchKey(event));
-		this.navBodyEl = nav.createDiv({ cls: "ta-da-nav-body" });
+		if (this.kind !== "agenda") {
+			const nav = root.createDiv({ cls: "ta-da-nav-pane" });
+			const search = nav.createDiv({ cls: "search-input-container ta-da-search" });
+			const searchEl = search.createEl("input", { attr: { type: "search", placeholder: "Search tasks and projects", spellcheck: "false" } });
+			searchEl.addEventListener("input", () => this.search(searchEl.value));
+			searchEl.addEventListener("keydown", (event) => this.onSearchKey(event));
+			this.searchEl = searchEl;
+			this.navBodyEl = nav.createDiv({ cls: "ta-da-nav-body" });
+		}
 
 		this.listPaneEl = root.createDiv({ cls: "ta-da-list-pane", attr: { tabindex: "0" } });
 		this.listPaneEl.addEventListener("keydown", (event) => this.onListKey(event));
 		this.listHeadEl = this.listPaneEl.createDiv({ cls: "ta-da-list-head" });
 		this.listBodyEl = this.listPaneEl.createDiv({ cls: "ta-da-list-body" });
-		if (Platform.isPhone) this.buildBottomBar(root);
 
+		this.addAction("plus", "New task", () => this.deps.newTask(this.newTaskContext()));
+		if (this.kind === "agenda") return;
 		this.collapseEl = this.addAction("panel-left-close", "Hide list pane", () => {
 			void this.deps.settings.update({ collapseListPane: !this.deps.settings.data.collapseListPane });
 		});
 	}
 
-	/** The phone's top bar: back (‹ Ta Da) at the left, Search and New task at the right. */
-	private buildTopBar(root: HTMLElement): void {
-		const bar = root.createDiv({ cls: "ta-da-phone-top" });
-		const back = bar.createEl("button", { cls: "ta-da-phone-back", attr: { type: "button", "aria-label": "Back" } });
-		setIcon(back.createSpan({ cls: "ta-da-phone-back-icon" }), "chevron-left");
-		back.createSpan({ text: "Ta Da" });
-		back.addEventListener("click", () => this.phoneBack());
-		this.phoneBackEl = back;
-		bar.createSpan({ cls: "ta-da-phone-top-space" });
-		this.iconButton(bar, "search", "Search", () => this.phoneSearch());
-		bar.lastElementChild?.addClass("ta-da-phone-button");
-		this.iconButton(bar, "plus", "New task", () => this.deps.newTask());
-		bar.lastElementChild?.addClass("ta-da-phone-button");
-	}
-
-	/** The phone's bottom bar: a tab each for Agenda and Projects, the icon above the label. */
-	private buildBottomBar(root: HTMLElement): void {
-		const bar = root.createEl("nav", { cls: "ta-da-phone-tabs", attr: { "aria-label": "Ta Da" } });
-		for (const tab of phoneTabs) {
-			const button = bar.createEl("button", { cls: "ta-da-phone-tab", attr: { type: "button" } });
-			setIcon(button.createSpan({ cls: "ta-da-phone-tab-icon" }), tab.icon);
-			button.createSpan({ text: tab.label });
-			button.addEventListener("click", () => this.openPhoneTab(tab.id));
-			this.phoneTabEls.set(tab.id, button);
-		}
-	}
-
-	/** Marks the current tab, shows the back button when something sits over the navigation pane, and shows the search field above search results. */
+	/** On a phone, shows the search field above search results. */
 	private updatePhone(): void {
-		if (!Platform.isPhone) return;
-		const searching = this.query.trim() !== "";
-		this.contentEl.toggleClass("is-searching", searching);
-		this.phoneBackEl?.toggleClass("is-hidden", !this.showingList && !searching);
-		const current = currentPhoneTab({ domain: this.domain, query: this.query, showingList: this.showingList });
-		for (const [id, el] of this.phoneTabEls) {
-			if (id === current) el.setAttribute("aria-current", "page");
-			else el.removeAttribute("aria-current");
-		}
-	}
-
-	private openPhoneTab(tab: PhoneTab): void {
-		switch (tab) {
-			case "agenda":
-				this.show({ kind: "agenda" });
-				break;
-			case "projects":
-				this.query = "";
-				this.searchEl.value = "";
-				this.showingList = false;
-				this.mode = "tasks";
-				this.maybeRefreshTrash();
-				this.refresh();
-				this.save();
-				break;
-		}
+		if (Platform.isPhone) this.contentEl.toggleClass("is-searching", this.query.trim() !== "");
 	}
 
 	/** Back to the navigation pane, clearing a search. */
-	private phoneBack(): void {
-		this.query = "";
-		this.searchEl.value = "";
+	private back(): void {
+		this.clearSearch();
 		this.showingList = false;
 		this.maybeRefreshTrash();
 		this.refresh();
 	}
 
-	/** The navigation pane, with the search field focused. */
-	private phoneSearch(): void {
-		this.showingList = false;
-		this.refresh();
-		this.searchEl.focus();
+	private clearSearch(): void {
+		this.query = "";
+		if (this.searchEl) this.searchEl.value = "";
 	}
 
 	private applyCollapse(): void {
+		if (!this.collapseEl) return;
 		const collapsed = this.deps.settings.data.collapseListPane;
 		this.contentEl.toggleClass("is-list-collapsed", collapsed);
 		setIcon(this.collapseEl, collapsed ? "panel-left-open" : "panel-left-close");
@@ -276,19 +220,13 @@ export class NavigatorView extends ItemView {
 	}
 
 	private context(): ListContext {
-		const folders = new Set(
-			this.app.vault
-				.getAllFolders(false)
-				.map((folder) => folder.path)
-				.filter((path) => isNotePath(`${path}/x.md`)),
-		);
 		const { dailyNotes } = this.deps.settings;
-		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, folders, agenda: this.agenda, notes: { names: this.deps.settings.names, weekNotes: dailyNotes.weekNotes } };
+		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, agenda: this.agenda, notes: { names: this.deps.settings.names, weekNotes: dailyNotes.weekNotes } };
 	}
 
-	/** Whether the Trash count or list is on screen: the navigation pane shows when wide, or when the list isn't showing. */
+	/** Whether the Trash count or list is on screen: in Tasks, the navigation pane shows when wide, or when the list isn't showing. */
 	private wantsTrash(): boolean {
-		return this.domain.kind === "trash" || !this.showingList || this.contentEl.clientWidth >= narrowBelow;
+		return this.kind === "tasks" && (this.domain.kind === "trash" || !this.showingList || this.contentEl.clientWidth >= narrowBelow);
 	}
 
 	/** Reads `.trash/` later, if it changed and something on screen shows it. */
@@ -316,13 +254,13 @@ export class NavigatorView extends ItemView {
 		const options = { groupings: this.groupings, picked: this.picked.get(domainKey(domain)) ?? noPicked, folds: this.folds };
 		let list = buildList(domain, ctx, options);
 		if (!list) {
-			this.domain = { kind: "agenda" };
+			this.domain = defaultDomain(this.kind);
 			list = buildList(this.domain, ctx, { ...options, picked: noPicked });
 		}
 		if (!list) return;
 		this.contentEl.toggleClass("is-showing-list", this.showingList);
 		this.updatePhone();
-		this.renderNav(ctx);
+		if (this.navBodyEl) this.renderNav(this.navBodyEl, ctx);
 		this.renderList(list);
 	}
 
@@ -339,12 +277,9 @@ export class NavigatorView extends ItemView {
 
 	private show(domain: Domain): void {
 		this.domain = domain;
-		this.query = "";
-		this.searchEl.value = "";
+		this.clearSearch();
 		this.showingList = true;
 		this.maybeRefreshTrash();
-		const mode = modeOf(domain);
-		if (mode) this.mode = mode;
 		for (const id of ancestorsOf(domain)) this.expanded.add(id);
 		this.lastKey = "";
 		this.refresh();
@@ -355,12 +290,6 @@ export class NavigatorView extends ItemView {
 		this.query = query;
 		if (query.trim() !== "" && !Platform.isPhone) this.showingList = true;
 		this.refresh();
-	}
-
-	private setMode(mode: NavMode): void {
-		this.mode = mode;
-		this.refresh();
-		this.save();
 	}
 
 	/**
@@ -471,8 +400,7 @@ export class NavigatorView extends ItemView {
 			this.move(1);
 		} else if (event.key === "Escape" && this.query !== "") {
 			event.preventDefault();
-			this.query = "";
-			this.searchEl.value = "";
+			this.clearSearch();
 			this.refresh();
 		}
 	}
@@ -484,21 +412,12 @@ export class NavigatorView extends ItemView {
 
 	// Navigation pane
 
-	private renderNav(ctx: ListContext): void {
-		const body = this.navBodyEl;
+	private renderNav(body: HTMLElement, ctx: ListContext): void {
+		if (this.kind === "agenda") return;
 		body.empty();
-		const nav = buildNav(ctx, this.mode, this.expanded);
 		const active = this.query.trim() === "" ? this.domain : null;
-		for (const item of nav.domains) this.navRow(body, item, active !== null && sameDomain(item.domain, active), false);
-
-		const switcher = body.createDiv({ cls: "ta-da-switch", attr: { role: "tablist", "aria-label": "Navigator view" } });
-		for (const mode of navModes) {
-			const label = sentence(mode);
-			const button = switcher.createEl("button", { cls: mode === this.mode ? "is-active" : "", text: label, attr: { role: "tab", "aria-selected": String(mode === this.mode) } });
-			button.addEventListener("click", () => this.setMode(mode));
-		}
-		// The tag and folder trees leave room for a fold arrow on every row.
-		for (const item of nav.tree) this.navRow(body, item, active !== null && sameDomain(item.domain, active), this.mode !== "tasks");
+		// The tag tree leaves room for a fold arrow on every row.
+		for (const item of buildNav(ctx, this.kind, this.expanded)) this.navRow(body, item, active !== null && sameDomain(item.domain, active), this.kind === "tags");
 	}
 
 	private navRow(parent: HTMLElement, item: NavItem, active: boolean, room: boolean): void {
@@ -545,12 +464,10 @@ export class NavigatorView extends ItemView {
 		head.empty();
 		const { header } = list;
 		const title = head.createDiv({ cls: "ta-da-list-title-row" });
-		this.iconButton(title, "chevron-left", "Back", () => {
-			this.showingList = false;
-			this.maybeRefreshTrash();
-			this.refresh();
-		});
-		title.lastElementChild?.addClass("ta-da-list-back");
+		if (this.kind !== "agenda") {
+			this.iconButton(title, "chevron-left", "Back", () => this.back());
+			title.lastElementChild?.addClass("ta-da-list-back");
+		}
 		drawIcon(title.createSpan({ cls: "ta-da-list-title-icon" }), header.icon);
 		title.createEl("h2", { cls: "ta-da-list-title", text: header.title });
 		if (header.detail) title.createSpan({ cls: "ta-da-list-detail", text: header.detail });

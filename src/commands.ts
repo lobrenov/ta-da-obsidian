@@ -5,17 +5,18 @@ import { localToday } from "./ui/dates";
 import { parentEdit } from "./ui/header/edits";
 import { buildHeaderModel } from "./ui/header/headerModel";
 import { openParentPicker } from "./ui/header/pickers";
-import { NavigatorView, navigatorViewType } from "./ui/navigator/NavigatorView";
+import { NavigatorView } from "./ui/navigator/NavigatorView";
+import { viewKinds, viewSpecs } from "./ui/navigator/views";
 import { NewTaskModal } from "./ui/newTask/NewTaskModal";
-import { prefillDraft } from "./ui/newTask/prefill";
+import { type NewTaskContext, prefillDraft } from "./ui/newTask/prefill";
 import { type StatusActions, statusItem } from "./ui/statusActions";
 
 /** What the commands need from the plugin. */
 export type CommandsPlugin = Plugin & { taDaIndex: TaDaIndex; writer: Writer; statusActions: StatusActions };
 
 /** New task, Complete, and Move to project or area. None has a default hotkey. */
-/** Returns the New task action, for the phone navigator's button. */
-export function registerCommands(plugin: CommandsPlugin): { newTask: () => void } {
+/** Returns the New task action, for the views' header buttons. */
+export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: NewTaskContext) => void } {
 	const { app } = plugin;
 	const index = plugin.taDaIndex.index;
 	const host = { app, index, today: localToday };
@@ -25,14 +26,16 @@ export function registerCommands(plugin: CommandsPlugin): { newTask: () => void 
 		return file instanceof TFile && item ? { file, kind: item.properties.kind as "task" | "project" } : null;
 	};
 
-	const newTask = (): void => {
-		const view = app.workspace
-			.getLeavesOfType(navigatorViewType)
+	/** From `context`, else from the active Ta Da view, else the first one showing. */
+	const newTask = (context?: NewTaskContext): void => {
+		const views = viewKinds
+			.flatMap((kind) => app.workspace.getLeavesOfType(viewSpecs[kind].type))
 			.map((leaf) => leaf.view)
-			.find((candidate): candidate is NavigatorView => candidate instanceof NavigatorView && candidate.containerEl.isShown());
-		new NewTaskModal(app, host, prefillDraft(view?.newTaskContext() ?? null, index)).open();
+			.filter((candidate): candidate is NavigatorView => candidate instanceof NavigatorView && candidate.containerEl.isShown());
+		const view = app.workspace.getActiveViewOfType(NavigatorView) ?? views[0];
+		new NewTaskModal(app, host, prefillDraft(context ?? view?.newTaskContext() ?? null, index)).open();
 	};
-	plugin.addCommand({ id: "new-task", name: "New task", callback: newTask });
+	plugin.addCommand({ id: "new-task", name: "New task", callback: () => newTask() });
 
 	plugin.addCommand({
 		id: "complete",

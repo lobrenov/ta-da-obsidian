@@ -23,10 +23,10 @@ function makePlugin(saved: unknown = null): { plugin: never; writes: unknown[]; 
 
 describe("SettingsStore", () => {
 	it("reads the header's and the navigator's settings from one file", async () => {
-		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: true } });
+		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: { tasks: true } } });
 		const store = new SettingsStore(plugin);
 		await store.load();
-		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false }, dailyNotes: defaultDailyNotes });
+		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes });
 	});
 
 	it("keeps the one data object, so what holds it sees a loaded or changed value", async () => {
@@ -45,19 +45,19 @@ describe("SettingsStore", () => {
 		await store.load();
 		store.data.hideProperties = false;
 		const header = store.save();
-		const navigator = store.updateNavigator({ openOnStartup: true });
+		const navigator = store.updateNavigator({ openOnStartup: { agenda: true, tasks: false, tags: false } });
 		await Promise.all([header, navigator]);
-		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: true, collapseListPane: false }, dailyNotes: defaultDailyNotes });
+		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes });
 	});
 
 	it("writes one at a time, the last write holding the latest state, even when an earlier write is slower", async () => {
 		const { plugin, writes, disk } = makePlugin();
 		const store = new SettingsStore(plugin);
-		const first = store.updateNavigator({ openOnStartup: true });
+		const first = store.updateNavigator({ openOnStartup: { agenda: true, tasks: false, tags: false } });
 		const second = store.updateNavigator({ collapseListPane: true });
 		await Promise.all([first, second]);
 		expect(writes).toHaveLength(2);
-		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: true, collapseListPane: true }, dailyNotes: defaultDailyNotes });
+		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: true }, dailyNotes: defaultDailyNotes });
 		expect(disk()).toEqual(writes[1]);
 	});
 
@@ -80,10 +80,11 @@ describe("SettingsStore", () => {
 
 describe("resolveData", () => {
 	it("gives defaults for nothing saved and for a wrong type", () => {
-		const defaults = { hideProperties: true, navigator: { openOnStartup: false, collapseListPane: false }, dailyNotes: defaultDailyNotes };
+		const defaults = { hideProperties: true, navigator: { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes };
 		expect(resolveData(null)).toEqual(defaults);
 		expect(resolveData({ navigator: "x" })).toEqual(defaults);
 		expect(resolveData({ navigator: { openOnStartup: "yes" } })).toEqual(defaults);
+		expect(resolveData({ navigator: { openOnStartup: { agenda: "yes", tags: 1 } } })).toEqual(defaults);
 		expect(resolveData({ dailyNotes: "x" })).toEqual(defaults);
 		expect(resolveData({ dailyNotes: { dailyFolder: 3, weekNotes: "no", dailyTemplate: 4, weekFolder: null } })).toEqual(defaults);
 	});

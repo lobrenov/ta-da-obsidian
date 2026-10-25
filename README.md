@@ -4,10 +4,10 @@ Ta Da's tasks, projects and areas inside Obsidian, over the same vault as the Ta
 
 ## What it does
 - **Header**: task, project and area files show a row of chips for status, project or area, dates and tags, in Live Preview and Reading view. Each chip opens its menu and changes one line of the file. Obsidian's Properties are hidden on these files; the header's Properties button shows them.
-- **Navigator**: a Ta Da view in the left sidebar, beside the file explorer. Search, Agenda, Loose tasks, Logbook and Trash; Tasks, Tags and Notes; areas with their projects, the tag tree and the folder tree. The list beside it shows the chosen page, with grouping and a tag filter, and follows the open file. Arrow keys move through the list and Return opens a file. A ribbon icon opens it. On a phone it shows one pane at a time in the drawer, with a bottom bar for Agenda and Projects.
+- **Agenda, Tasks and Tags**: three Ta Da views, each its own tab in the left sidebar beside the file explorer (and its own entry in a phone's drawer). Agenda shows the strip and a day's or week's list. Tasks has search, Loose tasks, Logbook, Trash, and areas with their projects; Tags has search and the tag tree. The list beside them shows the chosen page, with grouping and a tag filter. Each view has New task in its header, follows the open file, and has a ribbon icon. Arrow keys move through the list and Return opens a file. On a phone, Tasks and Tags show one pane at a time, with a back button.
 - **Agenda**: a week or month strip and a day's or a week's tasks, with the day's daily note or the week's note (Create when it's missing). A ring on a day marks open boxes in its daily note.
 - **New task**: a modal for a task or project with title, status, project or area, dates and tags. It starts in the project, area or tag on screen, or due on the Agenda's selected day.
-- **Commands**: New task, Complete, Move to project or area, Set status (one per status), Open navigator. None has a default hotkey.
+- **Commands**: New task, Complete, Move to project or area, Set status (one per status), Open Ta Da: Agenda, Open Ta Da: Tasks, Open Ta Da: Tags. None has a default hotkey.
 - **Status rules**, as in the apps: closing a project with open tasks asks first; reopening a task reopens its Done or Cancelled project; reopening a logged file moves it, and its logged project, out of the Logbook.
 
 Files are created where the apps create them, in `Ta Da/` at the vault's top level. Logging, moving a vault into `Ta Da/`, Calendar events and reminders stay with the apps.
@@ -17,7 +17,7 @@ By hand: copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidia
 
 ## Settings
 - Hide properties on Ta Da files.
-- Open the navigator on startup.
+- Open Agenda, Tasks and Tags on startup, one setting each.
 - Collapse the list pane.
 - Daily notes: the folder and template for daily notes, and for week notes, which can be turned off.
 

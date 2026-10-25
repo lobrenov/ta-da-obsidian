@@ -14,29 +14,26 @@ const describeItems = (items: NavItem[]): string[] =>
 	items.map((item) => `${"  ".repeat(item.depth)}${item.expanded === null ? "" : item.expanded ? "v " : "> "}${item.label}${item.count ? ` ${item.count}` : ""}`);
 
 describe("navigation pane", () => {
-	it("counts the open tasks due today under Agenda, Loose tasks and Trash beside the domains", () => {
+	it("offers Loose tasks, Logbook and Trash in Tasks, and no Agenda or notes", () => {
 		const nav = buildNav(context(loadFixtureIndex("DesignVault"), today), "tasks", new Set());
-		expect(describeItems(nav.domains)).toEqual(["Agenda 7", "Loose tasks 6", "Logbook", "Trash"]);
-		expect(nav.domains.map((item) => item.domain.kind)).toEqual(["agenda", "loose", "logbook", "trash"]);
-	});
-
-	it("leaves a task completed today out of the Agenda's count", () => {
-		const index = new VaultIndex([makeItem("Ta Da/tasks/A.md", "type: task\nstatus: Done\ncompletedDate: 2026-10-02"), makeItem("Ta Da/tasks/B.md", "type: task\nstatus: Doing\ndueDate: 2026-10-01")]);
-		expect(buildNav(context(index, today), "tasks", new Set()).domains[0]?.count).toBe(1);
+		expect(describeItems(nav).slice(0, 3)).toEqual(["Loose tasks 6", "Logbook", "Trash"]);
+		expect(nav.slice(0, 3).map((item) => item.domain.kind)).toEqual(["loose", "logbook", "trash"]);
+		expect(nav.some((item) => item.domain.kind === "agenda")).toBe(false);
 	});
 
 	it("lists loose projects, then each area with its active projects at the same left edge, a gap before each area", () => {
 		const nav = buildNav(context(loadFixtureIndex("AreaVault"), today), "tasks", new Set());
-		expect(describeItems(nav.tree)).toEqual(["Lost 1", "Side quest 1", "Empty", "Personal", "Ta Da 2", "Work", "Payroll 1"]);
-		expect(nav.tree.every((item) => item.depth === 0)).toBe(true);
-		expect(nav.tree.filter((item) => item.gap).map((item) => item.label)).toEqual(["Empty", "Personal", "Work"]);
-		expect(nav.tree.filter((item) => item.strong).map((item) => item.label)).toEqual(["Empty", "Personal", "Work"]);
+		const tree = nav.slice(3);
+		expect(describeItems(tree)).toEqual(["Lost 1", "Side quest 1", "Empty", "Personal", "Ta Da 2", "Work", "Payroll 1"]);
+		expect(tree.every((item) => item.depth === 0)).toBe(true);
+		expect(tree.filter((item) => item.gap).map((item) => item.label)).toEqual(["Lost", "Empty", "Personal", "Work"]);
+		expect(tree.filter((item) => item.strong).map((item) => item.label)).toEqual(["Empty", "Personal", "Work"]);
 	});
 
 	it("lists Untagged and the tag tree, opening a parent's children only when it's expanded", () => {
 		const ctx = context(loadFixtureIndex("TagVault"), today);
-		expect(describeItems(buildNav(ctx, "tags", new Set()).tree)).toEqual(["Untagged 2", "errands 3", "> Home 4", "> people 2", "quick win 2", "> Work 2"]);
-		expect(describeItems(buildNav(ctx, "tags", new Set(["tag:home", "tag:work"])).tree)).toEqual([
+		expect(describeItems(buildNav(ctx, "tags", new Set()))).toEqual(["Untagged 2", "errands 3", "> Home 4", "> people 2", "quick win 2", "> Work 2"]);
+		expect(describeItems(buildNav(ctx, "tags", new Set(["tag:home", "tag:work"])))).toEqual([
 			"Untagged 2",
 			"errands 3",
 			"v Home 4",
@@ -48,14 +45,8 @@ describe("navigation pane", () => {
 		]);
 	});
 
-	it("lists Loose and the folder tree, with folders on disk that hold no note", () => {
-		const ctx = context(loadFixtureIndex("NoteVault"), today, { folders: new Set(["Empty", "Docs"]) });
-		expect(describeItems(buildNav(ctx, "notes", new Set(["folder:Meetings"])).tree)).toEqual(["Loose 2", "Docs", "Empty", "v Meetings 2", "  2026 1", "> Work 1"]);
-	});
-
-	it("names the rows above a nested tag or folder, which open to show it", () => {
+	it("names the rows above a nested tag, which open to show it", () => {
 		expect(ancestorsOf({ kind: "tag", path: "work/clients" })).toEqual(["tag:work"]);
-		expect(ancestorsOf({ kind: "folder", path: "A/B/C" })).toEqual(["folder:A", "folder:A/B"]);
 		expect(ancestorsOf({ kind: "tag", path: null })).toEqual([]);
 		expect(ancestorsOf({ kind: "agenda" })).toEqual([]);
 	});

@@ -1,3 +1,5 @@
+import { type ViewKind, viewKinds } from "./ui/navigator/views";
+
 export interface TaDaSettings {
 	/** Hide Obsidian's Properties block on task, project and area files; the header's button still shows it. */
 	hideProperties: boolean;
@@ -12,13 +14,13 @@ export function resolveSettings(saved: unknown): TaDaSettings {
 }
 
 export interface NavigatorData {
-	/** Open the navigator in the left sidebar when Obsidian starts. */
-	openOnStartup: boolean;
-	/** Hide the list pane, leaving only the navigation pane. */
+	/** Open each view in the left sidebar when Obsidian starts. */
+	openOnStartup: Record<ViewKind, boolean>;
+	/** Hide the list pane in Tasks and Tags, leaving only the navigation pane. */
 	collapseListPane: boolean;
 }
 
-export const defaultNavigator: NavigatorData = { openOnStartup: false, collapseListPane: false };
+export const defaultNavigator: NavigatorData = { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false };
 
 /** Settings ▸ Daily notes: the folders daily and week notes live in, whether week notes show, and the notes new ones start from, by path. */
 export interface DailyNotesData {
@@ -65,10 +67,11 @@ function resolveDailyNotes(saved: unknown): DailyNotesData {
 export function resolveData(saved: unknown): TaDaData {
 	const data = typeof saved === "object" && saved !== null ? (saved as { navigator?: unknown; dailyNotes?: unknown }) : {};
 	const stored = typeof data.navigator === "object" && data.navigator !== null ? (data.navigator as Partial<Record<keyof NavigatorData, unknown>>) : {};
+	const startup = typeof stored.openOnStartup === "object" && stored.openOnStartup !== null ? (stored.openOnStartup as Partial<Record<ViewKind, unknown>>) : {};
 	return {
 		...resolveSettings(saved),
 		navigator: {
-			openOnStartup: typeof stored.openOnStartup === "boolean" ? stored.openOnStartup : defaultNavigator.openOnStartup,
+			openOnStartup: Object.fromEntries(viewKinds.map((kind) => [kind, typeof startup[kind] === "boolean" ? startup[kind] : defaultNavigator.openOnStartup[kind]])) as Record<ViewKind, boolean>,
 			collapseListPane: typeof stored.collapseListPane === "boolean" ? stored.collapseListPane : defaultNavigator.collapseListPane,
 		},
 		dailyNotes: resolveDailyNotes(data.dailyNotes),
@@ -86,7 +89,7 @@ export interface DataPlugin {
  * holds it sees every change; every save writes all of it, one at a time, in the order asked.
  */
 export class SettingsStore {
-	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator }, dailyNotes: { ...defaultDailyNotes } };
+	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes } };
 	private queue: Promise<void> = Promise.resolve();
 
 	constructor(private readonly plugin: DataPlugin) {}

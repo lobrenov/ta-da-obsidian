@@ -2,7 +2,6 @@ import { type Grouping, listSections, type ListSection, TagFilter } from "../../
 import type { TaskGroup } from "../../core/index/queries";
 import { dailyNote, openCheckboxCount, pathForDate, pathForWeek, weekNote } from "../../core/index/dailyNotes";
 import { agendaDay, agendaWeek, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
-import { folderTree, type FolderNode, notesIn } from "../../core/index/noteQueries";
 import { search as searchIndex } from "../../core/index/queries";
 import { tagBrowser } from "../../core/index/tagQueries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
@@ -12,7 +11,6 @@ import { isClosed } from "../../core/model/status";
 import type { Tag } from "../../core/model/tag";
 import { tagLeaf } from "../../core/model/tag";
 import { type TrashedItem, contentsOf } from "../../core/storage/trash";
-import { folderOf } from "../../core/storage/vault";
 import { linkTitle } from "../../core/model/wikiLink";
 import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel, weekOf } from "./agenda";
 import { dayMonth, fullDate, shortWeekday } from "./dates";
@@ -38,8 +36,6 @@ export interface ListContext {
 	today: LocalDate;
 	/** `.trash/`'s Ta Da files and notes, as `readTrash` lists them. */
 	trash: readonly TrashedItem[];
-	/** The folders known to be on disk, which the Notes tree shows even when empty. */
-	folders: ReadonlySet<string>;
 	/** The Agenda's day or week, and whether its strip shows the month. */
 	agenda: AgendaState;
 	/** Where daily and week notes live, and whether week notes show. */
@@ -86,7 +82,7 @@ export interface ListHeader {
 	lines: string[];
 	/** The page's own file, opened by an icon button. */
 	file: { path: string; label: string } | null;
-	/** Child tags or folders, each opening its page. */
+	/** Child tags, each opening its page. */
 	chips: { label: string; count: number; domain: Domain; icon: IconSpec }[];
 }
 
@@ -134,8 +130,6 @@ export function buildList(domain: Domain, ctx: ListContext, options: ListOptions
 		}
 		case "tag":
 			return tagList(domain, ctx, options);
-		case "folder":
-			return folderList(domain.path, ctx, options);
 		case "search":
 			return searchList(domain, ctx);
 	}
@@ -356,7 +350,7 @@ function groupSections(ctx: ListContext, groups: TaskGroup[], rowOptions: TaskRo
 	});
 }
 
-// Tag and folder pages
+// Tag pages
 
 function tagList(domain: Extract<Domain, { kind: "tag" }>, ctx: ListContext, options: ListOptions): ListModel {
 	const { index, today } = ctx;
@@ -406,41 +400,6 @@ function tagList(domain: Extract<Domain, { kind: "tag" }>, ctx: ListContext, opt
 		sections,
 		empty: null,
 	};
-}
-
-function folderList(folder: string, ctx: ListContext, options: ListOptions): ListModel {
-	const { index } = ctx;
-	const all = notesIn(index, folder);
-	const filter = new TagFilter(options.picked);
-	const notes = filter.apply(all);
-	const name = folder === "" ? "Loose" : (folder.split("/").pop() ?? folder);
-	const children = folder === "" ? [] : (folderNode(folder, folderTree(index, ctx.folders))?.children ?? []);
-	const parent = folderOf(folder);
-	const lines = [plural(all.length, "note"), ...(children.length > 0 ? [plural(children.length, "folder")] : [])].join(" · ");
-	return {
-		domain: { kind: "folder", path: folder },
-		header: {
-			...noHeader,
-			title: name,
-			icon: { type: "icon", name: folder === "" ? "inbox" : "folder", tint: "link" },
-			detail: parent === "" ? null : `${parent}/`,
-			lines: [lines],
-			chips: children.map((child) => ({ label: child.name, count: child.count, domain: { kind: "folder", path: child.path }, icon: { type: "icon", name: "folder", tint: "link" } })),
-		},
-		groupList: null,
-		grouping: null,
-		filter: filterModel(all, options.picked, notes.length),
-		sections: notes.length === 0 ? [] : [plain("notes", notes.map((note) => noteRow(note, false)))],
-		empty: notes.length > 0 ? null : filter.isActive && all.length > 0 ? noMatches : folder === "" ? "No notes at the top level." : `No notes in ${name} itself.`,
-	};
-}
-
-function folderNode(path: string, nodes: FolderNode[]): FolderNode | null {
-	for (const node of nodes) {
-		if (node.path === path) return node;
-		if (path.startsWith(`${node.path}/`)) return folderNode(path, node.children);
-	}
-	return null;
 }
 
 // Archives and search
@@ -502,13 +461,11 @@ function trashList(ctx: ListContext): ListModel {
 
 function searchList(domain: Extract<Domain, { kind: "search" }>, ctx: ListContext): ListModel {
 	const { index, today } = ctx;
-	const hits = searchIndex(index, domain.query);
+	const hits = searchIndex(index, domain.query).filter((item) => item.properties.kind !== "note");
 	const rows: ListRow[] = hits.map((item) => {
 		switch (item.properties.kind) {
 			case "task":
 				return taskRow(index, item, today, { dates: "elsewhere", place: false });
-			case "note":
-				return noteRow(item, true);
 			default:
 				return cardRow(index, item);
 		}

@@ -1,6 +1,7 @@
 import { Setting } from "obsidian";
 import { dateAtPath, weekAtPath, type DailyNoteNames } from "../../core/index/dailyNotes";
 import type { VaultIndex } from "../../core/index/vaultIndex";
+import { viewKinds, viewSpecs } from "./views";
 import { cleanedFolder, type DailyNotesData, type NavigatorData, type SettingsStore } from "../../settingsData";
 
 /** The navigator's part of the shared settings, with a call-back for the view when it changes. */
@@ -53,15 +54,18 @@ export class NavigatorSettings {
 	}
 }
 
-/** The navigator's settings, drawn into the plugin's settings tab. */
+/** The views' settings, drawn into the plugin's settings tab. */
 export function displayNavigatorSettings(containerEl: HTMLElement, settings: NavigatorSettings): void {
-	new Setting(containerEl)
-		.setName("Open the navigator on startup")
-		.setDesc("Shows the Ta Da navigator in the left sidebar, beside the file explorer.")
-		.addToggle((toggle) => toggle.setValue(settings.data.openOnStartup).onChange((value) => void settings.update({ openOnStartup: value })));
+	for (const kind of viewKinds) {
+		const name = viewSpecs[kind].title.replace("Ta Da: ", "");
+		new Setting(containerEl)
+			.setName(`Open ${name} on startup`)
+			.setDesc(`Shows the ${viewSpecs[kind].title} view in the left sidebar, beside the file explorer.`)
+			.addToggle((toggle) => toggle.setValue(settings.data.openOnStartup[kind]).onChange((value) => void settings.update({ openOnStartup: { ...settings.data.openOnStartup, [kind]: value } })));
+	}
 	new Setting(containerEl)
 		.setName("Collapse the list pane")
-		.setDesc("Hides the list beside the navigation pane. The button in the navigator's header toggles it too.")
+		.setDesc("Hides the list beside the navigation pane in Tasks and Tags. The button in the view's header toggles it too.")
 		.addToggle((toggle) => toggle.setValue(settings.data.collapseListPane).onChange((value) => void settings.update({ collapseListPane: value })));
 }
 

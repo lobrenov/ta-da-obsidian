@@ -290,25 +290,6 @@ describe("tags", () => {
 	});
 });
 
-describe("notes", () => {
-	const ctx = context(loadFixtureIndex("NoteVault"), today, { folders: new Set(["Empty"]) });
-
-	it("shows a folder's own notes with its subfolders as chips", () => {
-		const model = list({ kind: "folder", path: "Meetings" }, ctx);
-		expect(model.header.title).toBe("Meetings");
-		expect(model.header.lines).toEqual(["1 note · 1 folder"]);
-		expect(model.header.chips.map((chip) => [chip.label, chip.count, chip.domain])).toEqual([["2026", 1, { kind: "folder", path: "Meetings/2026" }]]);
-		expect(describeList(model)).toEqual(["# -", "    note | Ark planning call"]);
-		expect(list({ kind: "folder", path: "Meetings/2026" }, ctx).header.detail).toBe("Meetings/");
-	});
-
-	it("shows the top level as Loose, and says when a folder holds none", () => {
-		expect(describeList(list({ kind: "folder", path: "" }, ctx))).toEqual(["# -", "    note | Loose idea", "    note | Reading list"]);
-		expect(list({ kind: "folder", path: "" }, ctx).header.title).toBe("Loose");
-		expect(list({ kind: "folder", path: "Empty" }, ctx).empty).toBe("No notes in Empty itself.");
-	});
-});
-
 describe("tag filter", () => {
 	const index = new VaultIndex([
 		makeItem("Ta Da/tasks/Wet.md", "type: task\nstatus: Not Started\ntags: [Home/Garden]"),
@@ -423,7 +404,7 @@ describe("Trash", () => {
 });
 
 describe("search", () => {
-	it("lists matching tasks with their place, notes with their folder and parents as cards", () => {
+	it("lists matching tasks with their place and parents as cards, and no notes", () => {
 		const index = new VaultIndex([
 			makeItem("Ta Da/projects/Garden.md", "type: project\nstatus: Doing"),
 			makeItem("Ta Da/tasks/Water the garden.md", 'type: task\nstatus: Not Started\nproject: "[[Garden]]"'),
@@ -431,25 +412,25 @@ describe("search", () => {
 			makeItem("Ta Da/tasks/Unrelated.md", "type: task\nstatus: Doing"),
 		]);
 		const model = list({ kind: "search", query: "garden" }, context(index, today));
-		expect(model.header.detail).toBe("3 results");
-		expect(describeList(model)).toEqual(["# -", "    project | Garden | card | 0 of 1 done · No area", "    note | Garden ideas | Notes", "    Water the garden | [Not Started]"]);
+		expect(model.header.detail).toBe("2 results");
+		expect(describeList(model)).toEqual(["# -", "    project | Garden | card | 0 of 1 done · No area", "    Water the garden | [Not Started]"]);
 		expect(list({ kind: "search", query: "zzz" }, context(index, today)).empty).toBe("No results");
 	});
 });
 
 describe("domains", () => {
 	it("reads saved domains and refuses anything else", () => {
-		for (const domain of [{ kind: "agenda" }, { kind: "project", path: "p.md" }, { kind: "tag", path: null }, { kind: "tag", path: "a/b" }, { kind: "folder", path: "" }] as const) {
+		for (const domain of [{ kind: "agenda" }, { kind: "project", path: "p.md" }, { kind: "tag", path: null }, { kind: "tag", path: "a/b" }] as const) {
 			expect(readDomain(JSON.parse(JSON.stringify(domain)))).toEqual(domain);
 		}
 		expect(readDomain({ kind: "today" })).toEqual({ kind: "agenda" });
 		expect(readDomain({ kind: "upcoming" })).toEqual({ kind: "agenda" });
-		for (const bad of [null, "today", { kind: "search", query: "x" }, { kind: "project" }, { kind: "folder", path: 3 }, { kind: "nope" }]) {
+		for (const bad of [null, "today", { kind: "search", query: "x" }, { kind: "project" }, { kind: "folder", path: "" }, { kind: "nope" }]) {
 			expect(readDomain(bad)).toBeNull();
 		}
 	});
 
 	it("keys each list apart", () => {
-		expect(new Set([{ kind: "tag", path: null }, { kind: "tag", path: "a" }, { kind: "folder", path: "a" }, { kind: "area", path: "a" }, { kind: "agenda" }].map((domain) => domainKey(domain as never))).size).toBe(5);
+		expect(new Set([{ kind: "tag", path: null }, { kind: "tag", path: "a" }, { kind: "area", path: "a" }, { kind: "agenda" }].map((domain) => domainKey(domain as never))).size).toBe(4);
 	});
 });
