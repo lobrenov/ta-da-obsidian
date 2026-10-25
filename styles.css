@@ -639,12 +639,6 @@
 	flex: none;
 }
 
-.ta-da-navigator .ta-da-chevron {
-	flex: none;
-	width: var(--size-4-4);
-	margin-inline-end: calc(-1 * var(--size-4-1));
-}
-
 .ta-da-navigator .tree-item-inner.is-strong {
 	font-weight: var(--font-semibold);
 	color: var(--text-normal);
@@ -803,7 +797,7 @@
 
 /* Touch targets: rows are at least 44px tall, and the checkbox's hit area is 44px around its drawn box. */
 .ta-da-navigator.is-phone .ta-da-row,
-.ta-da-navigator.is-phone .ta-da-nav-item .tree-item-self {
+.ta-da-navigator.is-phone .tree-item-self {
 	box-sizing: border-box;
 	align-items: center;
 	min-height: 44px;

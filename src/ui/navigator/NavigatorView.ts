@@ -441,16 +441,28 @@ export class NavigatorView extends ItemView {
 		if (this.kind === "agenda") return;
 		body.empty();
 		const active = this.query.trim() === "" ? this.domain : null;
-		// The tag tree leaves room for a fold arrow on every row.
-		for (const item of buildNav(ctx, this.kind, this.expanded)) this.navRow(body, item, active !== null && sameDomain(item.domain, active), this.kind === "tags");
+		if (this.kind === "tags") {
+			// As Obsidian's file tree: a child sits in its parent's `tree-item-children`, which indents it.
+			const levels = [body];
+			for (const item of buildNav(ctx, this.kind, this.expanded)) {
+				const outer = this.navRow(levels[item.depth] ?? body, item, active !== null && sameDomain(item.domain, active), false);
+				levels[item.depth + 1] = outer.createDiv({ cls: "tree-item-children" });
+			}
+			return;
+		}
+		for (const item of buildNav(ctx, this.kind, this.expanded)) {
+			const outer = this.navRow(body, item, active !== null && sameDomain(item.domain, active), true);
+			outer.addClass("ta-da-nav-item");
+			(outer.firstElementChild as HTMLElement).style.setProperty("--ta-da-depth", String(item.depth));
+		}
 	}
 
-	private navRow(parent: HTMLElement, item: NavItem, active: boolean, room: boolean): void {
-		const outer = parent.createDiv({ cls: `tree-item ta-da-nav-item${item.gap ? " has-gap" : ""}` });
-		const self = outer.createDiv({ cls: `tree-item-self is-clickable${active ? " is-active" : ""}` });
-		self.style.setProperty("--ta-da-depth", String(item.depth));
+	/** A row in Obsidian's tree markup; `icon` adds the item's icon before its name. Returns the row's `tree-item`. */
+	private navRow(parent: HTMLElement, item: NavItem, active: boolean, icon: boolean): HTMLElement {
+		const outer = parent.createDiv({ cls: `tree-item${item.gap ? " has-gap" : ""}` });
+		const self = outer.createDiv({ cls: `tree-item-self is-clickable${active ? " is-active" : ""}${item.expanded !== null ? " mod-collapsible" : ""}` });
 		if (item.expanded !== null) {
-			const chevron = self.createDiv({ cls: `tree-item-icon collapse-icon ta-da-chevron${item.expanded ? "" : " is-collapsed"}` });
+			const chevron = self.createDiv({ cls: `tree-item-icon collapse-icon${item.expanded ? "" : " is-collapsed"}` });
 			setIcon(chevron, "right-triangle");
 			chevron.addEventListener("click", (event) => {
 				event.stopPropagation();
@@ -458,13 +470,12 @@ export class NavigatorView extends ItemView {
 				else this.expanded.add(item.id);
 				this.refresh();
 			});
-		} else if (room) {
-			self.createDiv({ cls: "ta-da-chevron" });
 		}
-		drawIcon(self.createDiv({ cls: "ta-da-nav-icon" }), item.icon);
+		if (icon) drawIcon(self.createDiv({ cls: "ta-da-nav-icon" }), item.icon);
 		self.createDiv({ cls: `tree-item-inner${item.strong ? " is-strong" : ""}`, text: item.label });
 		if (item.count !== null && item.count > 0) self.createDiv({ cls: "tree-item-flair-outer" }).createSpan({ cls: "tree-item-flair", text: String(item.count) });
 		self.addEventListener("click", () => this.show(item.domain));
+		return outer;
 	}
 
 	// List pane
