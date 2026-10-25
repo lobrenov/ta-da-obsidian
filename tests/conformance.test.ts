@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
@@ -9,6 +9,7 @@ import { type TagNode, itemsTagged, tagBrowser, tagSuggestions, tagTree, untagge
 import { type Item, isLogged, type Warning } from "../src/core/model/item";
 import { LocalDate } from "../src/core/model/localDate";
 import { parseItem } from "../src/core/parsing/parseItem";
+import { readDailyNotes, readObsidianDailyNotes, writeDailyNotes, type DailyNotesValues } from "../src/core/storage/settingsFile";
 import { contentsOf, tasksOf, trashedItems, type TrashedItem } from "../src/core/storage/trash";
 import { compareCodeUnits } from "../src/core/text";
 import { itemJson } from "./itemJson";
@@ -220,5 +221,29 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 		expect(vault, `queries.json has no \`${section}\``).toHaveProperty(section);
 		const expected = section === "warnings" ? maskedWarnings(vault[section]) : vault[section];
 		expect(sections[section]?.()).toEqual(expected);
+	});
+});
+
+interface SettingsExport {
+	read: { name: string; input: string | null; expected: { dailyNotes: Partial<DailyNotesValues> } }[];
+	obsidianDailyNotes: { name: string; input: string; expected: Record<string, unknown> }[];
+	write: { name: string; input: string | null; dailyNotes: DailyNotesValues; expected: unknown }[];
+}
+
+/** The settings fixture is skipped until the Swift side has written it. */
+const hasSettingsExport = existsSync(join(conformanceFolder, "settings.json"));
+const settingsExport = hasSettingsExport ? loadJson<SettingsExport>("settings.json") : { read: [], obsidianDailyNotes: [], write: [] };
+
+describe.skipIf(!hasSettingsExport)("settings", () => {
+	it.each(settingsExport.read)("read: $name", ({ input, expected }) => {
+		expect(readDailyNotes(input)).toEqual(expected.dailyNotes);
+	});
+	it.each(settingsExport.obsidianDailyNotes)("obsidianDailyNotes: $name", ({ input, expected }) => {
+		expect(readObsidianDailyNotes(input)).toEqual(expected);
+	});
+	it.each(settingsExport.write)("write: $name", ({ input, dailyNotes, expected }) => {
+		const text = writeDailyNotes(input, dailyNotes);
+		expect(text.endsWith("\n")).toBe(true);
+		expect(JSON.parse(text)).toEqual(expected);
 	});
 });

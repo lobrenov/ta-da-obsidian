@@ -19,7 +19,7 @@ By hand: copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidia
 - Hide properties on Ta Da files.
 - Open Agenda, Tasks and Tags on startup, one setting each.
 - Collapse the list pane.
-- Daily notes: the folder and template for daily notes, and for week notes, which can be turned off.
+- Daily notes: the folder and template for daily notes, and for week notes, which can be turned off. These are shared with Ta Da through `Ta Da/settings.json` in the vault.
 
 ## Development
 The Ta Da repo must be cloned beside this one (`../Ta Da`), with `swift-markdown-engine-extended` beside both; the tests read their fixtures. `CLAUDE.md` has the layout and rules.

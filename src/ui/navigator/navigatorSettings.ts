@@ -41,15 +41,20 @@ export class NavigatorSettings {
 		return () => this.listeners.delete(listener);
 	}
 
+	/** Tells the listeners that a setting has changed, here or in the settings file. */
+	notify(): void {
+		for (const listener of [...this.listeners]) listener();
+	}
+
 	async update(change: Partial<NavigatorData>): Promise<void> {
 		const saved = this.store.updateNavigator(change);
-		for (const listener of [...this.listeners]) listener();
+		this.notify();
 		await saved;
 	}
 
 	async updateDailyNotes(change: Partial<DailyNotesData>): Promise<void> {
 		const saved = this.store.updateDailyNotes(change);
-		for (const listener of [...this.listeners]) listener();
+		this.notify();
 		await saved;
 	}
 }
@@ -72,7 +77,7 @@ export function displayNavigatorSettings(containerEl: HTMLElement, settings: Nav
 /** Settings ▸ Daily notes, drawn into the plugin's settings tab. */
 export function displayDailyNotesSettings(containerEl: HTMLElement, settings: NavigatorSettings): void {
 	const data = settings.dailyNotes;
-	new Setting(containerEl).setName("Daily notes").setHeading();
+	new Setting(containerEl).setName("Daily notes").setDesc("Shared with Ta Da through Ta Da/settings.json in the vault.").setHeading();
 	folderSetting(containerEl, "Daily note folder", data.dailyFolder, (value) => void settings.updateDailyNotes({ dailyFolder: value }));
 	templateSetting(containerEl, "Daily note template", data.dailyTemplate, settings, (value) => void settings.updateDailyNotes({ dailyTemplate: value }), false);
 	new Setting(containerEl)

@@ -1,21 +1,23 @@
-import { Plugin, TFile } from "obsidian";
+import { Plugin, type TAbstractFile, TFile } from "obsidian";
 import { registerCommands } from "./commands";
 import { statuses } from "./core/model/status";
 import { TaDaSettingTab } from "./settings";
+import { settingsFilePath } from "./core/storage/settingsFile";
 import { SettingsStore, type TaDaData } from "./settingsData";
 import { TaDaIndex } from "./TaDaIndex";
 import { localToday } from "./ui/dates";
 import { registerHeader } from "./ui/header/registerHeader";
 import { registerNavigator } from "./ui/navigator/register";
 import { StatusActions } from "./ui/statusActions";
+import { vaultSettingsFiles } from "./vaultFiles";
 import { Writer } from "./Writer";
 
 export default class TaDaPlugin extends Plugin {
 	taDaIndex!: TaDaIndex;
 	writer!: Writer;
 	statusActions!: StatusActions;
-	store = new SettingsStore(this);
-	/** The whole of `data.json`, which `PluginSettingTab` saves. */
+	store = new SettingsStore(this, vaultSettingsFiles(this.app));
+	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes`. */
 	override settings: TaDaData = this.store.data;
 
 	override async onload(): Promise<void> {
@@ -28,18 +30,30 @@ export default class TaDaPlugin extends Plugin {
 		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
 		const navigator = registerNavigator(this, this.store, newTask);
-		this.addSettingTab(
-			new TaDaSettingTab(
-				this.app,
-				this,
-				this.settings,
-				() => {
-					void this.store.save();
-					header.refresh();
-				},
-				navigator,
-			),
+		const tab = new TaDaSettingTab(
+			this.app,
+			this,
+			this.settings,
+			() => {
+				void this.store.save();
+				header.refresh();
+			},
+			navigator,
 		);
+		this.addSettingTab(tab);
+		this.app.workspace.onLayoutReady(() => {
+			const reload = (file: TAbstractFile): void => {
+				if (file.path !== settingsFilePath) return;
+				void this.store.reloadDailyNotes().then((changed) => {
+					if (!changed) return;
+					navigator.notify();
+					tab.refresh();
+				});
+			};
+			this.registerEvent(this.app.vault.on("create", reload));
+			this.registerEvent(this.app.vault.on("modify", reload));
+			this.registerEvent(this.app.vault.on("delete", reload));
+		});
 	}
 
 	/** One `Set status` command per status, on the active task or project file. */

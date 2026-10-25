@@ -13,8 +13,9 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - Install into SampleVault: `npm run build`, then copy `main.js`, `manifest.json` and `styles.css` into `../Ta Da/SampleVault/.obsidian/plugins/ta-da/`, or run `OBSIDIAN_VAULT="../Ta Da/SampleVault" npm run dev`. Reload the plugin in Obsidian.
 
 ## Layout
-- `src/core/`: the TypeScript port of TaDaCore (`model/`, `parsing/`, `syntax/` from the editor fork's `MarkdownEngineSyntax`, `index/`, `writing/`, `storage/`). No Obsidian imports.
+- `src/core/`: the TypeScript port of TaDaCore (`model/`, `parsing/`, `syntax/` from the editor fork's `MarkdownEngineSyntax`, `index/`, `writing/`, `storage/`, including `storage/settingsFile.ts`, the read and write of `Ta Da/settings.json`). No Obsidian imports.
 - `src/TaDaIndex.ts`: `VaultIndex` built from the vault's markdown on layout ready, patched on file and editor changes.
+- `src/settingsData.ts`: `SettingsStore`. `data.json` holds `hideProperties` and `navigator`; the Daily notes settings are in the vault's `Ta Da/settings.json` (shared with Ta Da, `docs/file-format.md` Settings), each key falling back to `data.json`'s old `dailyNotes`, then Obsidian's `daily-notes.json` (folder and template), then the default. Loading never writes; a change writes the file through `src/vaultFiles.ts`, keeping its other keys, and `main.ts` reloads on the file's create, modify and delete.
 - `src/Writer.ts`: every write to a file's text, one queue per file.
 - `src/ui/header/`: the Ta Da header on task, project and area files (Live Preview widget and Reading view post-processor) and its menus.
 - `src/ui/navigator/`: the Agenda, Tasks and Tags views (one `NavigatorView` class, three kinds in `views.ts`), their domains, lists and settings.
@@ -24,7 +25,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - `tests/`: Vitest tests, including conformance with TaDaCore.
 
 ## Conformance
-The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/` (`read.json`, `queries.json`, `writes.json`, `HomeVault/`) and `../DesignVault/` beside it. `tests/spec.test.ts` reads the grammar spec from `../swift-markdown-engine-extended/spec/grammar`. Regenerate the JSON from the Ta Da repo with `swift test --package-path Packages/TaDaCore --filter writeConformance` (`ConformanceExportTests.swift`); a port change that changes behaviour starts there.
+The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/` (`read.json`, `queries.json`, `writes.json`, `settings.json`, `HomeVault/`) and `../DesignVault/` beside it. `tests/spec.test.ts` reads the grammar spec from `../swift-markdown-engine-extended/spec/grammar`. Regenerate the JSON from the Ta Da repo with `swift test --package-path Packages/TaDaCore --filter writeConformance` (`ConformanceExportTests.swift`); a port change that changes behaviour starts there.
 
 ## Rules
 - Writes splice lines through `Writer`: the open file through its `Editor` as one transaction, other files through `Vault.process`. Never `processFrontMatter`, never re-serialise YAML. Renames go through `FileManager.renameFile`, named by the ported `FileNaming`.

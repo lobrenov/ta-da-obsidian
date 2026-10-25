@@ -13,6 +13,11 @@ export class TaDaSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
+	/** Draws the settings again when the tab is showing. */
+	refresh(): void {
+		if (this.containerEl.isConnected) this.display();
+	}
+
 	override display(): void {
 		this.containerEl.empty();
 		new Setting(this.containerEl)

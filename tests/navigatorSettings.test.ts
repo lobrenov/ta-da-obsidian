@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { cleanedFolder, defaultDailyNotes, resolveData, SettingsStore } from "../src/settingsData";
+import { memoryFiles } from "./support";
 import { readGroupings } from "../src/ui/navigator/domain";
 import { maxParallelReads, readTrash } from "../src/TaDaTrash";
 
@@ -24,14 +25,14 @@ function makePlugin(saved: unknown = null): { plugin: never; writes: unknown[]; 
 describe("SettingsStore", () => {
 	it("reads the header's and the navigator's settings from one file", async () => {
 		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: { tasks: true } } });
-		const store = new SettingsStore(plugin);
+		const store = new SettingsStore(plugin, memoryFiles());
 		await store.load();
 		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes });
 	});
 
 	it("keeps the one data object, so what holds it sees a loaded or changed value", async () => {
 		const { plugin } = makePlugin({ hideProperties: false });
-		const store = new SettingsStore(plugin);
+		const store = new SettingsStore(plugin, memoryFiles());
 		const held = store.data;
 		await store.load();
 		expect(held.hideProperties).toBe(false);
@@ -41,38 +42,108 @@ describe("SettingsStore", () => {
 
 	it("saves all of it each time, so one section's save never drops the other's", async () => {
 		const { plugin, disk } = makePlugin();
-		const store = new SettingsStore(plugin);
+		const store = new SettingsStore(plugin, memoryFiles());
 		await store.load();
 		store.data.hideProperties = false;
 		const header = store.save();
 		const navigator = store.updateNavigator({ openOnStartup: { agenda: true, tasks: false, tags: false } });
 		await Promise.all([header, navigator]);
-		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes });
+		expect(disk()).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: false } });
 	});
 
 	it("writes one at a time, the last write holding the latest state, even when an earlier write is slower", async () => {
 		const { plugin, writes, disk } = makePlugin();
-		const store = new SettingsStore(plugin);
+		const store = new SettingsStore(plugin, memoryFiles());
 		const first = store.updateNavigator({ openOnStartup: { agenda: true, tasks: false, tags: false } });
 		const second = store.updateNavigator({ collapseListPane: true });
 		await Promise.all([first, second]);
 		expect(writes).toHaveLength(2);
-		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: true }, dailyNotes: defaultDailyNotes });
+		expect(writes[1]).toEqual({ hideProperties: true, navigator: { openOnStartup: { agenda: true, tasks: false, tags: false }, collapseListPane: true } });
 		expect(disk()).toEqual(writes[1]);
 	});
 
-	it("saves the daily notes' settings with the rest", async () => {
-		const { plugin, disk } = makePlugin();
-		const store = new SettingsStore(plugin);
+	it("writes the daily notes' settings to the vault file, not data.json", async () => {
+		const { plugin, writes } = makePlugin();
+		const files = memoryFiles({ "Ta Da/settings.json": JSON.stringify({ theme: { themeSet: "Ayu" }, dailyNotes: { extra: 1 } }) });
+		const store = new SettingsStore(plugin, files);
 		await store.load();
 		await store.updateDailyNotes({ weekNotes: false, dailyTemplate: "T.md" });
 		expect(store.data.dailyNotes).toEqual({ ...defaultDailyNotes, weekNotes: false, dailyTemplate: "T.md" });
-		expect(disk()).toEqual(store.data);
+		expect(writes).toEqual([]);
+		expect(JSON.parse(files.files.get("Ta Da/settings.json") ?? "")).toEqual({ theme: { themeSet: "Ayu" }, dailyNotes: { ...defaultDailyNotes, weekNotes: false, dailyTemplate: "T.md", extra: 1 } });
+	});
+
+	it("creates the settings file when a setting changes, and never when loading", async () => {
+		const files = memoryFiles();
+		const store = new SettingsStore(makePlugin().plugin, files);
+		await store.load();
+		expect(files.files.size).toBe(0);
+		await store.updateDailyNotes({ dailyFolder: "Journal" });
+		expect(files.files.get("Ta Da/settings.json")).toBe(`${JSON.stringify({ dailyNotes: { ...defaultDailyNotes, dailyFolder: "Journal" } }, null, 2)}\n`);
+	});
+
+	it("reads each daily notes key from the file, else data.json, else Obsidian's setting, else the default", async () => {
+		const { plugin } = makePlugin({ dailyNotes: { dailyFolder: "Old", dailyTemplate: "Old.md", weekFolder: "OldWeeks" } });
+		const files = memoryFiles({
+			"Ta Da/settings.json": JSON.stringify({ dailyNotes: { dailyFolder: "File", weekNotes: false, weekTemplate: 3 } }),
+			".obsidian/daily-notes.json": JSON.stringify({ folder: "Obsidian", template: "Tpl" }),
+		});
+		const store = new SettingsStore(plugin, files);
+		await store.load();
+		expect(store.data.dailyNotes).toEqual({ dailyFolder: "File", dailyTemplate: "Old.md", weekNotes: false, weekFolder: "OldWeeks", weekTemplate: null });
+	});
+
+	it("falls back to Obsidian's folder and template when nothing else has them", async () => {
+		const files = memoryFiles({ ".obsidian/daily-notes.json": JSON.stringify({ folder: "Obsidian", template: "Tpl" }) });
+		const store = new SettingsStore(makePlugin().plugin, files);
+		await store.load();
+		expect(store.data.dailyNotes).toEqual({ ...defaultDailyNotes, dailyFolder: "Obsidian", dailyTemplate: "Tpl.md" });
+	});
+
+	it("keeps data.json's old dailyNotes as it was when saving", async () => {
+		const old = { dailyFolder: "Old" };
+		const { plugin, disk } = makePlugin({ dailyNotes: old });
+		const store = new SettingsStore(plugin, memoryFiles());
+		await store.load();
+		await store.updateDailyNotes({ dailyFolder: "New" });
+		await store.updateNavigator({ collapseListPane: true });
+		expect((disk() as { dailyNotes: unknown }).dailyNotes).toEqual(old);
+	});
+
+	it("reloads the daily notes when the file changes, and says whether they did", async () => {
+		const files = memoryFiles();
+		const store = new SettingsStore(makePlugin().plugin, files);
+		await store.load();
+		const held = store.data;
+		expect(await store.reloadDailyNotes()).toBe(false);
+		files.files.set("Ta Da/settings.json", JSON.stringify({ dailyNotes: { weekNotes: false } }));
+		expect(await store.reloadDailyNotes()).toBe(true);
+		expect(held.dailyNotes.weekNotes).toBe(false);
+		files.files.delete("Ta Da/settings.json");
+		expect(await store.reloadDailyNotes()).toBe(true);
+		expect(held.dailyNotes).toEqual(defaultDailyNotes);
+	});
+
+	it("drops a reload that reads while a newer change is being written", async () => {
+		const files = memoryFiles();
+		const update = files.update;
+		files.update = async (path, change) => {
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			await update(path, change);
+		};
+		const store = new SettingsStore(makePlugin().plugin, files);
+		await store.load();
+		const written = store.updateDailyNotes({ dailyFolder: "A" });
+		const reloaded = store.reloadDailyNotes();
+		const second = store.updateDailyNotes({ dailyFolder: "B" });
+		await Promise.all([written, reloaded, second]);
+		expect(store.data.dailyNotes.dailyFolder).toBe("B");
+		expect(JSON.parse(files.files.get("Ta Da/settings.json") ?? "").dailyNotes.dailyFolder).toBe("B");
 	});
 
 	it("keeps saving after a save fails", async () => {
 		const saveData = vi.fn().mockRejectedValueOnce(new Error("disk")).mockResolvedValue(undefined);
-		const store = new SettingsStore({ loadData: async () => null, saveData });
+		const store = new SettingsStore({ loadData: async () => null, saveData }, memoryFiles());
 		await expect(store.save()).rejects.toThrow("disk");
 		await expect(store.save()).resolves.toBeUndefined();
 	});
