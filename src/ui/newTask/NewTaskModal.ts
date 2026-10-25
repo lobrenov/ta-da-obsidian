@@ -10,11 +10,11 @@ import { buildHeaderModel, type Chip, type TagChip } from "../header/headerModel
 import { openDatePicker, openParentPicker, openStatusMenu, openTagPicker, type PickerHost } from "../header/pickers";
 import { placeDraft } from "./place";
 
-const kinds: readonly Kind[] = ["task", "project", "area", "note"];
+const kinds: readonly Kind[] = ["task", "project", "area"];
 const quickEntryPath = "Quick Entry";
 
 /**
- * Makes a new task, project, area or note, as the Mac's Quick Entry: the type switch, the title, the header's chips and
+ * Makes a new task, project or area, as the Mac's Quick Entry: the type switch, the title, the header's chips and
  * Tags row, and the file it will write. The chips' menus change the draft; nothing is written until Create.
  */
 export class NewTaskModal extends Modal {
@@ -164,7 +164,7 @@ export class NewTaskModal extends Modal {
 
 	private place(): ReturnType<typeof placeDraft> {
 		const { vault } = this.app;
-		const folder = this.draft.kind === "note" ? vault.getRoot() : vault.getFolderByPath(placeDraft(this.draft, [], []).folder);
+		const folder = vault.getFolderByPath(placeDraft(this.draft, [], []).folder);
 		const folderNames = (folder?.children ?? []).map((child) => child.name);
 		const projectNames: string[] = [];
 		for (const item of this.host.index.items.values()) {
