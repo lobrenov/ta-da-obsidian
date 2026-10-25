@@ -6,7 +6,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - Design: the canvas's Obsidian POC page, https://claude.ai/artifact/A7c33hg9HUKz41u3wbki3V.
 
 ## Commands
-- Test: `npm test` (Vitest).
+- Test: `npm test` (Vitest). `TADA_REPO=<path>` points the tests at a Ta Da checkout other than `../Ta Da`.
 - Build: `npm run build` (typechecks `src/` and `tests/`, then bundles `main.js`).
 - Dev: `OBSIDIAN_VAULT=<vault> npm run dev` (watch build, copied into `<vault>/.obsidian/plugins/ta-da/`).
 - Install into SampleVault: `npm run build`, then copy `main.js`, `manifest.json` and `styles.css` into `../Ta Da/SampleVault/.obsidian/plugins/ta-da/`, or run `OBSIDIAN_VAULT="../Ta Da/SampleVault" npm run dev`. Reload the plugin in Obsidian.

@@ -260,8 +260,8 @@ describe("property reader", () => {
 	it("reads broken YAML with type note as a note only at note paths", () => {
 		const text = "---\ntype: note\ntags: [a\n---\n";
 		expect(parseItem(text, "x.md")?.properties.kind).toBe("note");
-		expect(parseItem(text, "tasks/x.md")).toBeNull();
-		expect(parseItem("---\ntags: [a\n---\n", "tasks/x.md")).toBeNull();
+		expect(parseItem(text, "Ta Da/tasks/x.md")).toBeNull();
+		expect(parseItem("---\ntags: [a\n---\n", "Ta Da/tasks/x.md")).toBeNull();
 	});
 });
 

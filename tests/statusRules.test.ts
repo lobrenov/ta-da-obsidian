@@ -67,8 +67,8 @@ describe("planStatus", () => {
 
 describe("planStatus on logged files", () => {
 	const logged = (name: string, status: string) =>
-		makeItem(`Ta Da/Logbook/2026-09/${name}.md`, `type: task\nstatus: ${status}\nproject: "[[Kombi]]"`);
-	const loggedProject = makeItem("Ta Da/Logbook/2026-09/Kombi.md", "type: project\nstatus: Done");
+		makeItem(`Ta Da/logbook/2026-09/${name}.md`, `type: task\nstatus: ${status}\nproject: "[[Kombi]]"`);
+	const loggedProject = makeItem("Ta Da/logbook/2026-09/Kombi.md", "type: project\nstatus: Done");
 
 	it("puts a reopened logged task back, with its logged project as Doing", () => {
 		const t = logged("A", "Done");

@@ -1,5 +1,5 @@
 import { identityKey } from "../text";
-import { legacyFolders, legacyLogbookFolder, home, logbookFolder, trashFolder } from "../storage/vault";
+import { home, logbookFolder, trashFolder } from "../storage/vault";
 import type { Checkbox } from "./checkbox";
 import type { LocalDate } from "./localDate";
 import type { Status } from "./status";
@@ -105,18 +105,18 @@ export function subtasks(item: Item): { done: number; total: number } {
 	return { done, total };
 }
 
-/** Whether a path is in `Ta Da/Logbook/` or the old `.logbook/`, ignoring case. */
+/** Whether a path is in `Ta Da/logbook/`, ignoring case. */
 export function isLoggedPath(path: string): boolean {
 	const lower = identityKey(path);
-	return lower.startsWith(`${identityKey(logbookFolder)}/`) || lower.startsWith(`${legacyLogbookFolder}/`);
+	return lower.startsWith(`${identityKey(logbookFolder)}/`);
 }
 
 export function isLogged(item: Item): boolean {
 	return isLoggedPath(item.path);
 }
 
-/** The top-level folders whose files are never notes, lowercased: `Ta Da/`, and the old layout's folders. */
-export const reservedFolders: ReadonlySet<string> = new Set([...legacyFolders, identityKey(home)]);
+/** The top-level folders whose files are never notes, lowercased: `Ta Da/`. */
+export const reservedFolders: ReadonlySet<string> = new Set([identityKey(home)]);
 
 /**
  * Whether an untyped file at `path` is a note: a `.md` file outside hidden folders and the top-level reserved folders

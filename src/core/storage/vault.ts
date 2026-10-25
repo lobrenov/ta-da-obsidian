@@ -4,12 +4,7 @@ export const taskFolder = `${home}/tasks`;
 export const projectFolder = `${home}/projects`;
 export const areaFolder = `${home}/areas`;
 export const attachmentFolder = `${home}/attachments`;
-export const logbookFolder = `${home}/Logbook`;
-
-/** The old layout's hidden logbook folder, which Obsidian can't see. */
-export const legacyLogbookFolder = ".logbook";
-/** The old layout's top-level folders, lowercased: Ta Da made them before `Ta Da/`. */
-export const legacyFolders: ReadonlySet<string> = new Set(["tasks", "projects", "areas", "attachments"]);
+export const logbookFolder = `${home}/logbook`;
 export const trashFolder = ".trash";
 
 /** The spec's image extensions, lowercase. */

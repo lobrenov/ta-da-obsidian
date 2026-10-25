@@ -359,10 +359,10 @@ describe("Logbook", () => {
 		makeItem("Ta Da/projects/Closed with open.md", "type: project\nstatus: Done\ncompletedDate: 2026-10-01"),
 		makeItem("Ta Da/tasks/Closed child.md", 'type: task\nstatus: Done\ncompletedDate: 2026-10-01\nproject: "[[Closed with open]]"'),
 		makeItem("Ta Da/tasks/Still open.md", 'type: task\nstatus: Doing\nproject: "[[Closed with open]]"'),
-		makeItem("Ta Da/Logbook/2026-09/Logged old.md", "type: task\nstatus: Done\ncompletedDate: 2026-09-30"),
-		makeItem("Ta Da/Logbook/2026-09/Old project.md", "type: project\nstatus: Cancelled\ncompletedDate: 2026-09-30"),
-		makeItem("Ta Da/Logbook/2026-09/Logged older.md", "type: task\nstatus: Cancelled\ncompletedDate: 2026-09-10"),
-		makeItem("Ta Da/Logbook/2025-12/Last year.md", "type: task\nstatus: Done\ncompletedDate: 2025-12-20"),
+		makeItem("Ta Da/logbook/2026-09/Logged old.md", "type: task\nstatus: Done\ncompletedDate: 2026-09-30"),
+		makeItem("Ta Da/logbook/2026-09/Old project.md", "type: project\nstatus: Cancelled\ncompletedDate: 2026-09-30"),
+		makeItem("Ta Da/logbook/2026-09/Logged older.md", "type: task\nstatus: Cancelled\ncompletedDate: 2026-09-10"),
+		makeItem("Ta Da/logbook/2025-12/Last year.md", "type: task\nstatus: Done\ncompletedDate: 2025-12-20"),
 		makeItem("Ta Da/tasks/Open.md", "type: task\nstatus: Doing"),
 	]);
 
