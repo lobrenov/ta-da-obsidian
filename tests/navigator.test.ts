@@ -222,7 +222,7 @@ describe("areas and projects", () => {
 		expect(model.header.title).toBe("Personal");
 		expect(model.header.lines).toEqual(["2 projects · 2 tasks"]);
 		expect(model.header.file).toEqual({ path: "areas/Personal.md", label: "Open area file" });
-		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# -", "    Book a dentist | [Not Started]", "    Pay rent | [Not Started] | due Today"]);
+		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# -", "    Pay rent | [Not Started] | due Today", "    Book a dentist | [Not Started]"]);
 		const index = new VaultIndex([
 			makeItem("Ta Da/areas/Home.md", "type: area"),
 			makeItem("Ta Da/tasks/Open.md", 'type: task\nstatus: Doing\narea: "[[Home]]"'),

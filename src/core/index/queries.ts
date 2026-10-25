@@ -3,7 +3,7 @@ import { LocalDate, type ISOWeek } from "../model/localDate";
 import { isClosed } from "../model/status";
 import { linkTitle } from "../model/wikiLink";
 import { dailyNote, type DailyNoteNames, defaultDailyNoteNames, openCheckboxCount } from "./dailyNotes";
-import { byTitle, type VaultIndex } from "./vaultIndex";
+import { byDate, byTitle, type VaultIndex } from "./vaultIndex";
 
 /** One dated entry in Upcoming. An item gets one entry on its `dueDate` and another on its `deadline`. */
 export interface AgendaEntry {
@@ -130,9 +130,9 @@ export function upcomingEntries(item: Item, today: LocalDate): AgendaEntry[] {
 	return entriesOf(item).filter((entry) => entry.date.compare(today) > 0).sort(byAgendaOrder);
 }
 
-/** Open tasks without a parent that resolves, sorted by title. */
+/** Open tasks without a parent that resolves, sorted by their earliest date, then title. */
 export function looseTasks(index: VaultIndex): Item[] {
-	return index.tasks.filter((task) => isLoose(index, task)).sort(byTitle);
+	return index.tasks.filter((task) => isLoose(index, task)).sort(byDate);
 }
 
 /** Whether a task is in Loose tasks: open, with no project or area that resolves. */
@@ -246,18 +246,5 @@ function byAgendaOrder(a: AgendaEntry, b: AgendaEntry): number {
 	if (byDay !== 0) return byDay;
 	if (a.kind !== b.kind) return a.kind === "due" ? -1 : 1;
 	return byTitle(a.item, b.item);
-}
-
-function earliest(item: Item): LocalDate | null {
-	const dates = [item.properties.dueDate, item.properties.deadline].filter((date): date is LocalDate => date !== null);
-	return dates.reduce<LocalDate | null>((min, date) => (min === null || date.compare(min) < 0 ? date : min), null);
-}
-
-function byDate(a: Item, b: Item): number {
-	const [x, y] = [earliest(a), earliest(b)];
-	if (x && y && !x.equals(y)) return x.compare(y);
-	if (!x && y) return 1;
-	if (x && !y) return -1;
-	return byTitle(a, b);
 }
 

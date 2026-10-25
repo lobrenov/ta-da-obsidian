@@ -1,6 +1,7 @@
 import { type Item, isLogged, isLoggedPath, titleOfPath, type Warning } from "../model/item";
 import { attachmentName, linkTitle } from "../model/wikiLink";
 import type { Tag } from "../model/tag";
+import type { LocalDate } from "../model/localDate";
 import { folderOf } from "../storage/vault";
 import { compareCodeUnits, identityKey } from "../text";
 
@@ -177,9 +178,9 @@ export class VaultIndex {
 		}
 	}
 
-	/** Tasks filed straight under this project or area, sorted by title; logged ones only when `includingLogged`. */
+	/** Tasks filed straight under this project or area, sorted by their earliest date, then title; logged ones only when `includingLogged`. */
 	tasksIn(parent: Item, includingLogged = false): Item[] {
-		return this.filedUnder(parent).filter((item) => item.properties.kind === "task" && (includingLogged || !isLogged(item)));
+		return this.filedUnder(parent).filter((item) => item.properties.kind === "task" && (includingLogged || !isLogged(item))).sort(byDate);
 	}
 
 	/** Projects whose `area` resolves to this area, sorted by title; logged ones only when `includingLogged`. */
@@ -187,12 +188,12 @@ export class VaultIndex {
 		return this.filedUnder(area).filter((item) => item.properties.kind === "project" && (includingLogged || !isLogged(item)));
 	}
 
-	/** A project's tasks that aren't Done or Cancelled, sorted by title. */
+	/** A project's tasks that aren't Done or Cancelled, sorted by their earliest date, then title. */
 	openTasksIn(project: Item): Item[] {
 		return this.tasksIn(project).filter((task) => task.properties.status !== "Done" && task.properties.status !== "Cancelled");
 	}
 
-	/** An area's own tasks, then its projects' tasks, each sorted by title. */
+	/** An area's own tasks, then its projects' tasks, each sorted by their earliest date, then title. */
 	allTasksIn(area: Item): Item[] {
 		return this.tasksIn(area).concat(this.projectsIn(area).flatMap((project) => this.tasksIn(project)));
 	}
@@ -320,6 +321,20 @@ export class VaultIndex {
 /** Orders items by title, then by path. */
 export function byTitle(a: Item, b: Item): number {
 	return compareTitles(a.title, b.title) || compareCodeUnits(a.path, b.path);
+}
+
+function earliest(item: Item): LocalDate | null {
+	const dates = [item.properties.dueDate, item.properties.deadline].filter((date): date is LocalDate => date !== null);
+	return dates.reduce<LocalDate | null>((min, date) => (min === null || date.compare(min) < 0 ? date : min), null);
+}
+
+/** By the earlier of `dueDate` and `deadline`, undated last, then by title. */
+export function byDate(a: Item, b: Item): number {
+	const [x, y] = [earliest(a), earliest(b)];
+	if (x && y && !x.equals(y)) return x.compare(y);
+	if (!x && y) return 1;
+	if (x && !y) return -1;
+	return byTitle(a, b);
 }
 
 /** The lowercased image filenames an item embeds. */

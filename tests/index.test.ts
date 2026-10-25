@@ -209,7 +209,7 @@ describe("queries", () => {
 	});
 
 	it("lists loose tasks", () => {
-		expect(titles(q.looseTasks(index))).toEqual(["Deadline today", "Overdue deadline", "Same day", "Undated"]);
+		expect(titles(q.looseTasks(index))).toEqual(["Overdue deadline", "Deadline today", "Same day", "Undated"]);
 	});
 
 	it("counts all of an active project's tasks", () => {
