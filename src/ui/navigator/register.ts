@@ -16,7 +16,8 @@ export function registerNavigator(plugin: Plugin & { taDaIndex: TaDaIndex; write
 	const settings = new NavigatorSettings(store, () => plugin.taDaIndex.index);
 	for (const kind of viewKinds) {
 		const { type, icon, openName, commandId } = viewSpecs[kind];
-		plugin.registerView(type, (leaf) => new NavigatorView(leaf, { taDaIndex: plugin.taDaIndex, writer: plugin.writer, status: plugin.statusActions, settings, newTask }, kind));
+		const View = NavigatorView.of(kind);
+		plugin.registerView(type, (leaf) => new View(leaf, { taDaIndex: plugin.taDaIndex, writer: plugin.writer, status: plugin.statusActions, settings, newTask }));
 		const open = (): void => {
 			void plugin.app.workspace.ensureSideLeaf(type, "left", { active: true, reveal: true });
 		};

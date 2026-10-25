@@ -103,6 +103,31 @@ export class NavigatorView extends ItemView {
 		return viewSpecs[this.kind].icon;
 	}
 
+	/**
+	 * The view class for `kind`. Obsidian's `View` constructor asks for the type before `kind` is set, so each kind's
+	 * class answers from its own closure.
+	 */
+	static of(kind: ViewKind): new (leaf: WorkspaceLeaf, deps: NavigatorDeps) => NavigatorView {
+		const spec = viewSpecs[kind];
+		return class extends NavigatorView {
+			constructor(leaf: WorkspaceLeaf, deps: NavigatorDeps) {
+				super(leaf, deps, kind);
+			}
+
+			override getViewType(): string {
+				return spec.type;
+			}
+
+			override getDisplayText(): string {
+				return spec.title;
+			}
+
+			override getIcon(): string {
+				return spec.icon;
+			}
+		};
+	}
+
 	override getState(): Record<string, unknown> {
 		return { domain: this.domain, groupings: this.groupings, agenda: writeAgenda(this.agenda) };
 	}
