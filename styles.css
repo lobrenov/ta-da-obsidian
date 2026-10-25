@@ -817,6 +817,10 @@
 	visibility: hidden;
 }
 
+.ta-da-navigator .ta-da-phone-back-icon {
+	display: flex;
+}
+
 .ta-da-navigator .ta-da-phone-back-icon svg {
 	width: 20px;
 	height: 20px;
@@ -862,6 +866,18 @@
 .ta-da-navigator .ta-da-phone-tab-icon svg {
 	width: 20px;
 	height: 20px;
+}
+
+/* On a phone, the New task and date windows sit at the top, above the keyboard. */
+.is-phone .modal-container:has(> .ta-da-new-modal, > .ta-da-date-modal) {
+	align-items: flex-start;
+}
+
+.is-phone .modal.ta-da-new-modal,
+.is-phone .modal.ta-da-date-modal {
+	margin-top: calc(var(--safe-area-inset-top) + var(--size-4-2));
+	max-height: calc(100vh - var(--keyboard-height) - var(--safe-area-inset-top) - var(--size-4-4));
+	overflow-y: auto;
 }
 
 /* Touch targets: rows are at least 44px tall, and the checkbox's hit area is 44px around its drawn box. */
@@ -928,6 +944,7 @@
 
 .ta-da-navigator .ta-da-list-actions {
 	display: flex;
+	align-items: center;
 	margin-inline-start: auto;
 }
 

@@ -621,6 +621,7 @@ export class NavigatorView extends ItemView {
 			const line = grid.createDiv({ cls: "ta-da-strip-row" });
 			const week = line.createEl("button", { cls: `ta-da-strip-cell is-week${row.week.selected ? " is-selected" : ""}${row.week.hasNote ? " has-note" : ""}`, attr: { "aria-label": `Week ${row.week.label}${row.week.hasNote ? ", note" : ""}` } });
 			week.createSpan({ cls: "ta-da-strip-number", text: row.week.label });
+			week.createSpan({ cls: "ta-da-strip-dots" });
 			week.addEventListener("click", () => this.setAgenda({ selection: { kind: "week", week: row.week.week } }));
 			for (const day of row.days) {
 				const cell = line.createEl("button", {
