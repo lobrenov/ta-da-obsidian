@@ -198,7 +198,7 @@ export class NavigatorView extends ItemView {
 		bar.lastElementChild?.addClass("ta-da-phone-button");
 	}
 
-	/** The phone's bottom bar: a tab each for Agenda, Projects and Files, the icon above the label. */
+	/** The phone's bottom bar: a tab each for Agenda and Projects, the icon above the label. */
 	private buildBottomBar(root: HTMLElement): void {
 		const bar = root.createEl("nav", { cls: "ta-da-phone-tabs", attr: { "aria-label": "Ta Da" } });
 		for (const tab of phoneTabs) {
@@ -237,11 +237,6 @@ export class NavigatorView extends ItemView {
 				this.refresh();
 				this.save();
 				break;
-			case "files": {
-				const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0];
-				if (explorer) void this.app.workspace.revealLeaf(explorer);
-				break;
-			}
 		}
 	}
 

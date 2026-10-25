@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { currentPhoneTab, phoneTabs } from "../src/ui/navigator/phone";
 
 describe("phone tabs", () => {
-	it("are Agenda, Projects and Files", () => {
-		expect(phoneTabs.map((tab) => tab.label)).toEqual(["Agenda", "Projects", "Files"]);
+	it("are Agenda and Projects", () => {
+		expect(phoneTabs.map((tab) => tab.label)).toEqual(["Agenda", "Projects"]);
 	});
 
 	it("highlight Agenda while the Agenda list shows", () => {

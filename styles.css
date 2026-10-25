@@ -836,7 +836,7 @@
 .ta-da-navigator .ta-da-phone-tabs {
 	display: grid;
 	flex: none;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	padding: var(--size-4-1) var(--size-4-2) calc(var(--size-4-1) + env(safe-area-inset-bottom));
 	border-top: 1px solid var(--background-modifier-border);
 }
