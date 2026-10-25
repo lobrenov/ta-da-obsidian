@@ -1,6 +1,6 @@
 {
 	"name": "ta-da",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "Ta Da for Obsidian: tasks, projects and areas over a folder of markdown files.",
 	"main": "main.js",
 	"private": true,

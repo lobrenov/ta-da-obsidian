@@ -32,3 +32,6 @@ The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaC
 - Dependencies are pinned exactly (`.npmrc` has `save-exact=true`).
 - Licence MIT (`LICENSE`). Third-party notices go in `ACKNOWLEDGEMENTS.txt`.
 - Tests use Vitest, with jsdom for DOM tests.
+
+## Versioning
+`x.y.z`, as the Ta Da repo's `docs/versioning.md` says. A new version sets `version` in `manifest.json` and `package.json`, adds its `versions.json` entry, is tagged `v<x.y.z>`, and adds its row to that file's pairing table.
