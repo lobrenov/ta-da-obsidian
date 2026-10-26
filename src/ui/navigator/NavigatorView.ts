@@ -1,7 +1,6 @@
 import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
 import type { Grouping } from "../../core/index/grouping";
 import type { LocalDate } from "../../core/model/localDate";
-import { statuses } from "../../core/model/status";
 import type { TrashedItem } from "../../core/storage/trash";
 import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
@@ -387,19 +386,13 @@ export class NavigatorView extends ItemView {
 		if (file) this.deps.status.set(file, row.closed ? "Not Started" : "Done");
 	}
 
-	/** The status menu on a task or project row. */
-	private statusMenu(path: string, event: MouseEvent): void {
+	/** Obsidian's file menu for a row's file, with the items plugins add to it. */
+	private fileMenu(path: string, event: MouseEvent): void {
 		const file = this.app.vault.getFileByPath(path);
-		const item = this.deps.taDaIndex.index.get(path);
-		if (!file || !item) return;
-		const { kind, status: current } = item.properties;
-		if (kind !== "task" && kind !== "project") return;
+		if (!file) return;
 		event.preventDefault();
 		const menu = new Menu();
-		for (const status of statuses) {
-			if (status === "Ongoing" && kind !== "project") continue;
-			menu.addItem((entry) => entry.setTitle(sentence(status)).setChecked(status === current).onClick(() => this.deps.status.set(file, status)));
-		}
+		this.app.workspace.trigger("file-menu", menu, file, "ta-da", this.leaf);
 		menu.showAtMouseEvent(event);
 	}
 
@@ -808,7 +801,7 @@ export class NavigatorView extends ItemView {
 			if (row.tags > 0) metaIcon(glyphs, "tag", "accent").setAttribute("aria-label", row.tags === 1 ? "1 tag" : `${row.tags} tags`);
 		}
 		if (row.place) el.createSpan({ cls: "ta-da-row-place", text: row.place, attr: { "aria-label": `In ${row.place}` } });
-		el.addEventListener("contextmenu", (event) => this.statusMenu(row.path, event));
+		el.addEventListener("contextmenu", (event) => this.fileMenu(row.path, event));
 		return el;
 	}
 
@@ -833,7 +826,7 @@ export class NavigatorView extends ItemView {
 		}
 		if (row.open !== null) el.createSpan({ cls: "ta-da-row-trailing ta-da-row-count", text: String(row.open) });
 		if (row.variant === "card") setIcon(el.createSpan({ cls: "ta-da-row-chevron" }), "chevron-right");
-		if (row.type === "project") el.addEventListener("contextmenu", (event) => this.statusMenu(row.path, event));
+		if (row.type === "project") el.addEventListener("contextmenu", (event) => this.fileMenu(row.path, event));
 		return el;
 	}
 
@@ -890,9 +883,4 @@ export class NavigatorView extends ItemView {
 		if (row.date) el.createSpan({ cls: "ta-da-row-trailing", text: row.date });
 		return el;
 	}
-}
-
-/** `Not Started` as `Not started`. */
-function sentence(text: string): string {
-	return text.slice(0, 1).toUpperCase() + text.slice(1).toLowerCase();
 }
