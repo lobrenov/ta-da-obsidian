@@ -1,10 +1,11 @@
 import { type App, Notice, type TFile } from "obsidian";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { LocalDate } from "../../core/model/localDate";
+import type { RepeatRule } from "../../core/model/repeatRule";
 import type { Edit, Writer } from "../../Writer";
 import type { StatusActions } from "../statusActions";
 import type { HeaderActions } from "./buildHeader";
-import { addTagEdit, dateEdit, parentEdit, removeTagEdit } from "./edits";
+import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit } from "./edits";
 import type { HeaderModel } from "./headerModel";
 import { openDatePicker, openParentPicker, openStatusMenu, openTagPicker } from "./pickers";
 
@@ -39,7 +40,9 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 		},
 		openDate(key, anchor) {
 			const iso = key === "dueDate" ? model.dueDate : model.deadline;
-			openDatePicker(host, key, iso === null ? null : LocalDate.parse(iso), anchor, (date) => write(dateEdit(key, date)));
+			const item = key === "dueDate" && model.kind === "task" ? host.index.get(file.path) : undefined;
+			const repeat = item && { item, index: host.index, set: (rule: RepeatRule | null) => write(repeatEdit(rule, file.path, host.today())) };
+			openDatePicker(host, key, iso === null ? null : LocalDate.parse(iso), anchor, (date) => write(dateEdit(key, date)), repeat);
 		},
 		openAddTag(anchor) {
 			const onFile = model.tags.filter((tag) => tag.inFrontmatter).map((tag) => tag.name);

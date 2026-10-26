@@ -1,5 +1,6 @@
 import { type App, Modal, Notice } from "obsidian";
 import { type Kind, titleOfPath } from "../../core/model/item";
+import { RepeatRule } from "../../core/model/repeatRule";
 import { readTag, uniqueTags } from "../../core/model/tag";
 import { parseItem } from "../../core/parsing/parseItem";
 import { sanitise } from "../../core/writing/fileNaming";
@@ -9,6 +10,7 @@ import { element, icon } from "../header/dom";
 import { buildHeaderModel, type Chip, type TagChip } from "../header/headerModel";
 import { openDatePicker, openParentPicker, openStatusMenu, openTagPicker, type PickerHost } from "../header/pickers";
 import { createIn } from "../../vaultFiles";
+import { repeatStart } from "../repeatRules";
 import { placeDraft } from "./place";
 
 const kinds: readonly Kind[] = ["task", "project", "area"];
@@ -70,9 +72,10 @@ export class NewTaskModal extends Modal {
 		this.contentEl.empty();
 	}
 
-	private change(change: (draft: QuickEntryDraft) => void): void {
+	private change(change: (draft: QuickEntryDraft) => void, focusTitle = true): void {
 		change(this.draft);
 		this.draw();
+		if (!focusTitle) return;
 		// After `Modal.open`, which focuses the first button once `onOpen` returns.
 		this.contentEl.win.setTimeout(() => this.titleInput.focus());
 	}
@@ -116,7 +119,14 @@ export class NewTaskModal extends Modal {
 			openParent: (anchor: HTMLElement) =>
 				openParentPicker(this.host, this.draft.kind, this.draft.parent, anchor, (parent) => this.change((draft) => (draft.parent = parent))),
 			openDate: (key: "dueDate" | "deadline", anchor: HTMLElement) =>
-				openDatePicker(this.host, key, this.draft[key], anchor, (date) => this.change((draft) => (draft[key] = date))),
+				openDatePicker(
+					this.host,
+					key,
+					this.draft[key],
+					anchor,
+					(date) => this.change((draft) => (draft[key] = date)),
+					key === "dueDate" && item && this.draft.kind === "task" ? { item, index: this.host.index, set: (rule, closing) => this.setRepeat(rule, closing) } : undefined,
+				),
 			removeTag: (name: string) => this.change((draft) => (draft.tags = draft.tags.filter((tag) => tag.path !== readTag(name)?.path))),
 		};
 
@@ -143,6 +153,20 @@ export class NewTaskModal extends Modal {
 			),
 		);
 		this.chipsEl.replaceChildren(inner);
+	}
+
+	/** Sets the task's repeat as the header writes it, and its due date when it has no date and no rule yet. */
+	private setRepeat(rule: RepeatRule | null, closing: boolean): void {
+		this.change((draft) => {
+			if (!rule) {
+				draft.repeatText = null;
+				return;
+			}
+			const hasRule = draft.repeatText !== null && RepeatRule.parse(draft.repeatText) !== null;
+			const start = repeatStart(rule, { dueDate: draft.dueDate, deadline: draft.deadline, hasRule }, this.host.today());
+			draft.repeatText = start.text;
+			if (start.dueDate) draft.dueDate = start.dueDate;
+		}, closing);
 	}
 
 	/** The file it will write, and a warning when its name is taken and gets a number. */

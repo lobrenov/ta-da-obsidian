@@ -427,6 +427,122 @@
 	background: var(--interactive-accent-hover);
 }
 
+.ta-da-date-day.is-occurrence {
+	background: color-mix(in srgb, var(--color-yellow) 26%, transparent);
+	color: var(--text-normal);
+}
+
+.ta-da-date-grid.is-ends .ta-da-date-day.is-current,
+.ta-da-date-grid.is-ends .ta-da-date-day.is-typed {
+	background: var(--text-muted);
+	color: var(--background-primary);
+}
+
+.ta-da-date-grid .ta-da-date-day:disabled {
+	opacity: 0.4;
+}
+
+.ta-da-date-quick button:disabled {
+	opacity: 0.4;
+}
+
+.ta-da-date-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: inherit;
+	font-weight: inherit;
+}
+
+.ta-da-date-field-icon {
+	display: inline-flex;
+}
+
+/* Repeat section under the month */
+
+.ta-da-repeat {
+	margin-top: 10px;
+	padding-top: 6px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.ta-da-repeat-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-repeat-title {
+	flex-grow: 1;
+	font-weight: var(--font-semibold);
+}
+
+.ta-da-repeat-rule {
+	padding-top: 4px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-normal);
+}
+
+.ta-da-repeat-rule.is-preview {
+	color: var(--text-muted);
+}
+
+.ta-da-repeat-help {
+	padding: 2px 0 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-repeat-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 28px;
+}
+
+.ta-da-repeat-row > :first-child {
+	flex-grow: 1;
+}
+
+.ta-da-repeat button.ta-da-repeat-row {
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: inherit;
+	text-align: left;
+}
+
+.ta-da-repeat-value.is-never,
+.ta-da-repeat-ends .ta-da-icon {
+	color: var(--text-muted);
+}
+
+.ta-da-repeat.is-summary {
+	padding-top: 8px;
+}
+
+.ta-da-repeat-summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	overflow: hidden;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
 /* A menu opened from a header chip sits by the chip. */
 
 .modal-container.ta-da-anchored .modal {

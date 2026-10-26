@@ -12,6 +12,7 @@ export const iconPaths = {
 	plus: "M5 12h14M12 5v14",
 	x: "M18 6L6 18M6 6l12 12",
 	list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
+	repeat: "m17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3",
 	chevronDown: "M6 9l6 6 6-6",
 	chevronLeft: "M15 18l-6-6 6-6",
 	chevronRight: "M9 18l6-6-6-6",

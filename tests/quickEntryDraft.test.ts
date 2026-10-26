@@ -21,6 +21,7 @@ function full(kind: Kind, parent: Parent | null): QuickEntryDraft {
 		parent,
 		dueDate: date("2026-10-14"),
 		deadline: date("2026-10-20"),
+		repeatText: null,
 		tags: [readTag("people/bea") as never],
 	};
 }
@@ -53,6 +54,16 @@ describe("QuickEntryDraft", () => {
 		expect(item.properties.dueDate?.toString()).toBe("2026-10-14");
 		expect(item.properties.deadline?.toString()).toBe("2026-10-20");
 		expect(item.properties.tags.map((tag) => tag.name)).toEqual(["people/bea"]);
+	});
+
+	it("writes a task's repeat, and a project doesn't keep it", () => {
+		const task = { ...full("task", null), repeatText: "every week on Mon" };
+		const text = draftText(task, today);
+		expect(text).toContain("deadline: 2026-10-20\nrepeat: every week on Mon\n---\n");
+		expect(parsed(text, "t.md").properties.repeatRule?.rule?.phrase).toBe("every week on Mon");
+		expect(changingKind(task, "project").repeatText).toBeNull();
+		expect(draftText({ ...task, kind: "project" }, today)).not.toContain("repeat");
+		expect(changingKind(changingKind(task, "task"), "task").repeatText).toBe("every week on Mon");
 	});
 
 	it("lets a task name an area", () => {

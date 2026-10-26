@@ -8,7 +8,7 @@ import { parentChoices, type TagChoice, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";
 import { statusLabel } from "./headerModel";
 import { dayOrderOf, firstWeekdayOf } from "./locale";
-import { DateModal, ParentModal, TagModal } from "./modals";
+import { DateModal, type DateRepeat, ParentModal, TagModal } from "./modals";
 
 /** What the pickers need: a file's header and the New task modal both open them, and each decides what a choice does. */
 export interface PickerHost {
@@ -55,8 +55,16 @@ export function openParentPicker(host: PickerHost, kind: Kind, current: Parent |
 	else modal.open();
 }
 
-export function openDatePicker(host: PickerHost, key: "dueDate" | "deadline", current: LocalDate | null, anchor: HTMLElement, choose: (date: LocalDate | null) => void): void {
-	const modal = new DateModal(host.app, key === "dueDate" ? "Due date" : "Deadline", current, host.today(), dayOrderOf(), firstWeekdayOf(), choose);
+/** The date menu; `repeat` gives a task's due date menu its Repeat section. */
+export function openDatePicker(
+	host: PickerHost,
+	key: "dueDate" | "deadline",
+	current: LocalDate | null,
+	anchor: HTMLElement,
+	choose: (date: LocalDate | null) => void,
+	repeat?: DateRepeat,
+): void {
+	const modal = new DateModal(host.app, key === "dueDate" ? "Due date" : "Deadline", current, host.today(), dayOrderOf(), firstWeekdayOf(), choose, repeat);
 	openBelow(modal, anchor);
 }
 

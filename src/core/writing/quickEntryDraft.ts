@@ -17,12 +17,14 @@ export interface QuickEntryDraft {
 	parent: Parent | null;
 	dueDate: LocalDate | null;
 	deadline: LocalDate | null;
+	/** A task's `repeat` phrase, as it's written. */
+	repeatText: string | null;
 	tags: Tag[];
 }
 
 /** A loose, Not Started task with no title. */
 export function emptyDraft(): QuickEntryDraft {
-	return { kind: "task", title: "", status: "Not Started", parent: null, dueDate: null, deadline: null, tags: [] };
+	return { kind: "task", title: "", status: "Not Started", parent: null, dueDate: null, deadline: null, repeatText: null, tags: [] };
 }
 
 /** The folder the file goes in; `""` is the top level of the vault. */
@@ -39,7 +41,7 @@ export function draftFolder(draft: QuickEntryDraft): string {
 	}
 }
 
-/** The file's text: `newFile`'s for the kind, with the status, due date and deadline set. */
+/** The file's text: `newFile`'s for the kind, with the status, due date, deadline and a task's repeat set. */
 export function draftText(draft: QuickEntryDraft, today: LocalDate): string {
 	const { parent, tags } = draft;
 	const project = parent?.kind === "project" ? parent.title : null;
@@ -60,6 +62,7 @@ export function draftText(draft: QuickEntryDraft, today: LocalDate): string {
 	if (draft.status !== "Not Started") text = setStatus(draft.status, text, today);
 	if (draft.dueDate) text = setProperty("dueDate", { kind: "date", value: draft.dueDate }, text);
 	if (draft.deadline) text = setProperty("deadline", { kind: "date", value: draft.deadline }, text);
+	if (draft.kind === "task" && draft.repeatText) text = setProperty("repeat", { kind: "text", value: draft.repeatText }, text);
 	return text;
 }
 
@@ -70,6 +73,7 @@ export function changingKind(draft: QuickEntryDraft, kind: Kind): QuickEntryDraf
 	next.status = statusChoices(kind).includes(draft.status) ? draft.status : "Not Started";
 	next.dueDate = draft.dueDate;
 	next.deadline = draft.deadline;
+	next.repeatText = kind === "task" ? draft.repeatText : null;
 	next.parent = kind === "project" && draft.parent?.kind !== "area" ? null : draft.parent;
 	return next;
 }
