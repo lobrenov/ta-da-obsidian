@@ -24,6 +24,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - `src/ui/extractTask.ts`: Extract to task, from the editor menu and its command. `src/ui/convertTask.ts` and `src/ui/convert/`: Convert to project and its modal. Both create task files through `createTask` in `src/vaultFiles.ts`.
 - `src/commands.ts`: New task, Complete, Move to project or area, Extract subtask to task, Convert task to project. Set status commands are in `src/main.ts`.
 - `src/ui/statusActions.ts`: every status change, with the apps' rules.
+- Recurrence UI: `src/ui/repeatWording.ts` (port of `RepeatWording.swift`: chip, row, menu and occurrence text) and `src/ui/repeatRules.ts` (`repeatStart`, the `repeat` and first due date a rule writes). Rules are typed in `DateModal` (`src/ui/header/modals.ts`). Where a completed task moves is `src/core/index/repeatMove.ts`. The plugin never moves a task forward.
 - `tests/`: Vitest tests, including conformance with TaDaCore.
 
 ## Conformance

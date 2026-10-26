@@ -11,6 +11,7 @@ Ta Da's tasks, projects and areas inside Obsidian, over the same vault as the Ta
 - **Extract to task**: a subtask's line becomes a task of its own, filed under the file's project or area, from the editor's right-click menu or its command.
 - **Convert to project**: a modal to make a task a project, with its status, area and, optionally, its subtasks made tasks under it. The file moves to `Ta Da/projects/`.
 - **Commands**: New task, Complete, Move to project or area, Set status (one per status), Extract subtask to task, Convert task to project, Open Ta Da: Agenda, Open Ta Da: Tasks, Open Ta Da: Tags. None has a default hotkey.
+- **Repeating tasks**: the due date's modal takes a repeat rule (`every mon`, `every 2 weeks when done`), with when done and an end date. Chips, rows, the status menu and the Agenda show the rule and where a completed task moves. Only Ta Da moves a repeating task forward: in a vault opened only in Obsidian, a completed repeating task stays Done.
 - **Status rules**, as in the apps: closing a project with open tasks asks first; reopening a task reopens its Done or Cancelled project; reopening a logged file moves it, and its logged project, out of the Logbook.
 
 Files are created where the apps create them, in `Ta Da/` at the vault's top level. Logging, Calendar events and reminders stay with the apps.
