@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LocalDate } from "../src/core/model/localDate";
 import { readTag, type Tag } from "../src/core/model/tag";
+import { type Kind } from "../src/core/model/item";
 import { type Status } from "../src/core/model/status";
 import { parseItem } from "../src/core/parsing/parseItem";
 import * as checklist from "../src/core/writing/checklistEditor";
@@ -11,7 +12,9 @@ import { type DayOrder, parseDatePhrase } from "../src/core/writing/datePhrase";
 import * as fileNaming from "../src/core/writing/fileNaming";
 import * as frontmatter from "../src/core/writing/frontmatterEditor";
 import * as newFile from "../src/core/writing/newFile";
+import * as noteConversion from "../src/core/writing/noteConversion";
 import { type Parent, setParent } from "../src/core/writing/parent";
+import * as subtaskExtraction from "../src/core/writing/subtaskExtraction";
 import * as tagEditor from "../src/core/writing/tagEditor";
 import { taDaRepo } from "./taDaRepo";
 
@@ -22,7 +25,7 @@ interface WriteCase {
 	op: string;
 	args: Record<string, unknown>;
 	input: string | null;
-	expected: string | null;
+	expected: unknown;
 }
 
 interface WritesExport {
@@ -51,7 +54,7 @@ function propertyValue({ kind, value }: JsonValue): frontmatter.PropertyValue {
 const tagList = (names: unknown): Tag[] => (names as string[]).flatMap((name) => readTag(name) ?? []);
 const nullable = (value: unknown): string | null => (value === null ? null : (value as string));
 
-function run(testCase: WriteCase, today: LocalDate): string | null {
+function run(testCase: WriteCase, today: LocalDate): unknown {
 	const { op, args } = testCase;
 	const input = testCase.input as string;
 	switch (op) {
@@ -95,6 +98,22 @@ function run(testCase: WriteCase, today: LocalDate): string | null {
 			return (
 				parseDatePhrase(args.phrase as string, today, args.order as DayOrder, args.firstWeekday as number)?.toString() ?? null
 			);
+		case "SubtaskExtraction.extract": {
+			let location = 0;
+			for (let line = 0; line < (args.lineIndex as number); line++) location = input.indexOf("\n", location) + 1;
+			return subtaskExtraction.extract(location, input);
+		}
+		case "SubtaskExtraction.extractAll":
+			return subtaskExtraction.extractAll(input);
+		case "SubtaskExtraction.taskText":
+			return subtaskExtraction.taskText(
+				{ title: args.title as string, status: args.status as Status, body: args.body as string, range: [0, 0] },
+				nullable(args.project),
+				nullable(args.area),
+				today,
+			);
+		case "NoteConversion.text":
+			return noteConversion.text(input, args.kind as Kind, args.status as Status, args.parent as Parent | null, today);
 		default:
 			throw new Error(`Unknown op ${op}`);
 	}
@@ -125,6 +144,6 @@ describe("writes", () => {
 	});
 
 	it.each(exported.cases.map((testCase) => [testCase.name, testCase] as const))("%s", (_name, testCase) => {
-		expect(run(testCase, today)).toBe(testCase.expected);
+		expect(run(testCase, today)).toEqual(testCase.expected);
 	});
 });
