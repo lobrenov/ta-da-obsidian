@@ -5,6 +5,8 @@ import { readProperties } from "../../core/parsing/propertyReader";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed, type Status } from "../../core/model/status";
 import { linkTitle } from "../../core/model/wikiLink";
+import { repeatMove } from "../../core/index/repeatMove";
+import { chipHelp, chipKind } from "../repeatWording";
 import type { Parent } from "../../core/writing/parent";
 
 const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -16,7 +18,14 @@ export type DateTone = "due" | "deadline" | "muted";
 export type Chip =
 	| { kind: "status"; status: Status; label: string }
 	| { kind: "parent"; label: string; icon: "ring" | "cube"; missing: boolean; unresolved: boolean }
-	| { kind: "dueDate" | "deadline"; label: string; missing: boolean; tone: DateTone };
+	| { kind: "dueDate" | "deadline"; label: string; missing: boolean; tone: DateTone; repeat?: ChipRepeat };
+
+/** A date chip's repeat suffix: the rule's frequency, or an unreadable rule as written after a warning. `tooltip` is the chip's. */
+export interface ChipRepeat {
+	label: string;
+	readable: boolean;
+	tooltip: string;
+}
 
 export interface TagChip {
 	name: string;
@@ -40,6 +49,7 @@ export interface HeaderModel {
 /** The file a task or project is filed under, as `VaultIndex.parentOf` finds it. */
 export interface ParentLookup {
 	parentOf(item: Item): Item | null;
+	projectOf(item: Item): Item | null;
 }
 
 /** `Tue 6 Oct`: never `Today`, never the year. */
@@ -79,16 +89,23 @@ export function buildHeaderModel(item: Item, lookup: ParentLookup, today: LocalD
 			chips.push({ kind: "parent", label: kind === "task" ? "Project" : "Area", icon: kind === "task" ? "ring" : "cube", missing: true, unresolved: false });
 		}
 		const closed = isClosed(status);
+		const repeating = item.properties.repeatRule;
+		const carrier = chipKind(item.properties);
+		const repeat: ChipRepeat | undefined = repeating === null ? undefined : {
+			label: repeating.rule?.frequencyLabel ?? repeating.text,
+			readable: repeating.rule !== null,
+			tooltip: chipHelp(repeating, repeatMove(lookup, item, today, true), today),
+		};
 		for (const [key, date, name] of [
 			["dueDate", dueDate, "Due"],
 			["deadline", deadline, "Deadline"],
 		] as const) {
 			if (date === null) {
-				chips.push({ kind: key, label: name, missing: true, tone: "muted" });
+				chips.push({ kind: key, label: name, missing: true, tone: "muted", ...(carrier === key && repeat ? { repeat } : {}) });
 				continue;
 			}
 			const tone: DateTone = closed ? "muted" : date.compare(today) < 0 ? "deadline" : key === "dueDate" ? "due" : "deadline";
-			chips.push({ kind: key, label: `${name} ${dateLabel(date, today)}`, missing: false, tone });
+			chips.push({ kind: key, label: `${name} ${dateLabel(date, today)}`, missing: false, tone, ...(carrier === key && repeat ? { repeat } : {}) });
 		}
 	}
 	const parts: string[] = [];

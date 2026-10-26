@@ -106,7 +106,32 @@ describe("a task row's place and glyphs", () => {
 		expect(row("status: Doing", {}, "- [ ] only a box\n").note).toBe(false);
 	});
 
-	it("has no repeat field", () => {
-		expect("repeat" in row("status: Doing\nrepeat: weekly")).toBe(false);
+	it("has no repeat glyph for a task that doesn't repeat", () => {
+		expect(row("status: Doing").repeat).toBeNull();
+	});
+});
+
+describe("a repeating task's row", () => {
+	it("has the glyph with the rule as its tooltip and nothing where a date would be while open", () => {
+		const open = row("status: Doing\ndueDate: 2026-10-05\nrepeat: every week on Mon");
+		expect(open.repeat).toEqual({ tooltip: "Repeats every week on Monday", next: null });
+	});
+
+	it("says where a done or skipped task moves", () => {
+		const done = row("status: Done\ncompletedDate: 2026-10-02\ndueDate: 2026-10-05\nrepeat: every week on Mon");
+		expect(done.date).toBeNull();
+		expect(done.repeat).toEqual({ tooltip: "Repeats every week on Monday · moves to Mon 12 Oct when the day changes", next: "Mon 12 Oct" });
+		expect(row("status: Cancelled\ncompletedDate: 2026-09-30\ndueDate: 2026-10-01\nrepeat: every day").repeat?.next).toBe("Today");
+	});
+
+	it("says Ended when until ends it, or its project is closed", () => {
+		const ended = row("status: Done\ncompletedDate: 2026-10-02\ndueDate: 2026-10-05\nrepeat: every week on Mon until 2026-10-06");
+		expect(ended.repeat).toEqual({ tooltip: "Repeats every week on Monday until Tue 6 Oct · the repeat ends", next: "Ended" });
+		const closed = row('status: Done\ncompletedDate: 2026-10-02\ndueDate: 2026-10-05\nrepeat: every week\nproject: "[[P0]]"', {}, "", ["type: project\nstatus: Done"]);
+		expect(closed.repeat?.next).toBe("Ended");
+	});
+
+	it("shows an unreadable rule as written", () => {
+		expect(row("status: Doing\nrepeat: Weekly - Fri").repeat).toEqual({ tooltip: "Repeats Weekly - Fri", next: null });
 	});
 });

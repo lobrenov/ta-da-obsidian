@@ -1,3 +1,4 @@
+import { repeatMove } from "../../core/index/repeatMove";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { byTitle } from "../../core/index/vaultIndex";
 import { type Item, isLogged, subtasks } from "../../core/model/item";
@@ -33,14 +34,15 @@ export function waitsForOpenTasks(index: VaultIndex, item: Item): boolean {
 
 /**
  * Newest first, then by title. Files not logged yet come first: those that log tonight, then those held back for a
- * project's open tasks. A file without a `completedDate` goes in `today`'s group.
+ * project's open tasks. A file without a `completedDate` goes in `today`'s group. A repeating task that logging moves
+ * forward isn't logged, so it's left out; one whose series ends stays.
  */
 export function logbookGroups(index: VaultIndex, items: Item[], today: LocalDate): LogbookGroup[] {
 	const completed = (item: Item): LocalDate => item.properties.completedDate ?? today;
 	const sorted = [...items].sort((a, b) => completed(b).compare(completed(a)) || byTitle(a, b));
 	const live = sorted.filter((item) => !isLogged(item));
 	const held = live.filter((item) => waitsForOpenTasks(index, item));
-	const tonight = live.filter((item) => !waitsForOpenTasks(index, item));
+	const tonight = live.filter((item) => repeatMove(index, item, today)?.case !== "moves" && !waitsForOpenTasks(index, item));
 	const groups: LogbookGroup[] = [];
 	if (tonight.length > 0) groups.push({ title: "Completed today", kind: "logsTonight", items: tonight });
 	if (held.length > 0) groups.push({ title: "Waiting for open tasks", kind: "waitsForOpenTasks", items: held });

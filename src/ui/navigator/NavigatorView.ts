@@ -794,10 +794,16 @@ export class NavigatorView extends ItemView {
 		});
 		if (row.date) el.createSpan({ cls: `ta-da-date-pill${row.date.overdue ? " is-overdue" : ""}`, text: row.date.text, attr: { "aria-label": row.date.tooltip } });
 		el.createSpan({ cls: "ta-da-row-title", text: row.title, attr: { title: row.title } });
-		if (row.note || row.subtasks || row.tags > 0) {
+		if (row.note || row.subtasks || row.repeat || row.tags > 0) {
 			const glyphs = el.createSpan({ cls: "ta-da-glyphs" });
 			if (row.note) metaIcon(glyphs, "file-text").setAttribute("aria-label", "Has a note");
 			if (row.subtasks) metaIcon(glyphs, "list-checks").setAttribute("aria-label", `${row.subtasks.done} of ${row.subtasks.total} subtasks done`);
+			if (row.repeat) {
+				const repeat = metaIcon(glyphs, "repeat");
+				repeat.setAttribute("aria-label", row.repeat.tooltip);
+				repeat.setAttribute("title", row.repeat.tooltip);
+				if (row.repeat.next) repeat.appendText(row.repeat.next);
+			}
 			if (row.tags > 0) metaIcon(glyphs, "tag", "accent").setAttribute("aria-label", row.tags === 1 ? "1 tag" : `${row.tags} tags`);
 		}
 		if (row.place) el.createSpan({ cls: "ta-da-row-place", text: row.place, attr: { "aria-label": `In ${row.place}` } });

@@ -126,3 +126,41 @@ describe("hasHeader", () => {
 		expect(modelFromText(note, "Notes/Big.md", index, today)).toBeNull();
 	});
 });
+
+describe("a repeating task's chips", () => {
+	const chips = (frontmatter: string) => (buildHeaderModel(makeItem("Ta Da/tasks/R.md", `type: task\n${frontmatter}`), index, today)?.chips ?? []).filter((chip) => chip.kind === "dueDate" || chip.kind === "deadline");
+
+	it("puts the frequency and tooltip on the due chip", () => {
+		const [due, deadline] = chips("status: Doing\ndueDate: 2026-10-05\nrepeat: every week on Mon");
+		expect(due).toMatchObject({ label: "Due Mon 5 Oct", repeat: { label: "Weekly", readable: true, tooltip: "Repeats every week on Monday · next Mon 12 Oct" } });
+		expect(deadline).not.toHaveProperty("repeat");
+	});
+
+	it("labels a when done rule and a longer interval", () => {
+		expect(chips("dueDate: 2026-10-05\nrepeat: every 2 weeks when done")[0]).toMatchObject({ repeat: { label: "Every 2 weeks when done" } });
+		expect(chips("dueDate: 2026-10-05\nrepeat: every weekday")[0]).toMatchObject({ repeat: { label: "Weekdays" } });
+	});
+
+	it("goes on the deadline chip when there is no due date", () => {
+		const [due, deadline] = chips("deadline: 2026-10-09\nrepeat: every month");
+		expect(due).not.toHaveProperty("repeat");
+		expect(deadline).toMatchObject({ repeat: { label: "Monthly", readable: true } });
+	});
+
+	it("goes on the dashed due chip when there is no date", () => {
+		const [due, deadline] = chips("repeat: every day");
+		expect(due).toMatchObject({ label: "Due", missing: true, repeat: { label: "Daily" } });
+		expect(deadline).not.toHaveProperty("repeat");
+	});
+
+	it("shows an unreadable rule as written, as a warning", () => {
+		expect(chips("dueDate: 2026-10-05\nrepeat: Weekly - Fri")[0]).toMatchObject({
+			repeat: { label: "Weekly - Fri", readable: false, tooltip: "Ta Da can't read this rule, so the task doesn't repeat" },
+		});
+	});
+
+	it("has no suffix without a repeat", () => {
+		expect(chips("dueDate: 2026-10-05")[0]).not.toHaveProperty("repeat");
+	});
+});
+

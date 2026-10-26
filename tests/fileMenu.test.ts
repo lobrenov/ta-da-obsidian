@@ -62,6 +62,8 @@ function setup() {
 	const index = new VaultIndex([
 		makeItem("Ta Da/tasks/Trip.md", "type: task\nstatus: Doing"),
 		makeItem("Ta Da/projects/Home.md", "type: project\nstatus: Ongoing"),
+		makeItem("Ta Da/tasks/Water.md", "type: task\nstatus: Doing\ndueDate: 2026-10-05\nrepeat: every week on Mon"),
+		makeItem("Ta Da/tasks/Last.md", "type: task\nstatus: Doing\ndueDate: 2026-10-05\nrepeat: every week until 2026-10-06"),
 		makeItem("Notes/Plain.md", ""),
 	]);
 	let handler: (menu: unknown, file: unknown) => void = () => undefined;
@@ -93,6 +95,25 @@ describe("the file menu's Status…", () => {
 		expect(status?.section).toBe("ta-da");
 		expect(status?.sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Blocked", "|", "Done", "Cancelled"]);
 		expect(status?.sub.filter((entry) => entry.checked).map((entry) => entry.title)).toEqual(["Doing"]);
+	});
+
+	it("words a repeating task's items: Skip this time, and where Done and Skip move it", () => {
+		const { open } = setup();
+		const titles = (path: string) => open(path)[0]?.sub.map((entry) => entry.title);
+		expect(titles("Ta Da/tasks/Water.md")).toEqual([
+			"Not started",
+			"Doing",
+			"Blocked",
+			"|",
+			expect.stringMatching(/^Done · moves to \w{3} \d+ \w{3}$/),
+			expect.stringMatching(/^Skip this time · moves to /),
+		]);
+		expect(titles("Ta Da/tasks/Last.md")?.slice(4)).toEqual(["Done · ends the repeat", "Skip this time · ends the repeat"]);
+	});
+
+	it("leaves a repeating task's own status unannotated", () => {
+		const { open } = setup();
+		expect(open("Ta Da/tasks/Water.md")[0]?.sub.map((entry) => entry.title)[1]).toBe("Doing");
 	});
 
 	it("offers Ongoing on a project", () => {

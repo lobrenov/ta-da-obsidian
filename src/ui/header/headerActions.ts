@@ -3,6 +3,7 @@ import type { VaultIndex } from "../../core/index/vaultIndex";
 import { LocalDate } from "../../core/model/localDate";
 import type { RepeatRule } from "../../core/model/repeatRule";
 import type { Edit, Writer } from "../../Writer";
+import { statusContext } from "../repeatWording";
 import type { StatusActions } from "../statusActions";
 import type { HeaderActions } from "./buildHeader";
 import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit } from "./edits";
@@ -33,7 +34,9 @@ export function headerActions(host: HeaderHost, file: TFile, model: HeaderModel)
 
 	return {
 		openStatus(anchor) {
-			openStatusMenu(anchor, model.kind, model.status, (status) => host.status.set(file, status));
+			const item = host.index.get(file.path);
+			const { repeating, move } = item ? statusContext(item, host.index, host.today()) : { repeating: false, move: null };
+			openStatusMenu(anchor, model.kind, model.status, (status) => host.status.set(file, status), repeating ? { move, today: host.today() } : undefined);
 		},
 		openParent(anchor) {
 			openParentPicker(host, model.kind, model.parent, anchor, (parent) => write(parentEdit(parent)));

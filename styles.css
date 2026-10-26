@@ -1710,3 +1710,27 @@
 	align-items: center;
 	gap: 8px;
 }
+
+/* Repeat: chip suffix, row glyph, status menu note */
+
+.ta-da-chip-repeat {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-muted);
+}
+
+.ta-da-chip-repeat.is-unreadable .ta-da-icon {
+	color: var(--color-orange);
+}
+
+.ta-da-navigator .ta-da-glyphs .ta-da-meta-icon {
+	gap: 4px;
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-menu-note {
+	margin-inline-start: var(--size-4-3);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}

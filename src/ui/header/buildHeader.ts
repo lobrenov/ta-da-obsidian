@@ -73,6 +73,13 @@ export function buildChip(doc: Document, chip: Chip, actions: Pick<HeaderActions
 			break;
 	}
 	button.appendChild(element(doc, "span", "ta-da-chip-label", chip.label));
+	if ((chip.kind === "dueDate" || chip.kind === "deadline") && chip.repeat) {
+		const suffix = button.appendChild(element(doc, "span", `ta-da-chip-repeat${chip.repeat.readable ? "" : " is-unreadable"}`));
+		suffix.appendChild(doc.createTextNode("·"));
+		suffix.appendChild(icon(doc, chip.repeat.readable ? "repeat" : "alert", 10, 2.2));
+		suffix.appendChild(doc.createTextNode(chip.repeat.label));
+		button.title = chip.repeat.tooltip;
+	}
 	if (chip.kind === "status") button.appendChild(icon(doc, "chevronDown", 10, 2.2));
 	button.addEventListener("click", () => {
 		switch (chip.kind) {

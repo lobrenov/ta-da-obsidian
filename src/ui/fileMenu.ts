@@ -1,7 +1,9 @@
 import { type Plugin, TFile } from "obsidian";
 import type { VaultIndex } from "../core/index/vaultIndex";
-import { statusChoices } from "../core/model/status";
+import { isClosed, statusChoices } from "../core/model/status";
+import { localToday } from "./dates";
 import { statusLabel } from "./header/headerModel";
+import { moveNote, statusContext, statusTitle } from "./repeatWording";
 import type { StatusActions } from "./statusActions";
 
 /** Adds the plugin's items to Obsidian's file menu, wherever it shows, for task and project files: Status…, and Convert to project… on a task. */
@@ -16,10 +18,13 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 			menu.addItem((entry) => {
 				entry.setTitle("Status…").setIcon("circle-dot").setSection("ta-da");
 				const submenu = entry.setSubmenu();
+				const today = localToday();
+				const { repeating, move } = statusContext(item, index, today);
 				for (const option of statusChoices(kind)) {
 					if (option === "Done") submenu.addSeparator();
 					submenu.addItem((sub) => {
-						sub.setTitle(statusLabel(option));
+						const note = move && isClosed(option) && option !== current ? ` · ${moveNote(move, today)}` : "";
+						sub.setTitle(`${statusTitle(option, repeating, statusLabel(option))}${note}`);
 						sub.setChecked(option === current);
 						sub.onClick(() => status.set(file, option));
 					});

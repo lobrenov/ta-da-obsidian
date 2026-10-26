@@ -1,3 +1,5 @@
+import { repeatMove } from "../../core/index/repeatMove";
+import { rowHelp, rowNext } from "../repeatWording";
 import { folderOf } from "../../core/storage/vault";
 import type { AgendaEntry } from "../../core/index/queries";
 import { progress as progressOf } from "../../core/index/queries";
@@ -41,6 +43,8 @@ export interface TaskRowModel {
 	/** The body has more than checkboxes. */
 	note: boolean;
 	date: RowDate | null;
+	/** The repeat glyph's tooltip, and for a done or skipped task `Tomorrow` or `Ended` where its date would be. */
+	repeat: { tooltip: string; next: string | null } | null;
 	tags: number;
 }
 
@@ -143,6 +147,7 @@ export interface TaskRowOptions {
 export function taskRow(index: VaultIndex, task: Item, today: LocalDate, options: TaskRowOptions): TaskRowModel {
 	const p = task.properties;
 	const subtasks = subtasksOf(task);
+	const move = repeatMove(index, task, today);
 	return {
 		type: "task",
 		id: options.entry ? `${task.path}#${options.entry.kind}` : task.path,
@@ -154,6 +159,7 @@ export function taskRow(index: VaultIndex, task: Item, today: LocalDate, options
 		subtasks: subtasks.total > 0 ? subtasks : null,
 		note: task.hasNote,
 		date: rowDate(task, today, options),
+		repeat: p.repeatRule ? { tooltip: rowHelp(p.repeatRule, move, today), next: move ? rowNext(move, today) : null } : null,
 		tags: task.tags.length,
 	};
 }

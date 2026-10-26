@@ -190,6 +190,19 @@ export class RepeatRule {
 		);
 	}
 
+	/** A short label for a chip: "Weekly", "Every 2 weeks when done". */
+	get frequencyLabel(): string {
+		const n = this.interval;
+		const label = {
+			weekday: "Weekdays",
+			day: n === 1 ? "Daily" : `Every ${n} days`,
+			week: n === 1 ? "Weekly" : `Every ${n} weeks`,
+			month: n === 1 ? "Monthly" : `Every ${n} months`,
+			year: n === 1 ? "Yearly" : `Every ${n} years`,
+		}[this.frequency];
+		return this.whenDone ? `${label} when done` : label;
+	}
+
 	private changing(changes: Partial<RepeatRuleFields>): RepeatRule {
 		return new RepeatRule({ ...this, ...changes });
 	}

@@ -2,12 +2,14 @@ import { type App, Menu, type MenuItem, type Modal, Platform } from "obsidian";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import type { Kind } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
-import { type Status, statusChoices } from "../../core/model/status";
+import { isClosed, type Status, statusChoices } from "../../core/model/status";
 import type { Parent } from "../../core/writing/parent";
 import { parentChoices, type TagChoice, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";
 import { statusLabel } from "./headerModel";
 import { dayOrderOf, firstWeekdayOf } from "./locale";
+import type { RepeatMove } from "../../core/index/repeatMove";
+import { moveNote, statusTitle } from "../repeatWording";
 import { DateModal, type DateRepeat, ParentModal, TagModal } from "./modals";
 
 /** What the pickers need: a file's header and the New task modal both open them, and each decides what a choice does. */
@@ -29,14 +31,23 @@ export function openBelow(modal: Modal, anchor: HTMLElement): void {
 	if (!Platform.isPhone) placeBelow(modal, anchor);
 }
 
-export function openStatusMenu(anchor: HTMLElement, kind: Kind, current: Status, choose: (status: Status) => void): void {
+/** What a repeating task's status menu says: where completing it moves it. */
+export interface StatusRepeat {
+	move: RepeatMove | null;
+	today: LocalDate;
+}
+
+/** The status menu. A `repeat` is a repeating task's: Cancelled reads Skip this time, and Done and Skip say where the task moves. */
+export function openStatusMenu(anchor: HTMLElement, kind: Kind, current: Status, choose: (status: Status) => void, repeat?: StatusRepeat): void {
 	const menu = new Menu();
 	for (const status of statusChoices(kind)) {
 		if (status === "Done") menu.addSeparator();
 		menu.addItem((item) => {
-			item.setTitle(statusLabel(status));
+			const title = statusTitle(status, repeat !== undefined, statusLabel(status));
+			const note = repeat?.move && isClosed(status) && status !== current ? moveNote(repeat.move, repeat.today) : null;
+			item.setTitle(title);
 			item.setIcon("circle");
-			markStatus(item, status, status === current);
+			markStatus(item, status, status === current, title, note);
 			item.onClick(() => choose(status));
 		});
 	}
@@ -92,14 +103,16 @@ function placeBelow(modal: Modal, anchor: HTMLElement): void {
  * Draws a status item's box in the icon slot and ticks the current one. Obsidian's `MenuItem` has no public handle on
  * its element; a native menu has none, and falls back to `setChecked`.
  */
-function markStatus(item: MenuItem, status: Status, current: boolean): void {
+function markStatus(item: MenuItem, status: Status, current: boolean, title: string, note: string | null): void {
 	const dom = (item as unknown as { dom?: HTMLElement }).dom;
 	if (!dom) {
 		item.setChecked(current);
+		if (note) item.setTitle(`${title} · ${note}`);
 		return;
 	}
 	const doc = dom.ownerDocument;
 	dom.querySelector(".menu-item-icon")?.replaceChildren(statusBox(doc, status));
+	if (note) dom.appendChild(element(doc, "span", "ta-da-menu-note", note));
 	if (current) {
 		dom.classList.add("ta-da-current");
 		dom.setAttribute("aria-checked", "true");
