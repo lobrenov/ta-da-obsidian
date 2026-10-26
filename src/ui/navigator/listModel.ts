@@ -204,7 +204,7 @@ function periodNoteRow(ctx: ListContext, selection: AgendaSelection): PeriodNote
 function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	const { index, today } = ctx;
 	const entries = agendaWeek(index, week);
-	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, ctx.notes.names);
+	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, today, ctx.notes.names);
 	const days = week.days.map((date): ListRow => {
 		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
 		const note = dailyNote(index, date, ctx.notes.names);

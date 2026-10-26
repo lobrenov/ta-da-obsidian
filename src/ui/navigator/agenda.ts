@@ -116,7 +116,7 @@ export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDa
 	const weeks = monthOpen ? anchor.isoWeeksOfMonth : [weekOf(selection)];
 	const first = weeks[0]?.firstDay ?? anchor;
 	const last = weeks[weeks.length - 1]?.days[6] ?? anchor;
-	const marks = dayMarks(index, first, last, notes.names);
+	const marks = dayMarks(index, first, last, today, notes.names);
 	const rows = weeks.map((week): StripRow => ({
 		week: {
 			week,

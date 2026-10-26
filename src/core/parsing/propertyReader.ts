@@ -15,6 +15,7 @@ import {
 } from "yaml";
 import { type Kind, makeProperties, type Properties, type Warning } from "../model/item";
 import { LocalDate } from "../model/localDate";
+import { RepeatRule } from "../model/repeatRule";
 import { readStatus } from "../model/status";
 import { readTag, type Tag, uniqueTags } from "../model/tag";
 import { readWikiLink, readWikiLinkInner, linkTitle, type WikiLink } from "../model/wikiLink";
@@ -73,7 +74,12 @@ export function readProperties(yaml: string): ReadResult | null {
 	properties.completedDate = reader.date("completedDate");
 	properties.dueDate = reader.date("dueDate");
 	properties.deadline = reader.date("deadline");
-	properties.repeatRule = reader.text("repeat");
+	const repeatText = reader.text("repeat");
+	if (repeatText !== null) {
+		const rule = kind === "task" ? RepeatRule.parse(repeatText) : null;
+		if (kind === "task" && rule === null) reader.warnings.push({ case: "invalidRepeat", value: repeatText });
+		properties.repeatRule = { text: repeatText, rule };
+	}
 	properties.tags = reader.tags();
 	return { properties, warnings: reader.warnings };
 }

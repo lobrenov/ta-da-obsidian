@@ -1,7 +1,9 @@
 import type { Item } from "../model/item";
 import { LocalDate, type ISOWeek } from "../model/localDate";
+import { nextDates, ruleDates } from "../model/repeatRuleNext";
 import { isClosed } from "../model/status";
 import { linkTitle } from "../model/wikiLink";
+import { nextForCompleted } from "../writing/recurrence";
 import { dailyNote, type DailyNoteNames, defaultDailyNoteNames, openCheckboxCount } from "./dailyNotes";
 import { byDate, byTitle, type VaultIndex } from "./vaultIndex";
 
@@ -29,6 +31,14 @@ export interface TaskGroup {
 export interface AreaProjects {
 	area: Item;
 	projects: ProjectProgress[];
+}
+
+/** A coming date of a repeating task, not yet in its file. `estimated` when a `when done` rule's date assumes each task is done on its day. */
+export interface Occurrence {
+	item: Item;
+	date: LocalDate;
+	kind: "due" | "deadline";
+	estimated: boolean;
 }
 
 /** What a date shows in the Agenda's strip, month and week rows. */
@@ -72,11 +82,15 @@ export function agendaWeek(index: VaultIndex, week: ISOWeek): AgendaEntry[] {
 	return index.tasks.flatMap((task) => agendaEntries(task, days)).sort(byAgendaOrder);
 }
 
-/** For each date from `from` through `through` that has either mark. The daily note is looked up by `names`. */
+/**
+ * For each date from `from` through `through` that has either mark. An occurrence marks its day like an open task, except
+ * those of `every day` and `every weekday` rules. The daily note is looked up by `names`.
+ */
 export function dayMarks(
 	index: VaultIndex,
 	from: LocalDate,
 	through: LocalDate,
+	today: LocalDate,
 	names: DailyNoteNames = defaultDailyNoteNames,
 ): Map<string, DayMarks> {
 	const marks = new Map<string, DayMarks>();
@@ -95,6 +109,11 @@ export function dayMarks(
 			if (date && date.compare(from) >= 0 && date.compare(through) <= 0) marksFor(date).hasOpenTasks = true;
 		}
 	}
+	for (const task of index.tasks) {
+		const rule = task.properties.repeatRule?.rule;
+		if (!rule || rule.frequency === "weekday" || (rule.frequency === "day" && rule.interval === 1)) continue;
+		for (const occurrence of occurrences(index, task, from, through, today)) marksFor(occurrence.date).hasOpenTasks = true;
+	}
 	const days = from.daysTo(through);
 	for (let offset = 0; offset <= days; offset++) {
 		const date = from.addingDays(offset);
@@ -103,6 +122,75 @@ export function dayMarks(
 	}
 	return marks;
 }
+
+/**
+ * A repeating task's coming dates from `from` through `through`, by date, due before deadline, each assumed done on its
+ * day. An open task's are the rule's dates after its current date that are after `today`. A completed task not yet moved
+ * forward lists its next date too, as the logging run would set it: on `today`, or the day after for a task completed
+ * today. A deadline-only task has deadline occurrences; a task with both has a due occurrence on each date and a deadline
+ * one at the same offset. A `when done` rule's are estimates, except a completed task's first. A month or year rule
+ * without `on …` steps date by date, as logging does. Empty without a rule that reads, or past `until`.
+ */
+export function occurrences(index: VaultIndex, item: Item, from: LocalDate, through: LocalDate, today: LocalDate): Occurrence[] {
+	const p = item.properties;
+	const rule = p.repeatRule?.rule;
+	if (p.kind !== "task" || !rule || from.compare(through) > 0) return [];
+	let dates: LocalDate[] = [];
+	let anchor: LocalDate;
+	let known: LocalDate | null = null;
+	let hasDue = p.dueDate !== null;
+	let hasDeadline = p.deadline !== null;
+	let offset = p.dueDate && p.deadline ? p.dueDate.daysTo(p.deadline) : 0;
+	let earliest = from;
+	if (isClosed(p.status)) {
+		const rollover = p.completedDate === null || p.completedDate.compare(today) < 0 ? today : today.addingDays(1);
+		const closed = isClosed(index.projectOf(item)?.properties.status ?? "Not Started");
+		const next = nextForCompleted(item, rollover, closed);
+		const date = next && (next.dueDate ?? next.deadline);
+		if (!next || !date) return [];
+		hasDue = next.dueDate !== null;
+		hasDeadline = next.deadline !== null;
+		offset = next.dueDate && next.deadline ? next.dueDate.daysTo(next.deadline) : 0;
+		dates = [date];
+		anchor = date;
+		if (rule.whenDone) known = date;
+	} else {
+		const date = p.dueDate ?? p.deadline;
+		if (!date) return [];
+		anchor = rule.whenDone ? later(date, today) : date;
+		earliest = later(from, today.addingDays(1));
+	}
+	const low = earlier(earliest, earliest.addingDays(-offset));
+	const high = later(through, through.addingDays(-offset));
+	const drifts = (rule.frequency === "month" && rule.monthDay === null) || (rule.frequency === "year" && rule.yearDate === null);
+	if (rule.whenDone || drifts) {
+		for (let date = stepped(); date && date.compare(high) <= 0; date = stepped()) {
+			dates.push(date);
+			anchor = date;
+		}
+	} else {
+		dates.push(...ruleDates(rule, anchor, low, high));
+	}
+	function stepped(): LocalDate | null | undefined {
+		return nextDates(rule as NonNullable<typeof rule>, anchor, null, anchor, later(anchor, today).addingDays(1))?.dueDate;
+	}
+	const found = dates
+		.filter((date) => date.compare(low) >= 0 && date.compare(high) <= 0)
+		.flatMap((date): Occurrence[] => {
+			const estimated = rule.whenDone && !(known && date.equals(known));
+			const entries: Occurrence[] = [];
+			if (hasDue) entries.push({ item, date, kind: "due", estimated });
+			const moved = hasDeadline ? date.checkedAddingDays(offset) : null;
+			if (moved) entries.push({ item, date: moved, kind: "deadline", estimated });
+			return entries;
+		});
+	return found
+		.filter((entry) => entry.date.compare(from) >= 0 && entry.date.compare(through) <= 0)
+		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1));
+}
+
+const later = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) >= 0 ? a : b);
+const earlier = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) <= 0 ? a : b);
 
 /** Whether a task is in Today: open and due or at its deadline today or earlier, or completed (Done or Cancelled) today. */
 export function isInToday(item: Item, today: LocalDate): boolean {

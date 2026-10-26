@@ -77,8 +77,8 @@ describe("property reader", () => {
 		expect(String(p.completedDate)).toBe("2026-10-01");
 		expect(String(p.dueDate)).toBe("2026-10-02");
 		expect(String(p.deadline)).toBe("2026-10-06");
-		expect(p.repeatRule).toBe("Weekly · Fri");
-		expect(warnings).toEqual([]);
+		expect(p.repeatRule?.text).toBe("Weekly · Fri");
+		expect(warnings).toEqual([{ case: "invalidRepeat", value: "Weekly · Fri" }]);
 	});
 
 	it("reads an area as a link or a title", () => {
@@ -121,7 +121,7 @@ describe("property reader", () => {
 	it("keeps values as written", () => {
 		const { properties } = read("type: task\nstatus: Doing\narea: yes\nrepeat: 2026\n");
 		expect(properties.area && linkTitle(properties.area)).toBe("yes");
-		expect(properties.repeatRule).toBe("2026");
+		expect(properties.repeatRule?.text).toBe("2026");
 	});
 
 	it("matches the type case-insensitively", () => {
@@ -466,7 +466,7 @@ describe("explicit YAML tags and identity", () => {
 	it("keeps explicitly tagged values as strings", () => {
 		const { properties } = read("type: task\nstatus: Doing\ndueDate: !!timestamp 2026-10-02\nrepeat: !!binary aGk=\n");
 		expect(String(properties.dueDate)).toBe("2026-10-02");
-		expect(properties.repeatRule).toBe("aGk=");
+		expect(properties.repeatRule?.text).toBe("aGk=");
 	});
 
 	it("gives canonically equivalent tags one path", () => {

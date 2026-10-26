@@ -128,7 +128,7 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 		dayMarks: () => {
 			const from = LocalDate.parse("2026-10-01") as LocalDate;
 			const through = LocalDate.parse("2026-10-31") as LocalDate;
-			const marks = queries.dayMarks(index, from, through);
+			const marks = queries.dayMarks(index, from, through, today);
 			return [...marks.keys()].sort(compareCodeUnits).map((key) => ({ date: key, ...marks.get(key) }));
 		},
 		loose: () => inOrder(queries.looseTasks(index)),

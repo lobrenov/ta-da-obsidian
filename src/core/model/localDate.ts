@@ -41,6 +41,12 @@ export class LocalDate {
 		return new LocalDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
 	}
 
+	/** `days` away, or null when that leaves years 1 to 9999. */
+	checkedAddingDays(days: number): LocalDate | null {
+		const date = new Date(this.midnightUTC() + days * dayMs);
+		return LocalDate.of(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+	}
+
 	/** The first day of this day's month. */
 	get startOfMonth(): LocalDate {
 		return new LocalDate(this.year, this.month, 1);
@@ -146,7 +152,7 @@ export class ISOWeek {
 	}
 }
 
-function daysIn(month: number, year: number): number {
+export function daysIn(month: number, year: number): number {
 	if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
 	return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }

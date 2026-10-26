@@ -401,14 +401,14 @@ describe("daily notes", () => {
 			daily("Periodic Notes/Daily Notes/2026-10-06.md", "- [-] a\n"),
 			daily("Periodic Notes/Daily Notes/2026-10-07.md"),
 		]);
-		const marks = q.dayMarks(index, today, date("2026-10-08"));
+		const marks = q.dayMarks(index, today, date("2026-10-08"), today);
 		expect(Object.fromEntries(marks)).toEqual({
 			"2026-10-02": { hasOpenTasks: true, hasOpenBoxes: true },
 			"2026-10-03": { hasOpenTasks: false, hasOpenBoxes: true },
 			"2026-10-04": { hasOpenTasks: true, hasOpenBoxes: false },
 		});
-		expect(q.dayMarks(index, today, today.addingDays(-1)).size).toBe(0);
-		const elsewhere = q.dayMarks(index, today, date("2026-10-08"), { dailyFolder: "Journal", weekFolder: "Weeks" });
+		expect(q.dayMarks(index, today, today.addingDays(-1), today).size).toBe(0);
+		const elsewhere = q.dayMarks(index, today, date("2026-10-08"), today, { dailyFolder: "Journal", weekFolder: "Weeks" });
 		expect(Object.keys(Object.fromEntries(elsewhere))).toEqual(["2026-10-02", "2026-10-04"]);
 		expect(elsewhere.get("2026-10-02")?.hasOpenBoxes).toBe(false);
 	});

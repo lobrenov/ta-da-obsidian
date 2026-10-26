@@ -2,11 +2,18 @@ import { identityKey } from "../text";
 import { home, logbookFolder, trashFolder } from "../storage/vault";
 import type { Checkbox } from "./checkbox";
 import type { LocalDate } from "./localDate";
+import type { RepeatRule } from "./repeatRule";
 import type { Status } from "./status";
 import type { Tag } from "./tag";
 import type { WikiLink } from "./wikiLink";
 
 export type Kind = "task" | "project" | "area" | "note";
+
+/** A task's `repeat` value: its text as written, and the rule when the text reads as one. */
+export interface Repeat {
+	text: string;
+	rule: RepeatRule | null;
+}
 
 /** The frontmatter keys Ta Da understands. Other keys are left alone. */
 export interface Properties {
@@ -21,8 +28,8 @@ export interface Properties {
 	completedDate: LocalDate | null;
 	dueDate: LocalDate | null;
 	deadline: LocalDate | null;
-	/** The `repeat` text, displayed only. */
-	repeatRule: string | null;
+	/** The `repeat` text, with its rule when it's a task's and reads as one. */
+	repeatRule: Repeat | null;
 	/** `tags:`, in order, without repeats. */
 	tags: Tag[];
 }
@@ -60,7 +67,9 @@ export type Warning =
 	/** An `area` link doesn't match any area file, so the file has no parent. */
 	| { case: "unresolvedArea"; value: string }
 	/** A task has both keys; `project` has a value, so its `area` (this title) is ignored. */
-	| { case: "areaIgnored"; value: string };
+	| { case: "areaIgnored"; value: string }
+	/** A task's `repeat` that isn't a rule; the task doesn't repeat. */
+	| { case: "invalidRepeat"; value: string };
 
 /** A tag on a file and where it's written. */
 export interface TagUse {

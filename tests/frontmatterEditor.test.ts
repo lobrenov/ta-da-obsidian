@@ -118,8 +118,8 @@ describe("FrontmatterEditor", () => {
 	])("reads text value %j back unchanged", (value) => {
 		const written = setProperty("repeat", text(value), "---\ntype: task\nstatus: Doing\n---\n");
 		const read = readProperties(splitFrontmatter(written).yaml as string);
-		expect(read?.properties.repeatRule).toBe(value);
-		expect(read?.warnings).toEqual([]);
+		expect(read?.properties.repeatRule?.text).toBe(value);
+		expect(read?.warnings).toEqual([{ case: "invalidRepeat", value }]);
 	});
 
 	it("reads list and link values back unchanged", () => {

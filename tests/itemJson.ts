@@ -19,7 +19,7 @@ export function itemJson(item: Item): unknown {
 		completedDate: date(p.completedDate),
 		dueDate: date(p.dueDate),
 		deadline: date(p.deadline),
-		repeat: p.repeatRule,
+		repeat: p.repeatRule?.text ?? null,
 		tags: p.tags.map((tag) => tag.name),
 		summary: item.summary,
 		hasNote: item.hasNote,
