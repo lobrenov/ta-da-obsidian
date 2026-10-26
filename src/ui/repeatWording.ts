@@ -1,4 +1,5 @@
 import { type RepeatMove, repeatMove } from "../core/index/repeatMove";
+import type { Occurrence } from "../core/index/queries";
 import type { Item, Properties, Repeat } from "../core/model/item";
 import type { LocalDate } from "../core/model/localDate";
 import type { Status } from "../core/model/status";
@@ -56,6 +57,19 @@ export function rowHelp(repeat: Repeat, move: RepeatMove | null, today: LocalDat
 	const spelled = ruleText(repeat.rule, today);
 	if (move?.case === "moves") return `${spelled} · moves to ${day(move.to, today)} when the day changes`;
 	return move?.case === "ends" ? `${spelled} · the repeat ends` : spelled;
+}
+
+/** An occurrence row's tooltip: the rule spelled out, led by what an estimate or a deadline means. */
+export function occurrenceHelp(occurrence: Occurrence, today: LocalDate): string {
+	const rule = occurrence.item.properties.repeatRule?.rule;
+	if (!rule) return "";
+	const lead = occurrence.estimated ? "Estimated, if done on its due date · " : occurrence.kind === "deadline" ? "Deadline · " : "";
+	return lead + ruleText(rule, today);
+}
+
+/** An occurrence row's spoken label: `Water plants, repeat, Repeats every week, Garden`. */
+export function occurrenceLabel(occurrence: Occurrence, place: string | null, today: LocalDate): string {
+	return [occurrence.item.title, "repeat", occurrenceHelp(occurrence, today), ...(place ? [place] : [])].join(", ");
 }
 
 /** The chip that carries a task's rule: the due chip, or the deadline chip when there's a deadline and no due date. */

@@ -106,6 +106,8 @@ export interface AgendaDayRowModel {
 	/** The daily note's first paragraph, or `No note`. */
 	note: string;
 	hasNote: boolean;
+	/** The first repeating task on the day, named in place of the note when nothing is due and the note has no summary. */
+	firstRepeat: string | null;
 }
 
 /**
@@ -130,7 +132,27 @@ export interface PeriodNoteRowModel {
 	subtasks: { done: number; total: number } | null;
 }
 
-export type ListRow = TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel | PeriodNoteRowModel;
+/**
+ * A coming occurrence of a repeating task in the Agenda's Repeats group. `path` is null so the row stays out of the
+ * list's keys and selection; a click opens `open`.
+ */
+export interface OccurrenceRowModel {
+	type: "occurrence";
+	id: string;
+	path: null;
+	open: string;
+	title: string;
+	place: string | null;
+	/** A `when done` rule's date assumes each task is done on its day: the row shows `≈`. */
+	estimated: boolean;
+	/** The row shows a Deadline pill. */
+	deadline: boolean;
+	tooltip: string;
+	/** `Water plants, repeat, Repeats every week, Garden`. */
+	label: string;
+}
+
+export type ListRow = OccurrenceRowModel | TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel | PeriodNoteRowModel;
 
 /** Which date a list shows. The Agenda shows a due date only when overdue; other lists show the date itself. */
 export type DateRule = "agenda" | "elsewhere";

@@ -37,6 +37,8 @@ function headerText(header: SectionHeader | null): string {
 			return "scheduled";
 		case "weekTitle":
 			return `week ${header.title} ${header.range}${header.thisWeek ? " (this week)" : ""}`;
+		case "repeats":
+			return "Repeats";
 		case "archive":
 			return `${header.title}${header.note ? ` [${header.note}]` : ""}`;
 	}
@@ -61,6 +63,8 @@ function rowText(row: ListRow): string {
 			return ["periodNote", row.name, row.path === null ? "create" : null, row.file, row.summary, row.open > 0 ? `${row.open} open` : null, row.subtasks ? `${row.subtasks.done}/${row.subtasks.total}` : null].filter((part) => part !== null).join(" | ");
 		case "day":
 			return ["day", row.label, row.summary || null, row.hasOpenTasks ? "dot" : null, row.hasOpenBoxes ? "ring" : null, row.today ? "today" : null].filter((part) => part !== null).join(" | ");
+		case "occurrence":
+			return ["occurrence", row.title, row.estimated ? "≈" : null, row.deadline ? "Deadline" : null, row.place].filter((part) => part !== null).join(" | ");
 		case "logged":
 		case "trashed":
 			return [row.type, row.kind, row.title, `[${row.status}]`, row.meta, row.date].filter((part) => part !== null).join(" | ");

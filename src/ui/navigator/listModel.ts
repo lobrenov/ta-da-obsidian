@@ -1,7 +1,7 @@
 import { type Grouping, listSections, type ListSection, TagFilter } from "../../core/index/grouping";
-import type { TaskGroup } from "../../core/index/queries";
+import type { Occurrence, TaskGroup } from "../../core/index/queries";
 import { dailyNote, openCheckboxCount, pathForDate, pathForWeek, weekNote } from "../../core/index/dailyNotes";
-import { agendaDay, agendaWeek, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
+import { agendaDay, agendaWeek, allOccurrences, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
 import { search as searchIndex } from "../../core/index/queries";
 import { tagBrowser } from "../../core/index/tagQueries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
@@ -14,6 +14,7 @@ import { type TrashedItem, contentsOf } from "../../core/storage/trash";
 import { linkTitle } from "../../core/model/wikiLink";
 import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel, weekOf } from "./agenda";
 import { dayMonth, fullDate, shortWeekday } from "./dates";
+import { occurrenceHelp, occurrenceLabel } from "../repeatWording";
 import { type Domain, domainKey, type GroupedList, groupingOf, type Groupings } from "./domain";
 import { logbookGroups, logbookItems, logbookRow } from "./logbook";
 import {
@@ -23,6 +24,7 @@ import {
 	type IconSpec,
 	lineRow,
 	type ListRow,
+	type OccurrenceRowModel,
 	linkedArea,
 	type PeriodNoteRowModel,
 	noteRow,
@@ -61,7 +63,9 @@ export type SectionHeader =
 	| { style: "dayTitle"; title: string; relative: string | null }
 	/** "Scheduled", with the Group menu and the tag filter. */
 	| { style: "scheduled" }
-	| { style: "weekTitle"; title: string; range: string; thisWeek: boolean };
+	| { style: "weekTitle"; title: string; range: string; thisWeek: boolean }
+	/** "Repeats": the coming occurrences of repeating tasks. */
+	| { style: "repeats" };
 
 export interface SectionModel {
 	id: string;
@@ -167,14 +171,36 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const relative = ["Today", "Tomorrow", "Yesterday"][[0, 1, -1].indexOf(today.daysTo(selection.date))] ?? null;
 	const title = plain("agenda:day", [periodNoteRow(ctx, selection)], { style: "dayTitle", title: fullDate(selection.date, today), relative });
 	const sections = [title];
+	const repeats = allOccurrences(index, selection.date, selection.date, today).filter((occurrence) => filter.matches(occurrence.item));
 	if (all.length === 0) {
-		title.message = "Nothing scheduled";
+		if (repeats.length === 0) title.message = "Nothing scheduled";
 	} else {
 		const scheduled = plain("agenda:scheduled", [], { style: "scheduled" });
 		if (tasks.length === 0) scheduled.message = "Nothing here carries the picked tags.";
 		sections.push(scheduled, ...taskSections(ctx, tasks, grouping, { dates: "agenda", place: grouping !== "Project" }, "agenda", options));
 	}
+	if (repeats.length > 0) sections.push(plain("agenda:repeats", occurrenceRows(ctx, repeats), { style: "repeats" }));
 	return { ...base, groupList: "agenda", grouping, filter: filterModel(all, options.picked, tasks.length), sections };
+}
+
+/** A Repeats row for each occurrence. */
+function occurrenceRows(ctx: ListContext, found: Occurrence[]): OccurrenceRowModel[] {
+	const { index, today } = ctx;
+	return found.map((occurrence) => {
+		const place = index.parentOf(occurrence.item)?.title ?? null;
+		return {
+			type: "occurrence",
+			id: `repeat:${occurrence.item.path}#${occurrence.kind}#${occurrence.date.toString()}`,
+			path: null,
+			open: occurrence.item.path,
+			title: occurrence.item.title,
+			place,
+			estimated: occurrence.estimated,
+			deadline: occurrence.kind === "deadline",
+			tooltip: occurrenceHelp(occurrence, today),
+			label: occurrenceLabel(occurrence, place, today),
+		};
+	});
 }
 
 /** The row for a day's or week's note: the note when there is one, else the row that creates it. */
@@ -205,8 +231,10 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	const { index, today } = ctx;
 	const entries = agendaWeek(index, week);
 	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, today, ctx.notes.names);
+	const coming = allOccurrences(index, week.firstDay, week.days[6] ?? week.firstDay, today);
 	const days = week.days.map((date): ListRow => {
 		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
+		const repeating = [...new Map(coming.filter((occurrence) => occurrence.date.equals(date)).map((occurrence) => [occurrence.item.path, occurrence.item])).values()];
 		const note = dailyNote(index, date, ctx.notes.names);
 		return {
 			type: "day",
@@ -214,12 +242,13 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 			path: null,
 			date,
 			label: `${shortWeekday(date)} ${date.day}`,
-			summary: due > 0 ? `${due} due` : "",
+			summary: [due > 0 ? `${due} due` : null, repeating.length > 0 ? `${repeating.length} ${repeating.length === 1 ? "repeat" : "repeats"}` : null].filter((part) => part !== null).join(" · "),
 			today: date.equals(today),
 			hasOpenTasks: marks.get(date.toString())?.hasOpenTasks === true,
 			hasOpenBoxes: marks.get(date.toString())?.hasOpenBoxes === true,
 			note: note ? (note.summary ?? "") : "No note",
 			hasNote: note !== null,
+			firstRepeat: due > 0 || note?.summary ? null : (repeating[0]?.title ?? null),
 		};
 	});
 	const selection: AgendaSelection = { kind: "week", week };

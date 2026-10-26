@@ -191,6 +191,14 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1));
 }
 
+/** The occurrences of every task whose rule reads, from `from` through `through`, by date, due before deadline, then title. */
+export function allOccurrences(index: VaultIndex, from: LocalDate, through: LocalDate, today: LocalDate): Occurrence[] {
+	return index.tasks
+		.filter((task) => task.properties.repeatRule?.rule)
+		.flatMap((task) => occurrences(index, task, from, through, today))
+		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1) || byTitle(a.item, b.item));
+}
+
 const earlier = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) <= 0 ? a : b);
 
 /** Whether a task is in Today: open and due or at its deadline today or earlier, or completed (Done or Cancelled) today. */

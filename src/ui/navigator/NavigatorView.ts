@@ -22,7 +22,7 @@ import {
 } from "./domain";
 import { buildList, type ListContext, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
-import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
+import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
 import { moveSelection } from "./selection";
 import type { NewTaskContext } from "../newTask/prefill";
@@ -684,6 +684,12 @@ export class NavigatorView extends ItemView {
 				this.renderFilter(parent, list);
 				break;
 			}
+			case "repeats": {
+				const el = parent.createDiv({ cls: "ta-da-group-header is-archive is-repeats" });
+				drawIcon(el.createSpan({ cls: "ta-da-group-icon" }), { type: "icon", name: "repeat", tint: "muted" });
+				el.createSpan({ cls: "ta-da-group-title", text: "Repeats" });
+				break;
+			}
 			case "archive": {
 				const el = parent.createDiv({ cls: "ta-da-group-header is-archive" });
 				el.createSpan({ cls: "ta-da-group-title", text: header.title });
@@ -715,6 +721,9 @@ export class NavigatorView extends ItemView {
 			case "day":
 				this.dayRow(parent, row);
 				return;
+			case "occurrence":
+				this.occurrenceRow(parent, row);
+				return;
 			case "periodNote":
 				el = this.periodNoteRow(parent, row);
 				if (row.path === null) return;
@@ -732,10 +741,28 @@ export class NavigatorView extends ItemView {
 	private dayRow(parent: HTMLElement, row: AgendaDayRowModel): void {
 		const el = parent.createDiv({ cls: `ta-da-row is-day${row.today ? " is-today" : ""}`, attr: { role: "button", tabindex: "-1" } });
 		el.createSpan({ cls: "ta-da-day-label", text: row.label });
-		el.createSpan({ cls: `ta-da-day-note${row.hasNote ? "" : " is-none"}`, text: row.note });
+		if (row.firstRepeat !== null) {
+			const note = el.createSpan({ cls: "ta-da-day-note is-repeat" });
+			metaIcon(note, "repeat").setAttribute("aria-hidden", "true");
+			note.appendText(row.firstRepeat);
+		} else {
+			el.createSpan({ cls: `ta-da-day-note${row.hasNote ? "" : " is-none"}`, text: row.note });
+		}
 		el.createSpan({ cls: "ta-da-day-summary", text: row.summary });
 		this.dots(el, row);
 		el.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: row.date } }));
+	}
+
+	/** A coming occurrence in the Repeats group: a muted row with a box that can't be ticked. A click opens the task. */
+	private occurrenceRow(parent: HTMLElement, row: OccurrenceRowModel): void {
+		const el = parent.createDiv({ cls: "ta-da-row is-occurrence", attr: { role: "button", tabindex: "-1", "aria-label": row.label, title: row.tooltip } });
+		el.createSpan({ cls: "ta-da-occurrence-box", attr: { "aria-hidden": "true" } });
+		if (row.estimated) el.createSpan({ cls: "ta-da-occurrence-pill", text: "≈", attr: { "aria-hidden": "true" } });
+		if (row.deadline) el.createSpan({ cls: "ta-da-occurrence-pill is-deadline", text: "Deadline", attr: { "aria-hidden": "true" } });
+		el.createSpan({ cls: "ta-da-row-title", text: row.title, attr: { title: row.title } });
+		metaIcon(el, "repeat").setAttribute("aria-hidden", "true");
+		if (row.place) el.createSpan({ cls: "ta-da-row-place", text: row.place, attr: { "aria-hidden": "true" } });
+		el.addEventListener("click", (event) => this.openPath(row.open, event));
 	}
 
 	/** A day's or week's note: its name, file and first paragraph; or, with no note, the row that creates it. */
