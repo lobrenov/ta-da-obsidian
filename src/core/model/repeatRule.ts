@@ -86,9 +86,20 @@ export class RepeatRule {
 			interval = Number(unit);
 			unit = next;
 		}
-		const frequency = frequencies.get(unit);
-		if (frequency === undefined) return null;
 		const weekdays: number[] = [];
+		let frequency = frequencies.get(unit);
+		if (frequency === undefined) {
+			// `every mon, thu` is `every week on mon, thu`.
+			const first = interval === 1 ? weekday(unit) : null;
+			if (first === null) return null;
+			frequency = "week";
+			weekdays.push(first);
+			while (tokens[0] !== undefined && !["until", "when"].includes(tokens[0])) {
+				const found = weekday(tokens.shift() as string);
+				if (found === null) return null;
+				weekdays.push(found);
+			}
+		}
 		let monthDay: MonthDay | null = null;
 		let yearDate: YearDate | null = null;
 		let until: LocalDate | null = null;
