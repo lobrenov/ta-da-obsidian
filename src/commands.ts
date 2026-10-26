@@ -1,7 +1,9 @@
-import { Notice, type Plugin, TFile } from "obsidian";
+import { type Editor, MarkdownView, Notice, type Plugin, TFile } from "obsidian";
+import { extract } from "./core/writing/subtaskExtraction";
 import type { Writer } from "./Writer";
 import type { TaDaIndex } from "./TaDaIndex";
 import { localToday } from "./ui/dates";
+import { extractSubtask } from "./ui/extractTask";
 import { parentEdit } from "./ui/header/edits";
 import { buildHeaderModel } from "./ui/header/headerModel";
 import { openParentPicker } from "./ui/header/pickers";
@@ -14,7 +16,7 @@ import { type StatusActions, statusItem } from "./ui/statusActions";
 /** What the commands need from the plugin. */
 export type CommandsPlugin = Plugin & { taDaIndex: TaDaIndex; writer: Writer; statusActions: StatusActions };
 
-/** New task, Complete, and Move to project or area. None has a default hotkey. */
+/** New task, Complete, Move to project or area, and Extract subtask to task. None has a default hotkey. */
 /** Returns the New task action, for the views' header buttons. */
 export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: NewTaskContext) => void } {
 	const { app } = plugin;
@@ -66,6 +68,28 @@ export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: 
 			return true;
 		},
 	});
+
+	/** Extract to task on the line `line` of the open file, when it's a subtask. */
+	const extractFrom = (editor: Editor, file: TFile | null, line: number, checking: boolean): boolean => {
+		if (!file) return false;
+		const text = editor.getValue();
+		const location = editor.posToOffset({ line, ch: 0 });
+		if (!extract(location, text)) return false;
+		if (!checking) void extractSubtask({ app, index, writer: plugin.writer, today: localToday }, file, text, location);
+		return true;
+	};
+	plugin.addCommand({
+		id: "extract-subtask-to-task",
+		name: "Extract subtask to task",
+		editorCheckCallback: (checking, editor, context) => extractFrom(editor, context.file, editor.getCursor().line, checking),
+	});
+	plugin.registerEvent(
+		app.workspace.on("editor-menu", (menu, editor, view) => {
+			const line = editor.getCursor().line;
+			if (!(view instanceof MarkdownView) || !extractFrom(editor, view.file, line, true)) return;
+			menu.addItem((item) => item.setTitle("Extract to task").setIcon("list-checks").onClick(() => extractFrom(editor, view.file, line, false)));
+		}),
+	);
 
 	return { newTask };
 }
