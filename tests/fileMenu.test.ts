@@ -38,6 +38,7 @@ interface Entry {
 /** A menu that records what is added to it, and the submenus inside. */
 function recorder(): { menu: { addItem: (add: (item: unknown) => void) => unknown }; entries: Entry[] } {
 	const make = (entries: Entry[]) => ({
+		addSeparator: () => void entries.push({ title: "|", click: () => undefined, sub: [] }),
 		addItem: (add: (item: unknown) => void) => {
 			const entry: Entry = { title: "", click: () => undefined, sub: [] };
 			const item = {
@@ -64,8 +65,9 @@ function setup() {
 		makeItem("Notes/Plain.md", ""),
 	]);
 	let handler: (menu: unknown, file: unknown) => void = () => undefined;
+	const names: string[] = [];
 	const plugin = {
-		app: { workspace: { on: (_name: string, callback: typeof handler) => void (handler = callback) } },
+		app: { workspace: { on: (name: string, callback: typeof handler) => void (names.push(name), (handler = callback)) } },
 		registerEvent: () => undefined,
 	};
 	const set = vi.fn();
@@ -74,24 +76,28 @@ function setup() {
 		const { menu, entries } = recorder();
 		handler(menu, file(path));
 		return entries;
-	}, set, handler: () => handler };
+	}, set, names, handler: () => handler };
 }
 
 describe("the file menu's Status…", () => {
+	it("registers on file-menu", () => {
+		expect(setup().names).toEqual(["file-menu"]);
+	});
+
 	it("is added to a task with every status but Ongoing, the current one checked", () => {
 		const { open } = setup();
 		const [status, ...rest] = open("Ta Da/tasks/Trip.md");
 		expect(rest).toEqual([]);
 		expect(status?.title).toBe("Status…");
 		expect(status?.section).toBe("ta-da");
-		expect(status?.sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Done", "Blocked", "Cancelled"]);
+		expect(status?.sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Blocked", "|", "Done", "Cancelled"]);
 		expect(status?.sub.filter((entry) => entry.checked).map((entry) => entry.title)).toEqual(["Doing"]);
 	});
 
 	it("offers Ongoing on a project", () => {
 		const { open } = setup();
 		const sub = open("Ta Da/projects/Home.md")[0]?.sub ?? [];
-		expect(sub.map((entry) => entry.title)).toContain("Ongoing");
+		expect(sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Ongoing", "Blocked", "|", "Done", "Cancelled"]);
 		expect(sub.filter((entry) => entry.checked).map((entry) => entry.title)).toEqual(["Ongoing"]);
 	});
 

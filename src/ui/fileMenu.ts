@@ -1,6 +1,7 @@
 import { type Plugin, TFile } from "obsidian";
 import type { VaultIndex } from "../core/index/vaultIndex";
-import { statuses } from "../core/model/status";
+import { statusChoices } from "../core/model/status";
+import { statusLabel } from "./header/headerModel";
 import type { StatusActions } from "./statusActions";
 
 /** Adds the plugin's items to Obsidian's file menu, wherever it shows, for task and project files. */
@@ -15,17 +16,15 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 			menu.addItem((entry) => {
 				entry.setTitle("Status…").setIcon("circle-dot").setSection("ta-da");
 				const submenu = entry.setSubmenu();
-				for (const option of statuses) {
-					if (option === "Ongoing" && kind !== "project") continue;
-					submenu.addItem((sub) => sub.setTitle(sentence(option)).setChecked(option === current).onClick(() => status.set(file, option)));
+				for (const option of statusChoices(kind)) {
+					if (option === "Done") submenu.addSeparator();
+					submenu.addItem((sub) => {
+						sub.setTitle(statusLabel(option));
+						sub.setChecked(option === current);
+						sub.onClick(() => status.set(file, option));
+					});
 				}
 			});
-			// Step 5: "Convert to project…" on a task, in the same section.
 		}),
 	);
-}
-
-/** `Not Started` as `Not started`. */
-function sentence(text: string): string {
-	return text.slice(0, 1).toUpperCase() + text.slice(1).toLowerCase();
 }
