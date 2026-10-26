@@ -1,7 +1,9 @@
 import { checkboxState } from "../model/checkbox";
 import type { LocalDate } from "../model/localDate";
 import type { Status } from "../model/status";
-import { isWhitespaceUnit, trimBlanks } from "../text";
+import { lineRange, lineRanges, maxRange, substring } from "../syntax/ranges";
+import { trimBlanks } from "../text";
+import { isBlank, isNewlineCharacter } from "./characters";
 import { box, markerEnd, markerStart } from "./checkboxSyntax";
 import { setStatus } from "./completion";
 import { newTask } from "./newFile";
@@ -20,29 +22,14 @@ export interface Extract {
 }
 
 const isIndent = (code: number): boolean => code === 0x20 || code === 0x09;
-const isLineBreak = (code: number): boolean => (code >= 0x0a && code <= 0x0d) || code === 0x85 || code === 0x2028 || code === 0x2029;
 
-/** The end of the line holding `location`, its line ending included (`NSString.lineRange`). */
-function lineEnd(text: string, location: number): number {
-	let at = location;
-	while (at < text.length && !isLineBreak(text.charCodeAt(at))) at++;
-	if (at >= text.length) return text.length;
-	return text.charCodeAt(at) === 0x0d && text.charCodeAt(at + 1) === 0x0a ? at + 2 : at + 1;
-}
-
-/** The start of the line holding `location`. */
-function lineStart(text: string, location: number): number {
-	let at = location;
-	while (at > 0 && !isLineBreak(text.charCodeAt(at - 1))) at--;
-	if (at > 0 && text.charCodeAt(at) === 0x0a && text.charCodeAt(at - 1) === 0x0d) at--;
-	return at;
-}
-
-/** A line without its line ending. */
-function content(text: string, start: number, end: number): string {
-	let result = end;
-	while (result > start && isLineBreak(text.charCodeAt(result - 1))) result--;
-	return text.slice(start, result);
+/** A line without its line ending: `trimmingCharacters(in: .newlines)`. */
+function content(line: string): string {
+	let start = 0;
+	let end = line.length;
+	while (start < end && isNewlineCharacter(line.charAt(start))) start++;
+	while (end > start && isNewlineCharacter(line.charAt(end - 1))) end--;
+	return line.slice(start, end);
 }
 
 const indentLength = (line: string): number => {
@@ -72,8 +59,9 @@ function outdented(line: string, columns: number): string {
 /** Whether a ``` or ~~~ fence before UTF-16 `location` opens a code block that hasn't closed. */
 function isInCode(location: number, text: string): boolean {
 	let inCode = false;
-	for (const line of text.slice(0, location).split(/\r\n|[\n\r\u0085\u2028\u2029]/)) {
-		const trimmed = trimBlanks(line);
+	const before = text.slice(0, location);
+	for (const line of lineRanges(before)) {
+		const trimmed = trimBlanks(substring(before, line));
 		if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) inCode = !inCode;
 	}
 	return inCode;
@@ -84,9 +72,10 @@ function isInCode(location: number, text: string): boolean {
  * has no text after its box, is in a quote or callout, or is inside a ``` or ~~~ code block.
  */
 export function extract(location: number, text: string): Extract | null {
-	const lineBegin = lineStart(text, Math.min(location, text.length));
-	let end = lineEnd(text, lineBegin);
-	const line = content(text, lineBegin, end);
+	const lineAt = lineRange(text, location);
+	const lineBegin = lineAt.location;
+	let end = maxRange(lineAt);
+	const line = content(substring(text, lineAt));
 	const indent = indentColumns(line);
 	const start = markerStart(line);
 	if (start !== indentLength(line) || isInCode(lineBegin, text)) return null;
@@ -100,9 +89,9 @@ export function extract(location: number, text: string): Extract | null {
 	const children: string[] = [];
 	let at = end;
 	while (at < text.length) {
-		const next = lineEnd(text, at);
-		const child = content(text, at, next);
-		if ([...child].every((character) => isWhitespaceUnit(character.charCodeAt(0)))) {
+		const next = maxRange(lineRange(text, at));
+		const child = content(text.slice(at, next));
+		if (isBlank(child)) {
 			children.push("");
 		} else if (indentColumns(child) > indent) {
 			children.push(child);
@@ -113,8 +102,9 @@ export function extract(location: number, text: string): Extract | null {
 		at = next;
 	}
 	while (children[children.length - 1] === "") children.pop();
-	const outdent = Math.min(...children.filter((child) => child !== "").map(indentColumns), Infinity);
-	const body = children.map((child) => outdented(child, outdent === Infinity ? 0 : outdent)).join("\n");
+	const indents = children.filter((child) => child !== "").map(indentColumns);
+	const outdent = indents.length === 0 ? 0 : Math.min(...indents);
+	const body = children.map((child) => outdented(child, outdent)).join("\n");
 
 	const status: Status = state === "done" ? "Done" : state === "cancelled" ? "Cancelled" : found.marker === "/" ? "Doing" : "Not Started";
 	return { title, status, body, range: [lineBegin, end - lineBegin] };
@@ -134,7 +124,7 @@ export function extractAll(source: string): { text: string; extracts: Extract[] 
 			extracts.push(found);
 			text = text.slice(0, found.range[0]) + text.slice(found.range[0] + found.range[1]);
 		} else {
-			location = lineEnd(text, location);
+			location = maxRange(lineRange(text, location));
 		}
 	}
 	return { text, extracts };

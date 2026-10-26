@@ -6,6 +6,7 @@ import { readTag, type Tag } from "../src/core/model/tag";
 import { type Kind } from "../src/core/model/item";
 import { type Status } from "../src/core/model/status";
 import { parseItem } from "../src/core/parsing/parseItem";
+import { lineRange, maxRange } from "../src/core/syntax/ranges";
 import * as checklist from "../src/core/writing/checklistEditor";
 import * as completion from "../src/core/writing/completion";
 import { type DayOrder, parseDatePhrase } from "../src/core/writing/datePhrase";
@@ -100,7 +101,7 @@ function run(testCase: WriteCase, today: LocalDate): unknown {
 			);
 		case "SubtaskExtraction.extract": {
 			let location = 0;
-			for (let line = 0; line < (args.lineIndex as number); line++) location = input.indexOf("\n", location) + 1;
+			for (let line = 0; line < (args.lineIndex as number); line++) location = maxRange(lineRange(input, location));
 			return subtaskExtraction.extract(location, input);
 		}
 		case "SubtaskExtraction.extractAll":
