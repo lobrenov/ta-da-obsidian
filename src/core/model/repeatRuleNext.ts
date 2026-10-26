@@ -1,4 +1,4 @@
-import { daysIn, LocalDate } from "./localDate";
+import { daysIn, later, LocalDate } from "./localDate";
 import type { RepeatRule } from "./repeatRule";
 
 /** The dates a repeating task moves to. */
@@ -7,7 +7,6 @@ export interface NextDates {
 	deadline: LocalDate | null;
 }
 
-const maxDate = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) >= 0 ? a : b);
 const withinUntil = (rule: RepeatRule, date: LocalDate): boolean => rule.until === null || date.compare(rule.until) <= 0;
 const monthIndex = (date: LocalDate): number => date.year * 12 + date.month - 1;
 const checked = (date: LocalDate | null, days: number): LocalDate | null => (date === null ? null : date.checkedAddingDays(days));
@@ -54,7 +53,7 @@ export function ruleDates(rule: RepeatRule, anchor: LocalDate, from: LocalDate, 
 
 function regular(rule: RepeatRule, anchor: LocalDate, from: LocalDate): LocalDate | null {
 	const day = anchor.checkedAddingDays(1);
-	return day === null ? null : first(rule, maxDate(day, from), anchor, rule.interval);
+	return day === null ? null : first(rule, later(day, from), anchor, rule.interval);
 }
 
 function afterDone(rule: RepeatRule, done: LocalDate): LocalDate | null {

@@ -1,4 +1,5 @@
-import { LocalDate } from "./localDate";
+import { characters, isWhitespaceCharacter, lowercased } from "../writing/characters";
+import { daysIn, LocalDate } from "./localDate";
 
 export type Frequency = "day" | "weekday" | "week" | "month" | "year";
 
@@ -30,7 +31,6 @@ const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const fullDayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const fullMonthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-const monthLengths = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const inRange = (value: number, low: number, high: number): boolean => Number.isInteger(value) && value >= low && value <= high;
 
 /**
@@ -69,13 +69,13 @@ export class RepeatRule {
 		if (monthDay?.case === "nth" && !(inRange(monthDay.n, 1, 5) && inRange(monthDay.weekday, 1, 7))) return null;
 		if (monthDay?.case === "lastWeekday" && !inRange(monthDay.weekday, 1, 7)) return null;
 		const yearDate = all.yearDate;
-		if (yearDate && !(inRange(yearDate.month, 1, 12) && inRange(yearDate.day, 1, monthLengths[yearDate.month - 1] as number))) return null;
+		if (yearDate && !(inRange(yearDate.month, 1, 12) && inRange(yearDate.day, 1, daysIn(yearDate.month, 2000)))) return null;
 		return new RepeatRule(all);
 	}
 
 	/** Reads a phrase; null when it isn't a rule. */
 	static parse(text: string): RepeatRule | null {
-		const tokens = text.toLowerCase().replaceAll(",", " ").split(/\s+/).filter((token) => token !== "");
+		const tokens = words(text);
 		if (tokens.shift() !== "every") return null;
 		let unit = tokens.shift();
 		if (unit === undefined) return null;
@@ -86,7 +86,7 @@ export class RepeatRule {
 			interval = Number(unit);
 			unit = next;
 		}
-		const frequency = frequencies[unit];
+		const frequency = frequencies.get(unit);
 		if (frequency === undefined) return null;
 		const weekdays: number[] = [];
 		let monthDay: MonthDay | null = null;
@@ -157,17 +157,33 @@ export class RepeatRule {
 	}
 }
 
-const frequencies: Record<string, Frequency | undefined> = {
-	day: "day",
-	days: "day",
-	weekday: "weekday",
-	week: "week",
-	weeks: "week",
-	month: "month",
-	months: "month",
-	year: "year",
-	years: "year",
-};
+const frequencies = new Map<string, Frequency>([
+	["day", "day"],
+	["days", "day"],
+	["weekday", "weekday"],
+	["week", "week"],
+	["weeks", "week"],
+	["month", "month"],
+	["months", "month"],
+	["year", "year"],
+	["years", "year"],
+]);
+
+/** The lowercased words, without commas. */
+function words(text: string): string[] {
+	const list: string[] = [];
+	let word = "";
+	for (const character of characters(lowercased(text).replaceAll(",", " "))) {
+		if (isWhitespaceCharacter(character)) {
+			if (word !== "") list.push(word);
+			word = "";
+		} else {
+			word += character;
+		}
+	}
+	if (word !== "") list.push(word);
+	return list;
+}
 
 function weekday(name: string): number | null {
 	const index = dayNames.includes(name) ? dayNames.indexOf(name) : fullDayNames.indexOf(name);
@@ -199,7 +215,7 @@ function readYearDate(clause: string[]): YearDate | null {
 	if (clause.length !== 2 || name === undefined || dayText === undefined) return null;
 	const index = monthNames.includes(name) ? monthNames.indexOf(name) : fullMonthNames.indexOf(name);
 	const day = readNumber(dayText);
-	if (index < 0 || day === null || day < 1 || day > (monthLengths[index] as number)) return null;
+	if (index < 0 || day === null || day < 1 || day > (daysIn(index + 1, 2000))) return null;
 	return { month: index + 1, day };
 }
 

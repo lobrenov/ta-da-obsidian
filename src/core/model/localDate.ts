@@ -157,6 +157,8 @@ export function daysIn(month: number, year: number): number {
 	return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
+export const later = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) >= 0 ? a : b);
+
 function pad(value: number, width: number): string {
 	return String(value).padStart(width, "0");
 }

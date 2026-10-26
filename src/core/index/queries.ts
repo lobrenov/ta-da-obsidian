@@ -1,5 +1,5 @@
 import type { Item } from "../model/item";
-import { LocalDate, type ISOWeek } from "../model/localDate";
+import { later, LocalDate, type ISOWeek } from "../model/localDate";
 import { nextDates, ruleDates } from "../model/repeatRuleNext";
 import { isClosed } from "../model/status";
 import { linkTitle } from "../model/wikiLink";
@@ -135,6 +135,7 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 	const p = item.properties;
 	const rule = p.repeatRule?.rule;
 	if (p.kind !== "task" || !rule || from.compare(through) > 0) return [];
+	const checkedRule = rule;
 	let dates: LocalDate[] = [];
 	let anchor: LocalDate;
 	let known: LocalDate | null = null;
@@ -172,7 +173,7 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 		dates.push(...ruleDates(rule, anchor, low, high));
 	}
 	function stepped(): LocalDate | null | undefined {
-		return nextDates(rule as NonNullable<typeof rule>, anchor, null, anchor, later(anchor, today).addingDays(1))?.dueDate;
+		return nextDates(checkedRule, anchor, null, anchor, later(anchor, today).addingDays(1))?.dueDate;
 	}
 	const found = dates
 		.filter((date) => date.compare(low) >= 0 && date.compare(high) <= 0)
@@ -189,7 +190,6 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1));
 }
 
-const later = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) >= 0 ? a : b);
 const earlier = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) <= 0 ? a : b);
 
 /** Whether a task is in Today: open and due or at its deadline today or earlier, or completed (Done or Cancelled) today. */
