@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import type { App, TFile, Vault } from "obsidian";
 import type { SettingsFiles } from "./settingsData";
 
 /** The settings store's files, read through the vault's adapter so a file another app just wrote is read as it is on disk. */
@@ -18,4 +18,14 @@ export function vaultSettingsFiles(app: App): SettingsFiles {
 			await vault.adapter.write(path, change(null));
 		},
 	};
+}
+
+/** Creates the file at `path` with `text`, and the folders above it that don't exist. */
+export async function createIn(vault: Vault, folder: string, path: string, text: string): Promise<TFile> {
+	let made = "";
+	for (const part of folder.split("/").filter((name) => name !== "")) {
+		made = made === "" ? part : `${made}/${part}`;
+		if (!vault.getFolderByPath(made)) await vault.createFolder(made);
+	}
+	return vault.create(path, text);
 }

@@ -8,6 +8,7 @@ import { buildChip, buildTag } from "../header/buildHeader";
 import { element, icon } from "../header/dom";
 import { buildHeaderModel, type Chip, type TagChip } from "../header/headerModel";
 import { openDatePicker, openParentPicker, openStatusMenu, openTagPicker, type PickerHost } from "../header/pickers";
+import { createIn } from "../../vaultFiles";
 import { placeDraft } from "./place";
 
 const kinds: readonly Kind[] = ["task", "project", "area"];
@@ -180,12 +181,7 @@ export class NewTaskModal extends Modal {
 		const { vault, workspace } = this.app;
 		const placement = this.place();
 		try {
-			let path = "";
-			for (const part of placement.folder.split("/").filter((name) => name !== "")) {
-				path = path === "" ? part : `${path}/${part}`;
-				if (!vault.getFolderByPath(path)) await vault.createFolder(path);
-			}
-			const file = await vault.create(placement.path, draftText(this.draft, this.host.today()));
+			const file = await createIn(vault, placement.folder, placement.path, draftText(this.draft, this.host.today()));
 			this.close();
 			await workspace.getLeaf(false).openFile(file);
 		} catch (error) {

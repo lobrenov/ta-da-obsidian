@@ -25,15 +25,17 @@ const location = source.indexOf("- [ ] Book");
 const file = { path: "Ta Da/tasks/Trip.md", basename: "Trip" } as never;
 
 /** The log of writes, in order, against a vault that holds `taken` filenames in Ta Da/tasks. */
-function setup(options: { taken?: string[]; createFails?: boolean; current?: string; hostItem?: ReturnType<typeof makeItem> } = {}) {
+function setup(options: { taken?: string[]; noFolder?: boolean; applyFails?: boolean; createFails?: boolean; current?: string; hostItem?: ReturnType<typeof makeItem> } = {}) {
 	const log: string[] = [];
 	const created: { path: string; text: string }[] = [];
 	const opened: unknown[] = [];
 	const folder = { children: (options.taken ?? []).map((name) => ({ name })) };
+	let folderMade = !options.noFolder;
+	const createFolder = vi.fn(async (path: string) => void (folderMade = path === "Ta Da/tasks"));
 	const app = {
 		vault: {
-			getFolderByPath: () => folder,
-			createFolder: vi.fn(),
+			getFolderByPath: () => (folderMade ? folder : null),
+			createFolder,
 			create: vi.fn(async (path: string, text: string) => {
 				if (options.createFails) throw new Error("disk full");
 				log.push("create");
@@ -51,13 +53,14 @@ function setup(options: { taken?: string[]; createFails?: boolean; current?: str
 	const writer = {
 		apply: vi.fn(async (_file: unknown, edit: (text: string) => string | null) => {
 			log.push("remove");
+			if (options.applyFails) throw new Error("locked");
 			const next = edit(options.current ?? source);
 			result = next ?? undefined;
 			return next !== null;
 		}),
 	};
 	const host = { app, index, writer, today: () => today } as never;
-	return { host, log, created, opened, writer, removed: () => result };
+	return { host, log, createFolder, created, opened, writer, removed: () => result };
 }
 
 beforeEach(() => void (notices.length = 0));
@@ -94,7 +97,7 @@ describe("extractSubtask", () => {
 		const run = setup({ createFails: true });
 		await extractSubtask(run.host, file, source, location);
 		expect(run.writer.apply).not.toHaveBeenCalled();
-		expect(notices.map((notice) => notice.message)).toEqual(["Couldn't extract the subtask, so it's still in the file. disk full"]);
+		expect(notices.map((notice) => notice.message)).toEqual(["Couldn't extract the subtask: disk full"]);
 	});
 
 	it("keeps the lines and says so when they changed after the task was made", async () => {
@@ -105,11 +108,24 @@ describe("extractSubtask", () => {
 		expect(notices[0]?.message).toContain("its subtask changed meanwhile");
 	});
 
+	it("makes the tasks folder when it's missing", async () => {
+		const run = setup({ noFolder: true });
+		await extractSubtask(run.host, file, source, location);
+		expect(run.createFolder.mock.calls).toEqual([["Ta Da"], ["Ta Da/tasks"]]);
+		expect(run.log).toEqual(["create", "remove"]);
+	});
+
+	it("says the line couldn't be removed when the write fails", async () => {
+		const run = setup({ applyFails: true });
+		await extractSubtask(run.host, file, source, location);
+		expect(notices.map((notice) => notice.message)).toEqual(["“Book flights” was made a task, but its line couldn't be removed: locked"]);
+	});
+
 	it("opens the new task when the notice is clicked", async () => {
 		const run = setup();
 		await extractSubtask(run.host, file, source, location);
 		notices[0]?.click();
-		expect(run.opened).toEqual([run.created[0] && expect.objectContaining({ path: "Ta Da/tasks/Book flights.md" })]);
+		expect(run.opened).toEqual([expect.objectContaining({ path: "Ta Da/tasks/Book flights.md" })]);
 	});
 
 	it("does nothing on a line that isn't a subtask", async () => {
