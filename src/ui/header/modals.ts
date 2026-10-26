@@ -4,12 +4,12 @@ import type { VaultIndex } from "../../core/index/vaultIndex";
 import type { Item } from "../../core/model/item";
 import { LocalDate } from "../../core/model/localDate";
 import { RepeatRule } from "../../core/model/repeatRule";
+import { firstDate } from "../../core/model/repeatRuleNext";
 import { parseDatePhrase, type DayOrder } from "../../core/writing/datePhrase";
 import { type ParentChoice, type TagChoice } from "./choices";
 import { element, icon } from "./dom";
-import { dateLabel } from "./headerModel";
+import { dateLabel, weekdayDayMonth } from "./headerModel";
 import { monthTitle } from "../dates";
-import { anchored, ending, firstDate, spelledRule, withWhenDone } from "../repeatRules";
 import { monthGrid, weekdayLetter, weekdayOrder } from "./monthGrid";
 
 /** The project or area menu: a filtered list with None first and the current choice ticked. */
@@ -119,6 +119,17 @@ export class DateModal extends Modal {
 		const doc = this.contentEl.ownerDocument;
 		this.modalEl.classList.add("ta-da-date-modal");
 		const root = this.contentEl;
+		this.scope.register([], "Escape", () => {
+			if (this.input.value !== "") {
+				this.input.value = "";
+				this.type("");
+			} else if (this.ends) {
+				this.switchView(false);
+			} else {
+				this.close();
+			}
+			return false;
+		});
 
 		const field = element(doc, "div", "ta-da-date-field");
 		this.fieldIcon = field.appendChild(element(doc, "span", "ta-da-date-field-icon"));
@@ -184,12 +195,12 @@ export class DateModal extends Modal {
 
 	/** The rule the month previews: the displayed one, with the end being typed in the Ends view. */
 	private get previewRule(): RepeatRule | null {
-		return this.ends && this.rule && this.typed ? ending(this.rule, this.typed) : this.displayedRule;
+		return this.ends && this.rule && this.typed ? this.rule.ending(this.typed) : this.displayedRule;
 	}
 
 	/** Where a rule starts, ignoring its end: the due date, else the deadline, else its first date. */
 	private startDate(rule: RepeatRule): LocalDate | null {
-		return this.current ?? this.repeat?.item.properties.deadline ?? firstDate(ending(rule, null), this.today);
+		return this.current ?? this.repeat?.item.properties.deadline ?? firstDate(rule.ending(null), this.today);
 	}
 
 	/** Where a rule starts; null when its end is before that. */
@@ -205,11 +216,6 @@ export class DateModal extends Modal {
 		return start !== null && day.compare(start) >= 0;
 	}
 
-	/** A date for the middle of a sentence. */
-	private inline(date: LocalDate): string {
-		return dateLabel(date, this.today).replace("Today", "today");
-	}
-
 	private type(phrase: string): void {
 		this.typed = null;
 		this.typedRule = null;
@@ -219,7 +225,7 @@ export class DateModal extends Modal {
 			const rule = RepeatRule.parse(phrase);
 			const start = rule && this.start(rule);
 			this.typedRule = start ? rule : null;
-			this.note.textContent = start ? `From ${this.inline(start)}` : "No match";
+			this.note.textContent = start ? `From ${weekdayDayMonth(start)}` : "No match";
 			this.month = (this.shownDate ?? this.today).startOfMonth;
 		} else {
 			this.typed = parseDatePhrase(phrase, this.today, this.dayOrder, this.firstWeekday);
@@ -277,7 +283,7 @@ export class DateModal extends Modal {
 					["Next week", this.today.nextWeek(this.firstWeekday)],
 				];
 		for (const [label, date] of days) {
-			const button = element(doc, "button", "ta-da-date-quick-button", label, { type: "button", title: date ? dateLabel(date, this.today) : "No end date" });
+			const button = element(doc, "button", "ta-da-date-quick-button", label, { type: "button", title: date ? (this.ends ? weekdayDayMonth(date) : dateLabel(date, this.today)) : "No end date" });
 			button.disabled = !this.canPick(date);
 			button.addEventListener("click", () => this.pick(date));
 			this.quick.appendChild(button);
@@ -334,7 +340,7 @@ export class DateModal extends Modal {
 				if (date.compare(first) >= 0 && date.compare(last) <= 0) days.add(date.toString());
 			}
 		}
-		const written = anchored(rule, anchor ?? this.today);
+		const written = rule.anchored(anchor ?? this.today);
 		const task: Item = { ...item, properties: { ...p, dueDate, repeatRule: { text: written.phrase, rule: written } } };
 		for (const entry of occurrences(index, task, first, last, this.today)) {
 			if (!dueDate || entry.kind === "due") days.add(entry.date.toString());
@@ -377,20 +383,20 @@ export class DateModal extends Modal {
 		const until = this.rule.until;
 		const row = this.section.appendChild(element(doc, "button", "ta-da-repeat-row ta-da-repeat-ends", undefined, { type: "button", "aria-label": "Ends" }));
 		row.appendChild(element(doc, "span", "", "Ends"));
-		row.appendChild(element(doc, "span", `ta-da-repeat-value${until ? "" : " is-never"}`, until ? dateLabel(until, this.today) : "Never"));
+		row.appendChild(element(doc, "span", `ta-da-repeat-value${until ? "" : " is-never"}`, until ? weekdayDayMonth(until) : "Never"));
 		row.appendChild(icon(doc, "chevronRight", 12, 2.2));
 		row.addEventListener("click", () => this.switchView(true));
 	}
 
 	/** The rule spelled out, with its end as a date. */
 	private spelled(rule: RepeatRule): string {
-		return spelledRule(rule, (date) => this.inline(date));
+		return rule.description(weekdayDayMonth);
 	}
 
 	/** Switches the rule to count from completion, or back to its schedule. The picker stays open. */
 	private setWhenDone(whenDone: boolean): void {
 		if (!this.rule || !this.repeat) return;
-		this.rule = withWhenDone(this.rule, whenDone);
+		this.rule = this.rule.withWhenDone(whenDone);
 		this.repeat.set(this.rule, false);
 		this.drawGrid();
 		this.drawSection();
@@ -404,7 +410,7 @@ export class DateModal extends Modal {
 
 	/** Ends the repeat on `day`, or never for null. A day before the repeat starts is ignored. */
 	private setEnd(day: LocalDate | null): void {
-		if (this.rule && this.canPick(day)) this.setRule(ending(this.rule, day));
+		if (this.rule && this.canPick(day)) this.setRule(this.rule.ending(day));
 	}
 
 	private pick(date: LocalDate | null): void {

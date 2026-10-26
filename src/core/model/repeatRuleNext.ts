@@ -35,6 +35,20 @@ export function nextDates(
 }
 
 /**
+ * The first date a task with no dates would be due: the first day of a rule that names its days (weekdays, a day of the
+ * month, a date) on or after `today`, else `today`. Null when `until` has passed.
+ */
+export function firstDate(rule: RepeatRule, today: LocalDate): LocalDate | null {
+	const namesDay =
+		rule.frequency === "weekday" ||
+		(rule.frequency === "week" && rule.weekdays.length > 0) ||
+		(rule.frequency === "month" && rule.monthDay !== null) ||
+		(rule.frequency === "year" && rule.yearDate !== null);
+	const date = namesDay ? first(rule, today, today, 1) : today;
+	return date && withinUntil(rule, date) ? date : null;
+}
+
+/**
  * The dates of a regular rule after `anchor`, on or after `from` and through `through`, each counted from `anchor`
  * rather than from the one before; stops at `until`.
  */

@@ -42,10 +42,15 @@ export interface ParentLookup {
 	parentOf(item: Item): Item | null;
 }
 
+/** `Tue 6 Oct`: never `Today`, never the year. */
+export function weekdayDayMonth(date: LocalDate): string {
+	return `${weekdayNames[date.weekday - 1]} ${date.day} ${monthNames[date.month - 1]}`;
+}
+
 /** `Tue 6 Oct`, with the year when it isn't the current one; `Today` for today. */
 export function dateLabel(date: LocalDate, today: LocalDate): string {
 	if (date.equals(today)) return "Today";
-	const base = `${weekdayNames[date.weekday - 1]} ${date.day} ${monthNames[date.month - 1]}`;
+	const base = weekdayDayMonth(date);
 	return date.year === today.year ? base : `${base} ${date.year}`;
 }
 

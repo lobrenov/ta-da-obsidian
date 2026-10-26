@@ -33,6 +33,7 @@ vi.mock("obsidian", () => ({
 			},
 		});
 		closed = false;
+		scope = { keys: new Map<string, () => boolean>(), register(_mods: string[], key: string, handler: () => boolean) { this.keys.set(key, handler); } };
 		constructor(public app: unknown) {}
 		open(): void {
 			(this as unknown as { onOpen(): void }).onOpen();
@@ -68,6 +69,7 @@ function opened(frontmatter: string, due: string | null = null, repeating = true
 	const input = root.querySelector<HTMLInputElement>(".ta-da-date-input") as HTMLInputElement;
 	return {
 		modal: modal as unknown as { closed: boolean; titleEl: HTMLElement },
+		escape: () => (modal as unknown as { scope: { keys: Map<string, () => boolean> } }).scope.keys.get("Escape")?.(),
 		root,
 		input,
 		type(text: string) {
@@ -116,6 +118,13 @@ describe("the date picker with a Repeat section", () => {
 		expect(picker.root.querySelector(".ta-da-repeat-rule")?.classList.contains("is-preview")).toBe(true);
 		expect(picker.days(".is-occurrence")).toEqual(["5", "12", "19", "26"]);
 		expect(picker.root.querySelector(".ta-da-repeat-row")).toBeNull();
+	});
+
+	it("previews a rule on a task with no dates from its first day", () => {
+		const picker = opened("");
+		picker.type("every mon");
+		expect(picker.days(".is-occurrence")).toEqual(["5", "12", "19", "26"]);
+		expect(picker.days(".is-occurrence")).not.toContain("2");
 	});
 
 	it("says no match for a phrase that isn't a rule", () => {
@@ -183,6 +192,33 @@ describe("the date picker with a Repeat section", () => {
 		expect(sets).toEqual([{ rule: "every week when done", closing: false, until: undefined }]);
 		expect(picker.modal.closed).toBe(false);
 		expect(picker.text(".ta-da-repeat-rule")).toBe("Every week when done");
+	});
+});
+
+describe("Esc", () => {
+	it("clears the typed phrase, then leaves the Ends view, then closes", () => {
+		const picker = opened("dueDate: 2026-10-05\nrepeat: every week on Mon", "2026-10-05");
+		picker.click(".ta-da-repeat-ends");
+		picker.type("20 dec");
+		picker.escape();
+		expect(picker.input.value).toBe("");
+		expect(picker.text(".ta-da-date-note")).toBe("");
+		expect(picker.modal.titleEl.textContent).toBe("Repeat ends");
+		picker.escape();
+		expect(picker.modal.titleEl.textContent).toBe("Due date");
+		expect(picker.modal.closed).toBe(false);
+		picker.escape();
+		expect(picker.modal.closed).toBe(true);
+		expect(sets).toEqual([]);
+	});
+
+	it("clears a typed rule first", () => {
+		const picker = opened("");
+		picker.type("every mon");
+		picker.escape();
+		expect(picker.root.querySelector(".ta-da-repeat-rule")).toBeNull();
+		expect(picker.days(".is-occurrence")).toEqual([]);
+		expect(picker.modal.closed).toBe(false);
 	});
 });
 

@@ -159,11 +159,47 @@ export class RepeatRule {
 
 	/** The canonical form: `until` before `when done`, three-letter days and months, `1st` to `5th`. */
 	get phrase(): string {
-		const every = { day: "day", weekday: "weekday", week: "week", month: "month", year: "year" }[this.frequency];
-		let words = this.frequency === "weekday" ? "every weekday" : this.interval === 1 ? `every ${every}` : `every ${this.interval} ${every}s`;
+		return this.words("every", (weekday) => capitalized(dayNames[weekday - 1] as string), (month) => capitalized(monthNames[month - 1] as string), (names) => names.join(", "), (date) => date.toString());
+	}
+
+	/** The rule with a month or year rule's day taken from `date` when it names none, as Ta Da writes it. */
+	anchored(date: LocalDate): RepeatRule {
+		if (this.frequency === "month" && this.monthDay === null) return this.changing({ monthDay: { case: "day", day: date.day } });
+		if (this.frequency === "year" && this.yearDate === null) return this.changing({ yearDate: { month: date.month, day: date.day } });
+		return this;
+	}
+
+	/** The rule ending on `until`, or never for null. */
+	ending(until: LocalDate | null): RepeatRule {
+		return this.changing({ until });
+	}
+
+	/** The rule counting from completion, or on its schedule. */
+	withWhenDone(whenDone: boolean): RepeatRule {
+		return this.changing({ whenDone });
+	}
+
+	/** The rule spelled out, with `format` writing the end date: "Every week on Monday", "Every month on the 2nd Tuesday until Sun 20 Dec when done". */
+	description(format: (date: LocalDate) => string): string {
+		return this.words(
+			"Every",
+			(weekday) => capitalized(fullDayNames[weekday - 1] as string),
+			(month) => capitalized(fullMonthNames[month - 1] as string),
+			(names) => (names.length === 1 ? (names[0] as string) : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`),
+			format,
+		);
+	}
+
+	private changing(changes: Partial<RepeatRuleFields>): RepeatRule {
+		return new RepeatRule({ ...this, ...changes });
+	}
+
+	/** The rule spelled out, its names, day list and end date written as given. */
+	private words(every: string, dayName: (weekday: number) => string, monthName: (month: number) => string, list: (names: string[]) => string, format: (date: LocalDate) => string): string {
+		const unit = this.frequency;
+		let words = unit === "weekday" ? `${every} weekday` : this.interval === 1 ? `${every} ${unit}` : `${every} ${this.interval} ${unit}s`;
 		if (this.frequency === "week" && this.weekdays.length > 0) {
-			const names = [2, 3, 4, 5, 6, 7, 1].filter((weekday) => this.weekdays.includes(weekday)).map(dayName);
-			words += ` on ${names.join(", ")}`;
+			words += ` on ${list([2, 3, 4, 5, 6, 7, 1].filter((weekday) => this.weekdays.includes(weekday)).map(dayName))}`;
 		} else if (this.frequency === "month" && this.monthDay) {
 			const day = this.monthDay;
 			if (day.case === "day") words += ` on the ${ordinal(day.day)}`;
@@ -171,9 +207,9 @@ export class RepeatRule {
 			else if (day.case === "nth") words += ` on the ${ordinal(day.n)} ${dayName(day.weekday)}`;
 			else words += ` on the last ${dayName(day.weekday)}`;
 		} else if (this.frequency === "year" && this.yearDate) {
-			words += ` on ${capitalized(monthNames[this.yearDate.month - 1] as string)} ${this.yearDate.day}`;
+			words += ` on ${monthName(this.yearDate.month)} ${this.yearDate.day}`;
 		}
-		if (this.until) words += ` until ${this.until.toString()}`;
+		if (this.until) words += ` until ${format(this.until)}`;
 		if (this.whenDone) words += " when done";
 		return words;
 	}
@@ -249,7 +285,6 @@ function readNumber(token: string): number | null {
 }
 
 const capitalized = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
-const dayName = (weekday: number): string => capitalized(dayNames[weekday - 1] as string);
 
 function ordinal(n: number): string {
 	if (n >= 11 && n <= 13) return `${n}th`;
