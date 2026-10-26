@@ -1,10 +1,8 @@
 import { type App, Notice, type TFile } from "obsidian";
 import type { VaultIndex } from "../core/index/vaultIndex";
 import type { LocalDate } from "../core/model/localDate";
-import { filename } from "../core/writing/fileNaming";
 import { type Extract, extract, taskText } from "../core/writing/subtaskExtraction";
-import { taskFolder } from "../core/storage/vault";
-import { createIn } from "../vaultFiles";
+import { createTask, message } from "../vaultFiles";
 import type { Writer } from "../Writer";
 
 /** What Extract to task needs from the plugin. */
@@ -14,8 +12,6 @@ export interface ExtractHost {
 	writer: Writer;
 	today: () => LocalDate;
 }
-
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /**
  * Extract to task: the subtask on the line holding `location` in `file`'s `text` becomes a task file, filed under the
@@ -33,8 +29,7 @@ export async function extractSubtask(host: ExtractHost, file: TFile, text: strin
 
 	let created: TFile;
 	try {
-		const names = (vault.getFolderByPath(taskFolder)?.children ?? []).map((child) => child.name);
-		created = await createIn(vault, taskFolder, `${taskFolder}/${filename(found.title, names)}`, content);
+		created = await createTask(vault, found.title, content);
 	} catch (error) {
 		new Notice(`Couldn't extract the subtask: ${message(error)}`);
 		return;

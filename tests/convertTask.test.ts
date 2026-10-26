@@ -24,6 +24,7 @@ interface Options {
 	createFailsAt?: number;
 	rewriteFails?: boolean;
 	removeFails?: boolean;
+	restoreFails?: boolean;
 	projects?: string[];
 	tasks?: string[];
 }
@@ -38,11 +39,13 @@ function setup(options: Options = {}) {
 	const taskFolder = { children: (options.tasks ?? []).map((name) => ({ name })) };
 	let applies = 0;
 	const writer = {
+		read: vi.fn(async () => state.text),
 		apply: vi.fn(async (_file: unknown, edit: (text: string) => string | null) => {
 			applies++;
 			const step = log.includes("rename") ? "remove" : applies === 1 ? "rewrite" : "restore";
 			log.push(step);
 			if (step === "rewrite" && options.rewriteFails) throw new Error("locked");
+			if (step === "restore" && options.restoreFails) throw new Error("locked");
 			if (step === "remove" && options.removeFails) throw new Error("locked");
 			const next = edit(state.text);
 			if (next === null || next === state.text) return false;
@@ -131,6 +134,38 @@ describe("convertToProject", () => {
 		expect(run.state.text).toBe(task);
 		expect(run.created).toEqual([]);
 		expect(notices).toEqual(["Couldn't convert “Trip” to a project: exists It's still a task."]);
+	});
+
+	it("says the file stays a project when putting the text back fails or finds it changed", async () => {
+		const failed = setup({ renameFails: true, restoreFails: true });
+		await convertToProject(failed.host, failed.file, choice);
+		expect(notices[0]).toBe("Couldn't convert “Trip” to a project: exists Its file was changed to a project but not moved, and putting it back failed: locked");
+		const changed = setup({ renameFails: true });
+		changed.writer.apply.mockImplementationOnce(async (_file, edit) => {
+			changed.state.text = edit(changed.state.text) ?? "";
+			return true;
+		});
+		changed.writer.apply.mockImplementationOnce(async () => false);
+		await convertToProject(changed.host, changed.file, choice);
+		expect(notices[1]).toBe("Couldn't convert “Trip” to a project: exists Its file was changed to a project but not moved.");
+	});
+
+	it("reads the subtasks from the writer, so an open editor's text counts", async () => {
+		const run = setup({ text: "---\ntype: task\n---\n" });
+		run.writer.read.mockImplementation(async () => "---\ntype: project\n---\n- [ ] Only in the editor\n");
+		await convertToProject(run.host, run.file, choice);
+		expect(run.created.map((made) => made.path)).toEqual(["Ta Da/tasks/Only in the editor.md"]);
+	});
+
+	it("keeps the lines when a box flips while the tasks are made", async () => {
+		const run = setup();
+		run.app.vault.create.mockImplementationOnce(async (path: string) => {
+			run.state.text = run.state.text.replace("- [x] Pack", "- [ ] Pack");
+			return { path };
+		});
+		await convertToProject(run.host, run.file, choice);
+		expect(run.state.text).toContain("- [ ] Pack");
+		expect(notices).toEqual(["The subtasks of “Trip” were made tasks, but its file changed meanwhile, so they're still in it."]);
 	});
 
 	it("stops without moving when the frontmatter can't be written", async () => {

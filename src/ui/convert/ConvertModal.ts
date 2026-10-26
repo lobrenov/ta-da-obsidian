@@ -17,7 +17,6 @@ export class ConvertModal extends Modal {
 	private choice: ConvertChoice;
 	private chipsEl!: HTMLElement;
 	private fileEl!: HTMLElement;
-	private converting = false;
 
 	constructor(
 		app: App,
@@ -48,18 +47,12 @@ export class ConvertModal extends Modal {
 		}
 
 		this.fileEl = this.contentEl.appendChild(element(doc, "div", "ta-da-new-file"));
-		if (this.app.vault.getConfig("alwaysUpdateLinks") === false) {
-			const warning = this.contentEl.appendChild(element(doc, "div", "ta-da-new-warning"));
-			warning.appendChild(icon(doc, "alert", 13));
-			warning.appendChild(element(doc, "span", "", "Obsidian isn't set to update internal links, so links to it won't follow it."));
-		}
-
 		const footer = this.contentEl.appendChild(element(doc, "div", "ta-da-new-footer"));
 		footer.appendChild(element(doc, "span", "ta-da-grow"));
 		const cancel = footer.appendChild(element(doc, "button", "", "Cancel", { type: "button" }));
 		cancel.addEventListener("click", () => this.close());
 		const convert = footer.appendChild(element(doc, "button", "mod-cta", "Convert to project", { type: "button" }));
-		convert.addEventListener("click", () => void this.convert(convert));
+		convert.addEventListener("click", () => void this.convert());
 		this.draw();
 		// After `Modal.open`, which focuses the first button once `onOpen` returns.
 		this.contentEl.win.setTimeout(() => convert.focus());
@@ -103,10 +96,7 @@ export class ConvertModal extends Modal {
 		}
 	}
 
-	private async convert(button: HTMLButtonElement): Promise<void> {
-		if (this.converting) return;
-		this.converting = true;
-		button.disabled = true;
+	private async convert(): Promise<void> {
 		this.close();
 		if (await convertToProject(this.host, this.file, this.choice)) await this.app.workspace.getLeaf(false).openFile(this.file);
 	}
@@ -117,7 +107,7 @@ export async function openConvertModal(host: ConvertHost & PickerHost, file: TFi
 	const defaults = convertDefaults(host.index, file.path);
 	if (!defaults) return;
 	try {
-		new ConvertModal(host.app, host, file, await host.app.vault.read(file), defaults).open();
+		new ConvertModal(host.app, host, file, await host.writer.read(file), defaults).open();
 	} catch (error) {
 		new Notice(`Couldn't open Convert to project: ${error instanceof Error ? error.message : String(error)}`);
 	}

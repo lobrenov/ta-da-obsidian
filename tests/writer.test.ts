@@ -160,4 +160,11 @@ describe("Writer", () => {
 		await fake.writer.rename(file as never, "a b");
 		expect(fake.renameFile).toHaveBeenCalledWith(file, "tasks/a b 2.md");
 	});
+
+	it("reads an open file from its editor, else from the vault", async () => {
+		const file = makeFile("Ta Da/tasks/A.md");
+		const view = Object.assign(newView(), { file, editor: { getValue: () => "editor" } });
+		expect(await makeApp({ active: view }).writer.read(file as never)).toBe("editor");
+		expect(await makeApp().writer.read(file as never)).toBe("base");
+	});
 });

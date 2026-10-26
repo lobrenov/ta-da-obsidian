@@ -26,6 +26,11 @@ export class Writer {
 		});
 	}
 
+	/** The file's text as the user sees it: the open editor's, which can be ahead of the disk, else the file's. */
+	read(file: TFile): Promise<string> {
+		return this.enqueue(file, async () => this.openView(file)?.editor.getValue() ?? this.app.vault.read(file));
+	}
+
 	/** Renames a file to a title's filename, through `FileManager` so links follow. Resolves to the file's path. */
 	rename(file: TFile, title: string): Promise<string> {
 		return this.enqueue(file, async () => {

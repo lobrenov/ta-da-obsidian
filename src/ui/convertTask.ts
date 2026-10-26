@@ -7,9 +7,9 @@ import { splitFrontmatter } from "../core/parsing/frontmatterSplitter";
 import { filename } from "../core/writing/fileNaming";
 import { text as convertedText } from "../core/writing/noteConversion";
 import type { Parent } from "../core/writing/parent";
-import { extractAll, taskText } from "../core/writing/subtaskExtraction";
-import { projectFolder, taskFolder } from "../core/storage/vault";
-import { createIn, ensureFolder } from "../vaultFiles";
+import { type Extract, extractAll, taskText } from "../core/writing/subtaskExtraction";
+import { projectFolder } from "../core/storage/vault";
+import { createTask, ensureFolder, message } from "../vaultFiles";
 import type { Writer } from "../Writer";
 
 /** What Convert to project needs from the plugin. */
@@ -27,8 +27,6 @@ export interface ConvertChoice {
 	/** Make each of the task's subtasks a task under the project. */
 	extractSubtasks: boolean;
 }
-
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /** How many subtasks `text`'s body has that converting could make tasks. */
 export const subtaskCount = (text: string): number => extractAll(splitFrontmatter(text).body).extracts.length;
@@ -76,8 +74,11 @@ export async function convertToProject(host: ConvertHost, file: TFile, choice: C
 		await ensureFolder(vault, projectFolder);
 		await app.fileManager.renameFile(file, projectPath(host, file));
 	} catch (error) {
-		await writer.apply(file, (current) => (current === converted ? original : null)).catch(() => undefined);
-		new Notice(`Couldn't convert “${title}” to a project: ${message(error)} It's still a task.`);
+		const restored = await writer.apply(file, (current) => (current === converted ? original : null)).then(
+			(done) => (done ? "It's still a task." : "Its file was changed to a project but not moved."),
+			(failure: unknown) => `Its file was changed to a project but not moved, and putting it back failed: ${message(failure)}`,
+		);
+		new Notice(`Couldn't convert “${title}” to a project: ${message(error)} ${restored}`);
 		return false;
 	}
 
@@ -89,15 +90,15 @@ export async function convertToProject(host: ConvertHost, file: TFile, choice: C
 async function extractSubtasks(host: ConvertHost, file: TFile): Promise<void> {
 	const { vault } = host.app;
 	const project = titleOfPath(file.path);
-	const split = splitFrontmatter(await vault.read(file));
+	const split = splitFrontmatter(await host.writer.read(file));
 	const { extracts } = extractAll(split.body);
 	if (extracts.length === 0) return;
-	const same = (text: string): boolean => extractAll(splitFrontmatter(text).body).extracts.map((found) => found.title).join("\n") === extracts.map((found) => found.title).join("\n");
+	const key = (list: Extract[]): string => JSON.stringify(list.map(({ title, status, body }) => [title, status, body]));
+	const same = (text: string): boolean => key(extractAll(splitFrontmatter(text).body).extracts) === key(extracts);
 
 	try {
 		for (const found of extracts) {
-			const names = (vault.getFolderByPath(taskFolder)?.children ?? []).map((child) => child.name);
-			await createIn(vault, taskFolder, `${taskFolder}/${filename(found.title, names)}`, taskText(found, project, null, host.today()));
+			await createTask(vault, found.title, taskText(found, project, null, host.today()));
 		}
 	} catch (error) {
 		new Notice(`Couldn't make the subtasks of “${project}” its tasks: ${message(error)} They stay in its file.`);
