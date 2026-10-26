@@ -1724,8 +1724,8 @@
 	color: var(--color-orange);
 }
 
-.ta-da-navigator .ta-da-glyphs .ta-da-meta-icon {
-	gap: 4px;
+.ta-da-navigator .ta-da-glyphs .ta-da-repeat-next {
+	margin-inline-start: -2px;
 	font-size: var(--font-ui-smaller);
 }
 

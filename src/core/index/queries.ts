@@ -3,6 +3,7 @@ import { later, LocalDate, type ISOWeek } from "../model/localDate";
 import { nextDates, ruleDates } from "../model/repeatRuleNext";
 import { isClosed } from "../model/status";
 import { linkTitle } from "../model/wikiLink";
+import { rolloverDay } from "./repeatMove";
 import { nextForCompleted } from "../writing/recurrence";
 import { dailyNote, type DailyNoteNames, defaultDailyNoteNames, openCheckboxCount } from "./dailyNotes";
 import { byDate, byTitle, type VaultIndex } from "./vaultIndex";
@@ -144,7 +145,7 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 	let offset = p.dueDate && p.deadline ? p.dueDate.daysTo(p.deadline) : 0;
 	let earliest = from;
 	if (isClosed(p.status)) {
-		const rollover = p.completedDate === null || p.completedDate.compare(today) < 0 ? today : today.addingDays(1);
+		const rollover = rolloverDay(p.completedDate, today);
 		const closed = isClosed(index.projectOf(item)?.properties.status ?? "Not Started");
 		const next = nextForCompleted(item, rollover, closed);
 		const date = next && (next.dueDate ?? next.deadline);

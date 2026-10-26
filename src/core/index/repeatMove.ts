@@ -10,12 +10,6 @@ export type RepeatMove =
 	/** The series ends: `until` or the task's project ends it, so the task logs. */
 	| { case: "ends" };
 
-/** Whether two moves are the same. */
-export function sameMove(a: RepeatMove | null, b: RepeatMove | null): boolean {
-	if (a === null || b === null) return a === b;
-	return a.case === "ends" ? b.case === "ends" : b.case === "moves" && a.to.equals(b.to);
-}
-
 /** The day logging moves a task completed on `completedDate` forward on: `today`, or the day after for a task completed today. */
 export function rolloverDay(completedDate: LocalDate | null, today: LocalDate): LocalDate {
 	return completedDate === null || completedDate.compare(today) < 0 ? today : today.addingDays(1);

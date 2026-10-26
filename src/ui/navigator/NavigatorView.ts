@@ -802,7 +802,7 @@ export class NavigatorView extends ItemView {
 				const repeat = metaIcon(glyphs, "repeat");
 				repeat.setAttribute("aria-label", row.repeat.tooltip);
 				repeat.setAttribute("title", row.repeat.tooltip);
-				if (row.repeat.next) repeat.appendText(row.repeat.next);
+				if (row.repeat.next) glyphs.createSpan({ cls: "ta-da-repeat-next", text: row.repeat.next, attr: { title: row.repeat.tooltip } });
 			}
 			if (row.tags > 0) metaIcon(glyphs, "tag", "accent").setAttribute("aria-label", row.tags === 1 ? "1 tag" : `${row.tags} tags`);
 		}

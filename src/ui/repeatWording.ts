@@ -2,7 +2,7 @@ import { type RepeatMove, repeatMove } from "../core/index/repeatMove";
 import type { Item, Properties, Repeat } from "../core/model/item";
 import type { LocalDate } from "../core/model/localDate";
 import type { Status } from "../core/model/status";
-import { relativeLabel, weekdayDayMonth } from "./navigator/dates";
+import { capitalised, relativeLabel, weekdayDayMonth } from "./navigator/dates";
 
 /** What the chips, rows and status menus say about a repeating task. */
 
@@ -41,8 +41,7 @@ export function statusContext(
 /** A row's text after the repeat glyph for a done or skipped task waiting to move: `Tomorrow` or `Ended`. */
 export function rowNext(move: RepeatMove, today: LocalDate): string {
 	if (move.case === "ends") return "Ended";
-	const text = day(move.to, today);
-	return text.slice(0, 1).toUpperCase() + text.slice(1);
+	return capitalised(day(move.to, today));
 }
 
 /** `Repeats every week on Monday until Sun 20 Dec`. */
