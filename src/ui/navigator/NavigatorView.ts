@@ -722,7 +722,8 @@ export class NavigatorView extends ItemView {
 				this.dayRow(parent, row);
 				return;
 			case "occurrence":
-				this.occurrenceRow(parent, row);
+				el = this.occurrenceRow(parent, row);
+				this.track(row.open, el);
 				return;
 			case "periodNote":
 				el = this.periodNoteRow(parent, row);
@@ -731,9 +732,7 @@ export class NavigatorView extends ItemView {
 		}
 		if (row.path === null) return;
 		const path = row.path;
-		const els = this.rowEls.get(path) ?? [];
-		els.push(el);
-		this.rowEls.set(path, els);
+		this.track(path, el);
 		el.addEventListener("click", (event) => this.openPath(path, event));
 	}
 
@@ -753,8 +752,15 @@ export class NavigatorView extends ItemView {
 		el.addEventListener("click", () => this.setAgenda({ selection: { kind: "day", date: row.date } }));
 	}
 
+	/** Keeps a row's element under its file's path, so selecting the path highlights it. */
+	private track(path: string, el: HTMLElement): void {
+		const els = this.rowEls.get(path) ?? [];
+		els.push(el);
+		this.rowEls.set(path, els);
+	}
+
 	/** A coming occurrence in the Repeats group: a muted row with a box that can't be ticked. A click opens the task. */
-	private occurrenceRow(parent: HTMLElement, row: OccurrenceRowModel): void {
+	private occurrenceRow(parent: HTMLElement, row: OccurrenceRowModel): HTMLElement {
 		const el = parent.createDiv({ cls: "ta-da-row is-occurrence", attr: { role: "button", tabindex: "-1", "aria-label": row.label, title: row.tooltip } });
 		el.createSpan({ cls: "ta-da-occurrence-box", attr: { "aria-hidden": "true" } });
 		if (row.estimated) el.createSpan({ cls: "ta-da-occurrence-pill", text: "≈", attr: { "aria-hidden": "true" } });
@@ -763,6 +769,7 @@ export class NavigatorView extends ItemView {
 		metaIcon(el, "repeat").setAttribute("aria-hidden", "true");
 		if (row.place) el.createSpan({ cls: "ta-da-row-place", text: row.place, attr: { "aria-hidden": "true" } });
 		el.addEventListener("click", (event) => this.openPath(row.open, event));
+		return el;
 	}
 
 	/** A day's or week's note: its name, file and first paragraph; or, with no note, the row that creates it. */

@@ -188,15 +188,18 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 		});
 	return found
 		.filter((entry) => entry.date.compare(from) >= 0 && entry.date.compare(through) <= 0)
-		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1));
+		.sort(byDateThenKind);
 }
+
+/** By date, then due before deadline. */
+const byDateThenKind = (a: Occurrence, b: Occurrence): number => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1);
 
 /** The occurrences of every task whose rule reads, from `from` through `through`, by date, due before deadline, then title. */
 export function allOccurrences(index: VaultIndex, from: LocalDate, through: LocalDate, today: LocalDate): Occurrence[] {
 	return index.tasks
 		.filter((task) => task.properties.repeatRule?.rule)
 		.flatMap((task) => occurrences(index, task, from, through, today))
-		.sort((a, b) => a.date.compare(b.date) || (a.kind === b.kind ? 0 : a.kind === "due" ? -1 : 1) || byTitle(a.item, b.item));
+		.sort((a, b) => byDateThenKind(a, b) || byTitle(a.item, b.item));
 }
 
 const earlier = (a: LocalDate, b: LocalDate): LocalDate => (a.compare(b) <= 0 ? a : b);

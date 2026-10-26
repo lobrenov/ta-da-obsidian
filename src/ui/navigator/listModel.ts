@@ -183,6 +183,12 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	return { ...base, groupList: "agenda", grouping, filter: filterModel(all, options.picked, tasks.length), sections };
 }
 
+/** The repeating tasks with an occurrence on `day`, once each, in `occurrences`' order. */
+function repeatsOn(day: LocalDate, found: Occurrence[]): Item[] {
+	const seen = new Set<string>();
+	return found.filter((occurrence) => occurrence.date.equals(day) && !seen.has(occurrence.item.path) && seen.add(occurrence.item.path)).map((occurrence) => occurrence.item);
+}
+
 /** A Repeats row for each occurrence. */
 function occurrenceRows(ctx: ListContext, found: Occurrence[]): OccurrenceRowModel[] {
 	const { index, today } = ctx;
@@ -234,7 +240,7 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	const coming = allOccurrences(index, week.firstDay, week.days[6] ?? week.firstDay, today);
 	const days = week.days.map((date): ListRow => {
 		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
-		const repeating = [...new Map(coming.filter((occurrence) => occurrence.date.equals(date)).map((occurrence) => [occurrence.item.path, occurrence.item])).values()];
+		const repeating = repeatsOn(date, coming);
 		const note = dailyNote(index, date, ctx.notes.names);
 		return {
 			type: "day",
