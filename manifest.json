@@ -1,7 +1,7 @@
 {
   "id": "ta-da",
   "name": "Ta Da",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "minAppVersion": "1.14.0",
   "description": "Tasks, projects and areas over a folder of markdown files.",
   "author": "Leon Obrenov",

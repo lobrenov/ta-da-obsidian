@@ -176,7 +176,7 @@ export function occurrences(index: VaultIndex, item: Item, from: LocalDate, thro
 		return nextDates(checkedRule, anchor, null, anchor, later(anchor, today).addingDays(1))?.dueDate;
 	}
 	const found = dates
-		.filter((date) => date.compare(low) >= 0 && date.compare(high) <= 0)
+		.filter((date) => date.compare(low) >= 0 && date.compare(high) <= 0 && (isClosed(p.status) || date.compare(today) > 0))
 		.flatMap((date): Occurrence[] => {
 			const estimated = rule.whenDone && !(known && date.equals(known));
 			const entries: Occurrence[] = [];
