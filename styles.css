@@ -1586,3 +1586,11 @@
 	border-style: dashed;
 	color: var(--text-muted);
 }
+
+/* Convert to project modal */
+
+.ta-da-convert-subtasks {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}

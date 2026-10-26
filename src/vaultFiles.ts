@@ -20,12 +20,17 @@ export function vaultSettingsFiles(app: App): SettingsFiles {
 	};
 }
 
-/** Creates the file at `path` with `text`, and the folders above it that don't exist. */
-export async function createIn(vault: Vault, folder: string, path: string, text: string): Promise<TFile> {
+/** Makes `folder` and the folders above it that don't exist. */
+export async function ensureFolder(vault: Vault, folder: string): Promise<void> {
 	let made = "";
 	for (const part of folder.split("/").filter((name) => name !== "")) {
 		made = made === "" ? part : `${made}/${part}`;
 		if (!vault.getFolderByPath(made)) await vault.createFolder(made);
 	}
+}
+
+/** Creates the file at `path` with `text`, and the folders above it that don't exist. */
+export async function createIn(vault: Vault, folder: string, path: string, text: string): Promise<TFile> {
+	await ensureFolder(vault, folder);
 	return vault.create(path, text);
 }

@@ -4,6 +4,7 @@ import type { Writer } from "./Writer";
 import type { TaDaIndex } from "./TaDaIndex";
 import { localToday } from "./ui/dates";
 import { extractSubtask } from "./ui/extractTask";
+import { openConvertModal } from "./ui/convert/ConvertModal";
 import { parentEdit } from "./ui/header/edits";
 import { buildHeaderModel } from "./ui/header/headerModel";
 import { openParentPicker } from "./ui/header/pickers";
@@ -16,7 +17,7 @@ import { type StatusActions, statusItem } from "./ui/statusActions";
 /** What the commands need from the plugin. */
 export type CommandsPlugin = Plugin & { taDaIndex: TaDaIndex; writer: Writer; statusActions: StatusActions };
 
-/** New task, Complete, Move to project or area, and Extract subtask to task. None has a default hotkey. */
+/** New task, Complete, Move to project or area, Convert task to project, and Extract subtask to task. None has a default hotkey. */
 /** Returns the New task action, for the views' header buttons. */
 export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: NewTaskContext) => void } {
 	const { app } = plugin;
@@ -65,6 +66,17 @@ export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: 
 					});
 				});
 			}
+			return true;
+		},
+	});
+
+	plugin.addCommand({
+		id: "convert-task-to-project",
+		name: "Convert task to project",
+		checkCallback: (checking) => {
+			const active = activeItem();
+			if (active?.kind !== "task") return false;
+			if (!checking) void openConvertModal({ ...host, writer: plugin.writer }, active.file);
 			return true;
 		},
 	});

@@ -9,6 +9,7 @@ vi.mock("obsidian", () => ({
 	Plugin: class {},
 	TFile: class {},
 }));
+vi.mock("../src/ui/convert/ConvertModal", () => ({ openConvertModal: vi.fn() }));
 vi.mock("../src/ui/navigator/NavigatorView", () => ({ NavigatorView: class {} }));
 vi.mock("../src/ui/navigator/views", () => ({ viewKinds: [], viewSpecs: {} }));
 vi.mock("../src/ui/newTask/NewTaskModal", () => ({ NewTaskModal: class {} }));

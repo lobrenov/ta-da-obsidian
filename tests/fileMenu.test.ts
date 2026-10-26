@@ -71,12 +71,13 @@ function setup() {
 		registerEvent: () => undefined,
 	};
 	const set = vi.fn();
-	registerFileMenu(plugin as never, index, { set } as never);
+	const convert = vi.fn();
+	registerFileMenu(plugin as never, index, { set } as never, convert);
 	return { open: (path: string) => {
 		const { menu, entries } = recorder();
 		handler(menu, file(path));
 		return entries;
-	}, set, names, handler: () => handler };
+	}, set, convert, names, handler: () => handler };
 }
 
 describe("the file menu's Status…", () => {
@@ -87,7 +88,7 @@ describe("the file menu's Status…", () => {
 	it("is added to a task with every status but Ongoing, the current one checked", () => {
 		const { open } = setup();
 		const [status, ...rest] = open("Ta Da/tasks/Trip.md");
-		expect(rest).toEqual([]);
+		expect(rest.map((entry) => entry.title)).toEqual(["Convert to project…"]);
 		expect(status?.title).toBe("Status…");
 		expect(status?.section).toBe("ta-da");
 		expect(status?.sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Blocked", "|", "Done", "Cancelled"]);
@@ -99,6 +100,18 @@ describe("the file menu's Status…", () => {
 		const sub = open("Ta Da/projects/Home.md")[0]?.sub ?? [];
 		expect(sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Ongoing", "Blocked", "|", "Done", "Cancelled"]);
 		expect(sub.filter((entry) => entry.checked).map((entry) => entry.title)).toEqual(["Ongoing"]);
+	});
+
+	it("adds Convert to project… after Status… in the same section on a task, and opens it for the file", () => {
+		const { open, convert } = setup();
+		const [status, convertItem] = open("Ta Da/tasks/Trip.md");
+		expect(convertItem?.section).toBe(status?.section);
+		convertItem?.click();
+		expect(convert).toHaveBeenCalledWith(expect.objectContaining({ path: "Ta Da/tasks/Trip.md" }));
+	});
+
+	it("does not offer Convert to project… on a project", () => {
+		expect(setup().open("Ta Da/projects/Home.md").map((entry) => entry.title)).toEqual(["Status…"]);
 	});
 
 	it("is not added for other files or for folders", () => {

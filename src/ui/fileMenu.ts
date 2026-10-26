@@ -4,8 +4,8 @@ import { statusChoices } from "../core/model/status";
 import { statusLabel } from "./header/headerModel";
 import type { StatusActions } from "./statusActions";
 
-/** Adds the plugin's items to Obsidian's file menu, wherever it shows, for task and project files. */
-export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: StatusActions): void {
+/** Adds the plugin's items to Obsidian's file menu, wherever it shows, for task and project files: Status…, and Convert to project… on a task. */
+export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: StatusActions, convert: (file: TFile) => void): void {
 	plugin.registerEvent(
 		plugin.app.workspace.on("file-menu", (menu, file) => {
 			if (!(file instanceof TFile)) return;
@@ -25,6 +25,8 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 					});
 				}
 			});
+			if (kind !== "task") return;
+			menu.addItem((entry) => entry.setTitle("Convert to project…").setIcon("folder-input").setSection("ta-da").onClick(() => convert(file)));
 		}),
 	);
 }
