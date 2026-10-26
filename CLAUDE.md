@@ -16,11 +16,13 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - `src/core/`: the TypeScript port of TaDaCore (`model/`, `parsing/`, `syntax/` from the editor fork's `MarkdownEngineSyntax`, `index/`, `writing/`, `storage/`, including `storage/settingsFile.ts`, the read and write of `Ta Da/settings.json`). No Obsidian imports.
 - `src/TaDaIndex.ts`: `VaultIndex` built from the vault's markdown on layout ready, patched on file and editor changes.
 - `src/settingsData.ts`: `SettingsStore`. `data.json` holds `hideProperties` and `navigator`; the Daily notes settings are in the vault's `Ta Da/settings.json` (shared with Ta Da, `docs/file-format.md` Settings), each key falling back to `data.json`'s old `dailyNotes`, then Obsidian's `daily-notes.json` (folder and template), then the default. Loading never writes; a change writes the file through `src/vaultFiles.ts`, keeping its other keys, and `main.ts` reloads on the file's create, modify and delete.
-- `src/Writer.ts`: every write to a file's text, one queue per file.
+- `src/Writer.ts`: every write to a file's text, and the reads a write builds on (the open editor's text, else the file's), one queue per file.
 - `src/ui/header/`: the Ta Da header on task, project and area files (Live Preview widget and Reading view post-processor) and its menus.
 - `src/ui/navigator/`: the Agenda, Tasks and Tags views (one `NavigatorView` class, three kinds in `views.ts`), their domains, lists and settings.
 - `src/ui/newTask/`: the New task modal.
-- `src/commands.ts`: New task, Complete, Move to project or area. Set status commands are in `src/main.ts`.
+- `src/ui/fileMenu.ts`: the plugin's items in Obsidian's file menu (Status…, Convert to project…), which is also a navigator row's right-click menu.
+- `src/ui/extractTask.ts`: Extract to task, from the editor menu and its command. `src/ui/convertTask.ts` and `src/ui/convert/`: Convert to project and its modal. Both create task files through `createTask` in `src/vaultFiles.ts`.
+- `src/commands.ts`: New task, Complete, Move to project or area, Extract subtask to task, Convert task to project. Set status commands are in `src/main.ts`.
 - `src/ui/statusActions.ts`: every status change, with the apps' rules.
 - `tests/`: Vitest tests, including conformance with TaDaCore.
 

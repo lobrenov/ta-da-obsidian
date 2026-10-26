@@ -7,7 +7,10 @@ Ta Da's tasks, projects and areas inside Obsidian, over the same vault as the Ta
 - **Agenda, Tasks and Tags**: three Ta Da views, each its own tab in the left sidebar beside the file explorer (and its own entry in a phone's drawer). Agenda shows the strip and a day's or week's list. Tasks has search, Loose tasks, Logbook, Trash, and areas with their projects; Tags has search and the tag tree. The list beside them shows the chosen page, with grouping and a tag filter. Each view has New task in its header, follows the open file, and has a ribbon icon. Arrow keys move through the list and Return opens a file. On a phone, Tasks and Tags show one pane at a time, with a back button.
 - **Agenda**: a week or month strip and a day's or a week's tasks, with the day's daily note or the week's note (Create when it's missing). A ring on a day marks open boxes in its daily note.
 - **New task**: a modal for a task or project with title, status, project or area, dates and tags. It starts in the project, area or tag on screen, or due on the Agenda's selected day.
-- **Commands**: New task, Complete, Move to project or area, Set status (one per status), Open Ta Da: Agenda, Open Ta Da: Tasks, Open Ta Da: Tags. None has a default hotkey.
+- **File menu**: a task's or project's file menu, which is also its row's right-click menu in the views, has Status… (a submenu of statuses) and, on a task, Convert to project….
+- **Extract to task**: a subtask's line becomes a task of its own, filed under the file's project or area, from the editor's right-click menu or its command.
+- **Convert to project**: a modal to make a task a project, with its status, area and, optionally, its subtasks made tasks under it. The file moves to `Ta Da/projects/`.
+- **Commands**: New task, Complete, Move to project or area, Set status (one per status), Extract subtask to task, Convert task to project, Open Ta Da: Agenda, Open Ta Da: Tasks, Open Ta Da: Tags. None has a default hotkey.
 - **Status rules**, as in the apps: closing a project with open tasks asks first; reopening a task reopens its Done or Cancelled project; reopening a logged file moves it, and its logged project, out of the Logbook.
 
 Files are created where the apps create them, in `Ta Da/` at the vault's top level. Logging, Calendar events and reminders stay with the apps.
