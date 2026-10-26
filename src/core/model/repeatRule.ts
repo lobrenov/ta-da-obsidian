@@ -80,28 +80,39 @@ export class RepeatRule {
 		let unit = tokens.shift();
 		if (unit === undefined) return null;
 		let interval = 1;
+		let number: string | null = null;
 		if (/^[+-]?[0-9]+$/.test(unit)) {
 			const next = tokens.shift();
 			if (next === undefined) return null;
 			interval = Number(unit);
+			number = unit;
 			unit = next;
 		}
-		const weekdays: number[] = [];
-		let frequency = frequencies.get(unit);
-		if (frequency === undefined) {
-			// `every mon, thu` is `every week on mon, thu`.
-			const first = interval === 1 ? weekday(unit) : null;
-			if (first === null) return null;
-			frequency = "week";
-			weekdays.push(first);
-			while (tokens[0] !== undefined && !["until", "when"].includes(tokens[0])) {
-				const found = weekday(tokens.shift() as string);
-				if (found === null) return null;
-				weekdays.push(found);
-			}
-		}
+		let weekdays: number[] = [];
 		let monthDay: MonthDay | null = null;
 		let yearDate: YearDate | null = null;
+		let frequency = frequencies.get(unit);
+		if (frequency === undefined) {
+			// A day or date alone: `every mon, thu`, `every 15th`, `every 2nd tue`, `every oct 26`, `every 26 oct`.
+			const clause = [unit];
+			while (tokens[0] !== undefined && !["until", "when"].includes(tokens[0])) clause.push(tokens.shift() as string);
+			const days = clause.map(weekday);
+			if (number !== null) {
+				yearDate = readYearDate([number, ...clause]);
+				if (yearDate === null) return null;
+				interval = 1;
+				frequency = "year";
+			} else if (days.every((day) => day !== null)) {
+				frequency = "week";
+				weekdays = days as number[];
+			} else if ((monthDay = readMonthDay(["the", ...clause])) !== null) {
+				frequency = "month";
+			} else if ((yearDate = readYearDate(clause)) !== null) {
+				frequency = "year";
+			} else {
+				return null;
+			}
+		}
 		let until: LocalDate | null = null;
 		let whenDone = false;
 
@@ -220,10 +231,11 @@ function readMonthDay(clause: string[]): MonthDay | null {
 	return n !== null && n >= 1 && n <= 5 && found !== null ? { case: "nth", n, weekday: found } : null;
 }
 
-/** `oct 26`. */
+/** `oct 26` or `26 oct`. */
 function readYearDate(clause: string[]): YearDate | null {
-	const [name, dayText] = clause;
-	if (clause.length !== 2 || name === undefined || dayText === undefined) return null;
+	const [first, second] = clause;
+	if (clause.length !== 2 || first === undefined || second === undefined) return null;
+	const [name, dayText] = readNumber(first) === null ? [first, second] : [second, first];
 	const index = monthNames.includes(name) ? monthNames.indexOf(name) : fullMonthNames.indexOf(name);
 	const day = readNumber(dayText);
 	if (index < 0 || day === null || day < 1 || day > (daysIn(index + 1, 2000))) return null;
