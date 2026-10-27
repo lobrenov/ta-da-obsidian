@@ -70,7 +70,7 @@ export function displayNavigatorSettings(containerEl: HTMLElement, settings: Nav
 	}
 	new Setting(containerEl)
 		.setName("Collapse the list pane")
-		.setDesc("Hides the list beside the navigation pane in Tasks and Tags. The button in the view's header toggles it too.")
+		.setDesc("Shows one pane at a time in Tasks and Tags: picking a list shows it, with a back button. The button in the view's header toggles it too.")
 		.addToggle((toggle) => toggle.setValue(settings.data.collapseListPane).onChange((value) => void settings.update({ collapseListPane: value })));
 }
 

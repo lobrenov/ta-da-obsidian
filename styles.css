@@ -821,15 +821,22 @@
 	display: none;
 }
 
-/* Wide: two panes side by side; the setting can hide the list. */
+/* Wide: two panes side by side; the setting shows one pane at a time, as narrow does. */
 @container (min-width: 520px) {
-	.ta-da-navigator.is-list-collapsed .ta-da-nav-pane {
-		flex: 1 1 auto;
+	.ta-da-navigator.is-list-collapsed .ta-da-nav-pane,
+	.ta-da-navigator.is-list-collapsed .ta-da-list-pane {
+		flex: 1 1 100%;
+		min-width: 0;
 		border-right: 0;
 	}
 
-	.ta-da-navigator.is-list-collapsed .ta-da-list-pane {
+	.ta-da-navigator.is-list-collapsed:not(.is-showing-list) .ta-da-list-pane,
+	.ta-da-navigator.is-list-collapsed.is-showing-list .ta-da-nav-pane {
 		display: none;
+	}
+
+	.ta-da-navigator.is-list-collapsed .ta-da-list-back {
+		display: flex;
 	}
 }
 
