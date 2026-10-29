@@ -31,6 +31,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/` (`read.json`, `queries.json`, `writes.json`, `settings.json`, `HomeVault/`) and `../DesignVault/` beside it. `tests/spec.test.ts` reads the grammar spec from `../swift-markdown-engine-extended/spec/grammar`. Regenerate the JSON from the Ta Da repo with `swift test --package-path Packages/TaDaCore --filter writeConformance` (`ConformanceExportTests.swift`); a port change that changes behaviour starts there.
 
 ## Rules
+- The plugin never changes how Obsidian renders Markdown. Where Ta Da's editor renders Markdown differently, Obsidian's rendering stands.
 - Writes splice lines through `Writer`: the open file through its `Editor` as one transaction, other files through `Vault.process`. Never `processFrontMatter`, never re-serialise YAML. Renames go through `FileManager.renameFile`, named by the ported `FileNaming`.
 - Community store rules: no default hotkeys, sentence-case UI text, no `innerHTML` with file content, no Node or Electron at runtime (the esbuild config rejects Node built-ins).
 - Dependencies are pinned exactly (`.npmrc` has `save-exact=true`).
