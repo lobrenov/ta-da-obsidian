@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../../src/core/index/vaultIndex";
-import { parentChoices, tagChoices } from "../../src/ui/header/choices";
+import { parentChoices, pickerTags, tagChoices } from "../../src/ui/header/choices";
+import { readTag } from "../../src/core/model/tag";
 import { makeItem } from "../support";
 
 const items = [
@@ -56,5 +57,14 @@ describe("tagChoices", () => {
 			{ name: "Home/Garden", current: false, isNew: false },
 		]);
 		expect(tagChoices(vault, [], "DEV")).toEqual([{ name: "dev", current: false, isNew: false }]);
+	});
+});
+
+describe("pickerTags", () => {
+	it("keeps the index's spellings, then adds Obsidian's tags for paths the index lacks", () => {
+		const carried = [readTag("Home"), readTag("quick win")].flatMap((tag) => tag ?? []);
+		const tags = pickerTags(carried, { "#Home": 1, "#home": 2, "#quick": 1, "#home/": 1, "#2026/10": 1 });
+		expect(tags.map((tag) => tag.name)).toEqual(["Home", "quick win", "quick", "2026/10"]);
+		expect(tagChoices(tags, [], "home").map((choice) => choice.name)).toEqual(["Home"]);
 	});
 });

@@ -1,6 +1,6 @@
 import type { Item, Kind } from "../../core/model/item";
 import { isClosed } from "../../core/model/status";
-import { readTag } from "../../core/model/tag";
+import { readTag, type Tag } from "../../core/model/tag";
 import { compareTitles } from "../../core/index/vaultIndex";
 import { identityKey } from "../../core/text";
 import type { Parent } from "../../core/writing/parent";
@@ -62,6 +62,13 @@ export interface TagChoice {
 	isNew: boolean;
 }
 
+/** The index's tags, then Obsidian's tags (`#` and as written) for the paths the index doesn't have. */
+export function pickerTags(carried: Tag[], obsidianTags: Record<string, number>): Tag[] {
+	const seen = new Set(carried.map((tag) => tag.path));
+	const extra = Object.keys(obsidianTags).flatMap((key) => readTag(key) ?? []).filter((tag) => !seen.has(tag.path) && seen.add(tag.path));
+	return [...carried, ...extra];
+}
+
 /**
  * The tags in the vault by name, plus the typed query as a new tag when it names none of them. The ones on the file
  * are marked, never hidden.
@@ -71,7 +78,7 @@ export function tagChoices(vaultTags: { name: string; path: string }[], onFile: 
 	const typed = readTag(query);
 	const needle = typed?.path ?? identityKey(query.trim().replace(/^#/, ""));
 	const names = new Map<string, string>();
-	for (const tag of vaultTags) names.set(tag.path, tag.name);
+	for (const tag of vaultTags) if (!names.has(tag.path)) names.set(tag.path, tag.name);
 	const list: TagChoice[] = [...names]
 		.filter(([path]) => path.includes(needle))
 		.sort((a, b) => compareTitles(a[1], b[1]))

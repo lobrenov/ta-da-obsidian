@@ -2,10 +2,10 @@ import { type App, Menu, type MenuItem, type Modal, Platform } from "obsidian";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import type { Kind } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
-import { readTag } from "../../core/model/tag";
 import { isClosed, type Status, statusChoices } from "../../core/model/status";
+import { readTag } from "../../core/model/tag";
 import type { Parent } from "../../core/writing/parent";
-import { parentChoices, type TagChoice, tagChoices } from "./choices";
+import { parentChoices, pickerTags, type TagChoice, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";
 import { statusLabel } from "./headerModel";
 import { dayOrderOf, firstWeekdayOf } from "./locale";
@@ -82,7 +82,7 @@ export function openDatePicker(
 
 /** The tag menu; `onFile` are the names already on the file or draft, which a pick removes. */
 export function openTagPicker(host: PickerHost, onFile: string[], anchor: HTMLElement, choose: (choice: TagChoice) => void): void {
-	const vaultTags = Object.keys(host.app.metadataCache.getTags()).flatMap((key) => readTag(key) ?? []);
+	const vaultTags = pickerTags(host.index.carriedTags, host.app.metadataCache.getTags?.() ?? {});
 	openBelow(new TagModal(host.app, (query) => tagChoices(vaultTags, onFile, query), choose), anchor);
 }
 

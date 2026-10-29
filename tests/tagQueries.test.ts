@@ -99,3 +99,33 @@ describe("tags and logged files", () => {
 		expect(describeNodes(tagTree(small))).toEqual(["chore 1", "shared 1"]);
 	});
 });
+
+describe("tag spelling and logged files", () => {
+	it("spells a tag from live carriers before logged ones", () => {
+		const logged = makeItem("Ta Da/logbook/tasks/Old.md", "type: task\nstatus: Done\ntags: [Home]");
+		const live = makeItem("tasks/New.md", "type: task\nstatus: Doing\ntags: [home]");
+		const index = new VaultIndex([logged, live]);
+		expect(index.carriedTags.map((t) => t.name)).toEqual(["home"]);
+		index.remove(live.path);
+		expect(index.carriedTags.map((t) => t.name)).toEqual(["Home"]);
+		index.update(live);
+		expect(index.carriedTags.map((t) => t.name)).toEqual(["home"]);
+		index.remove(live.path);
+		index.update(makeItem("tasks/Newer.md", "type: task\nstatus: Doing\ntags: [HOME]"));
+		index.remove("tasks/Newer.md");
+		expect(index.carriedTags.map((t) => t.name)).toEqual(["Home"]);
+	});
+
+	it("keeps the tag counts when a tagged file moves into the logbook and back", () => {
+		const live = makeItem("tasks/Old.md", "type: task\nstatus: Done\ntags: [Home]");
+		const logged = makeItem("Ta Da/logbook/tasks/Old.md", "type: task\nstatus: Done\ntags: [Home]");
+		const index = new VaultIndex([live, makeItem("tasks/Other.md", "type: task\nstatus: Doing\ntags: [home]")]);
+		index.remove(live.path);
+		index.update(logged);
+		expect(describeNodes(tagTree(index))).toEqual(["home 2"]);
+		index.remove(logged.path);
+		index.update(live);
+		expect(describeNodes(tagTree(index))).toEqual(["Home 2"]);
+		expect([...index.pathsCarrying("home")].sort()).toEqual([live.path, "tasks/Other.md"]);
+	});
+});

@@ -1,5 +1,6 @@
 import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
 import type { Grouping } from "../../core/index/grouping";
+import { isLoggedPath } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import type { TrashedItem } from "../../core/storage/trash";
 import type { TaDaIndex } from "../../TaDaIndex";
@@ -644,7 +645,7 @@ export class NavigatorView extends ItemView {
 				drawIcon(el.createSpan({ cls: "ta-da-group-icon" }), { type: "area" });
 				el.createSpan({ cls: "ta-da-group-title", text: header.title });
 				if (header.count > 0) el.createSpan({ cls: "ta-da-group-count", text: String(header.count) });
-				el.addEventListener("click", () => this.show({ kind: "area", path: header.path }));
+				el.addEventListener("click", () => (isLoggedPath(header.path) ? this.openPath(header.path) : this.show({ kind: "area", path: header.path })));
 				break;
 			}
 			case "project": {
@@ -653,7 +654,7 @@ export class NavigatorView extends ItemView {
 				el.createSpan({ cls: "ta-da-group-title", text: header.title });
 				if (header.area) el.createSpan({ cls: "ta-da-group-area", text: header.area });
 				if (header.count > 0) el.createSpan({ cls: "ta-da-group-count", text: String(header.count) });
-				el.addEventListener("click", () => this.show({ kind: "project", path: header.path }));
+				el.addEventListener("click", () => (isLoggedPath(header.path) ? this.openPath(header.path) : this.show({ kind: "project", path: header.path })));
 				break;
 			}
 			case "loose": {

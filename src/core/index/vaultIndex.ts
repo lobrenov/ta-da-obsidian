@@ -34,7 +34,7 @@ export class VaultIndex {
 	private readonly pathsByTag = new Map<string, Set<string>>();
 	/** Folder (empty for the top level) to the paths of the notes straight in it. */
 	private readonly notesByFolder = new Map<string, Set<string>>();
-	/** Tag path to the tag as spelled by the carrier with the first path, and that path. */
+	/** Tag path to the tag as spelled by the first carrier (live before logged, then by path), and that path. */
 	private readonly tagsByPath = new Map<string, { tag: Tag; path: string }>();
 
 	constructor(items: Item[] = []) {
@@ -118,7 +118,7 @@ export class VaultIndex {
 		return [...this.itemsByPath.values()].filter((item) => isLogged(item));
 	}
 
-	/** Every tag carried by an item, spelled as in the carrier with the first path, in no order. */
+	/** Every tag carried by an item, spelled as in the first carrier (live before logged, then by path), in no order. */
 	get carriedTags(): Tag[] {
 		return [...this.tagsByPath.values()].map((entry) => entry.tag);
 	}
@@ -299,7 +299,7 @@ export class VaultIndex {
 		for (const use of item.tags) {
 			addTo(this.pathsByTag, use.tag.path, item.path);
 			const current = this.tagsByPath.get(use.tag.path);
-			if (!current || compareCodeUnits(item.path, current.path) < 0) this.tagsByPath.set(use.tag.path, { tag: use.tag, path: item.path });
+			if (!current || spells(item.path, current.path)) this.tagsByPath.set(use.tag.path, { tag: use.tag, path: item.path });
 		}
 	}
 
@@ -307,13 +307,19 @@ export class VaultIndex {
 		for (const use of item.tags) {
 			removeFrom(this.pathsByTag, use.tag.path, item.path);
 			if (this.tagsByPath.get(use.tag.path)?.path !== item.path) continue;
-			const first = [...(this.pathsByTag.get(use.tag.path) ?? [])].sort(compareCodeUnits)[0];
+			const first = [...(this.pathsByTag.get(use.tag.path) ?? [])].sort((a, b) => (spells(a, b) ? -1 : spells(b, a) ? 1 : 0))[0];
 			const carrier = first === undefined ? undefined : this.itemsByPath.get(first);
 			const match = carrier?.tags.find((other) => other.tag.path === use.tag.path);
 			if (first !== undefined && match) this.tagsByPath.set(use.tag.path, { tag: match.tag, path: first });
 			else this.tagsByPath.delete(use.tag.path);
 		}
 	}
+}
+
+/** Whether the carrier at `a` sets a tag's spelling before the one at `b`: live files before logged ones, each by path. */
+function spells(a: string, b: string): boolean {
+	const [x, y] = [isLoggedPath(a) ? 1 : 0, isLoggedPath(b) ? 1 : 0];
+	return x !== y ? x < y : compareCodeUnits(a, b) < 0;
 }
 
 /** Orders items by title, then by path. */
