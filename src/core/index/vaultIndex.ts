@@ -30,7 +30,7 @@ export class VaultIndex {
 	private readonly linkersByTitle = new Map<string, Set<string>>();
 	/** Lowercased image filename to the paths of the items that embed it. */
 	private readonly embeddersByName = new Map<string, Set<string>>();
-	/** Tag path to the paths of the items that aren't logged and carry it (not counting its children). */
+	/** Tag path to the paths of the items that carry it (not counting its children). */
 	private readonly pathsByTag = new Map<string, Set<string>>();
 	/** Folder (empty for the top level) to the paths of the notes straight in it. */
 	private readonly notesByFolder = new Map<string, Set<string>>();
@@ -118,7 +118,7 @@ export class VaultIndex {
 		return [...this.itemsByPath.values()].filter((item) => isLogged(item));
 	}
 
-	/** Every tag carried by an item that isn't logged, spelled as in the carrier with the first path, in no order. */
+	/** Every tag carried by an item, spelled as in the carrier with the first path, in no order. */
 	get carriedTags(): Tag[] {
 		return [...this.tagsByPath.values()].map((entry) => entry.tag);
 	}
@@ -128,7 +128,7 @@ export class VaultIndex {
 		return this.notesByFolder;
 	}
 
-	/** The paths of the items that aren't logged and carry this tag path itself, not its children. */
+	/** The paths of the items that carry this tag path itself, not its children. */
 	pathsCarrying(tagPath: string): ReadonlySet<string> {
 		return this.pathsByTag.get(tagPath) ?? new Set();
 	}
@@ -296,7 +296,6 @@ export class VaultIndex {
 	}
 
 	private addTags(item: Item): void {
-		if (isLogged(item)) return;
 		for (const use of item.tags) {
 			addTo(this.pathsByTag, use.tag.path, item.path);
 			const current = this.tagsByPath.get(use.tag.path);
@@ -305,7 +304,6 @@ export class VaultIndex {
 	}
 
 	private removeTags(item: Item): void {
-		if (isLogged(item)) return;
 		for (const use of item.tags) {
 			removeFrom(this.pathsByTag, use.tag.path, item.path);
 			if (this.tagsByPath.get(use.tag.path)?.path !== item.path) continue;

@@ -26,7 +26,7 @@ export interface TagBrowser {
 	children: TagNode[];
 }
 
-// The tag queries. A file is tagged by its own tags only, never its parent's. Logged files aren't counted.
+// The tag queries. A file is tagged by its own tags only, never its parent's.
 
 /**
  * Every carried tag and its parents, as a tree. Each level is sorted by name, ignoring case. A parent carried by no
@@ -56,7 +56,7 @@ export function tagTree(index: VaultIndex): TagNode[] {
 	return nodes("");
 }
 
-/** Items that aren't logged and carry the tag or any child of it, sorted by title. */
+/** Items that carry the tag or any child of it, sorted by title. */
 export function itemsTagged(index: VaultIndex, tag: Tag): Item[] {
 	const paths = new Set<string>();
 	for (const carried of index.carriedTags) {

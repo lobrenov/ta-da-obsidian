@@ -32,12 +32,13 @@ describe("navigation pane", () => {
 
 	it("lists Untagged and the tag tree, opening a parent's children only when it's expanded", () => {
 		const ctx = context(loadFixtureIndex("TagVault"), today);
-		expect(describeItems(buildNav(ctx, "tags", new Set()))).toEqual(["Untagged 2", "errands 3", "> Home 4", "> people 2", "quick win 2", "> Work 2"]);
+		expect(describeItems(buildNav(ctx, "tags", new Set()))).toEqual(["Untagged 2", "errands 4", "> Home 4", "logged-only 1", "> people 2", "quick win 2", "> Work 2"]);
 		expect(describeItems(buildNav(ctx, "tags", new Set(["tag:home", "tag:work"])))).toEqual([
 			"Untagged 2",
-			"errands 3",
+			"errands 4",
 			"v Home 4",
 			"  garden 3",
+			"logged-only 1",
 			"> people 2",
 			"quick win 2",
 			"v Work 2",

@@ -140,12 +140,13 @@ describe("VaultIndex", () => {
 		expect(index.carriedTags).toEqual([]);
 	});
 
-	it("leaves logged files out of tags", () => {
+	it("counts logged files in tags", () => {
 		const logged = makeItem("Ta Da/logbook/tasks/Old.md", "type: task\nstatus: Done\ntags: [old]");
 		const index = new VaultIndex([logged]);
-		expect(index.carriedTags).toEqual([]);
-		index.remove(logged.path);
+		expect(index.pathsCarrying("old")).toEqual(new Set([logged.path]));
 		index.update(makeItem("tasks/Old.md", "type: task\nstatus: Done\ntags: [old]"));
+		expect(index.pathsCarrying("old")).toEqual(new Set([logged.path, "tasks/Old.md"]));
+		index.remove(logged.path);
 		expect(index.pathsCarrying("old")).toEqual(new Set(["tasks/Old.md"]));
 	});
 
