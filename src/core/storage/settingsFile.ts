@@ -22,6 +22,19 @@ function parseObject(text: string | null): Record<string, unknown> | null {
 	}
 }
 
+/** `editor.taskLinkBoxes`: whether wikilinks to tasks draw the task's status box. Missing or not a boolean is on. */
+export function readTaskLinkBoxes(text: string | null): boolean {
+	const value = objectOf(parseObject(text)?.["editor"])?.["taskLinkBoxes"];
+	return typeof value === "boolean" ? value : true;
+}
+
+/** The settings file's text with `editor.taskLinkBoxes` set and everything else as it was. */
+export function writeTaskLinkBoxes(text: string | null, value: boolean): string {
+	const root = parseObject(text) ?? {};
+	root["editor"] = { ...(objectOf(root["editor"]) ?? {}), taskLinkBoxes: value };
+	return `${JSON.stringify(root, null, 2)}\n`;
+}
+
 /** The keys of a `dailyNotes` group that hold a value of the right type; each key stands alone. */
 export function validDailyNotes(group: unknown): Partial<DailyNotesValues> {
 	const stored = objectOf(group) ?? {};

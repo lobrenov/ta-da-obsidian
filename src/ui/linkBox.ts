@@ -9,7 +9,7 @@ import { wikiLinkParts } from "../core/model/wikiLink";
 /** Draws a status box into a parent. */
 export type DrawBox = (parent: HTMLElement, status: Status) => void;
 
-/** Dispatched to redraw the boxes from the index, after a task's status changes in another file. */
+/** Dispatched to redraw the boxes from the index and the setting, after a task's status changes in another file or the setting changes. */
 export const refreshLinkBoxes = StateEffect.define<null>();
 
 /** The path of the file a link's target resolves to from a source file, as Obsidian resolves it; null when it doesn't. */
@@ -20,6 +20,8 @@ export interface LinkBoxHost {
 	index: Pick<VaultIndex, "get">;
 	resolve: Resolve;
 	draw: DrawBox;
+	/** Whether the boxes are on. */
+	enabled: () => boolean;
 }
 
 /** The status of the task a link's inner text (`target#heading|alias`) points at, logged ones included; null for any other target. Ongoing is a project's. */
@@ -79,7 +81,7 @@ const literalNode = /code|comment|math|frontmatter/i;
 export function linkBoxExtension(host: LinkBoxHost, editor: LinkBoxEditor): Extension {
 	const build = (view: EditorView): DecorationSet => {
 		const { state } = view;
-		if (!editor.isLivePreview(state)) return Decoration.none;
+		if (!host.enabled() || !editor.isLivePreview(state)) return Decoration.none;
 		const tree = syntaxTree(state);
 		const sourcePath = editor.sourceOf(state);
 		const widgets: Range<Decoration>[] = [];
@@ -135,6 +137,7 @@ export function linkBoxProcessor(host: LinkBoxHost, renderChild: (section: HTMLE
 		if (el.querySelector("a.internal-link") === null) return;
 		const draw = (): void => {
 			for (const box of el.querySelectorAll(".ta-da-link-box")) box.remove();
+			if (!host.enabled()) return;
 			for (const link of el.querySelectorAll<HTMLAnchorElement>("a.internal-link")) {
 				const status = linkedTaskStatus(host, link.getAttribute("data-href") ?? "", ctx.sourcePath);
 				if (status) link.before(linkBox(el.ownerDocument, status, host.draw));

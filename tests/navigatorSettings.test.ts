@@ -27,7 +27,7 @@ describe("SettingsStore", () => {
 		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: { tasks: true } } });
 		const store = new SettingsStore(plugin, memoryFiles());
 		await store.load();
-		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes });
+		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true });
 	});
 
 	it("keeps the one data object, so what holds it sees a loaded or changed value", async () => {
@@ -73,6 +73,22 @@ describe("SettingsStore", () => {
 		expect(JSON.parse(files.files.get("Ta Da/settings.json") ?? "")).toEqual({ theme: { themeSet: "Ayu" }, dailyNotes: { ...defaultDailyNotes, weekNotes: false, dailyTemplate: "T.md", extra: 1 } });
 	});
 
+	it("reads, writes and reloads the task link boxes through the vault file, keeping its other keys", async () => {
+		const { plugin, writes } = makePlugin();
+		const files = memoryFiles({ "Ta Da/settings.json": JSON.stringify({ editor: { autocomplete: { tags: true } } }) });
+		const store = new SettingsStore(plugin, files);
+		await store.load();
+		expect(store.data.taskLinkBoxes).toBe(true);
+		await store.updateTaskLinkBoxes(false);
+		expect(store.data.taskLinkBoxes).toBe(false);
+		expect(writes).toEqual([]);
+		expect(JSON.parse(files.files.get("Ta Da/settings.json") ?? "")).toEqual({ editor: { autocomplete: { tags: true }, taskLinkBoxes: false } });
+		expect(await store.reloadSettingsFile()).toBe(false);
+		files.files.set("Ta Da/settings.json", JSON.stringify({ editor: { taskLinkBoxes: true } }));
+		expect(await store.reloadSettingsFile()).toBe(true);
+		expect(store.data.taskLinkBoxes).toBe(true);
+	});
+
 	it("creates the settings file when a setting changes, and never when loading", async () => {
 		const files = memoryFiles();
 		const store = new SettingsStore(makePlugin().plugin, files);
@@ -115,12 +131,12 @@ describe("SettingsStore", () => {
 		const store = new SettingsStore(makePlugin().plugin, files);
 		await store.load();
 		const held = store.data;
-		expect(await store.reloadDailyNotes()).toBe(false);
+		expect(await store.reloadSettingsFile()).toBe(false);
 		files.files.set("Ta Da/settings.json", JSON.stringify({ dailyNotes: { weekNotes: false } }));
-		expect(await store.reloadDailyNotes()).toBe(true);
+		expect(await store.reloadSettingsFile()).toBe(true);
 		expect(held.dailyNotes.weekNotes).toBe(false);
 		files.files.delete("Ta Da/settings.json");
-		expect(await store.reloadDailyNotes()).toBe(true);
+		expect(await store.reloadSettingsFile()).toBe(true);
 		expect(held.dailyNotes).toEqual(defaultDailyNotes);
 	});
 
@@ -134,7 +150,7 @@ describe("SettingsStore", () => {
 		const store = new SettingsStore(makePlugin().plugin, files);
 		await store.load();
 		const written = store.updateDailyNotes({ dailyFolder: "A" });
-		const reloaded = store.reloadDailyNotes();
+		const reloaded = store.reloadSettingsFile();
 		const second = store.updateDailyNotes({ dailyFolder: "B" });
 		await Promise.all([written, reloaded, second]);
 		expect(store.data.dailyNotes.dailyFolder).toBe("B");
@@ -151,7 +167,7 @@ describe("SettingsStore", () => {
 
 describe("resolveData", () => {
 	it("gives defaults for nothing saved and for a wrong type", () => {
-		const defaults = { hideProperties: true, navigator: { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes };
+		const defaults = { hideProperties: true, navigator: { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true };
 		expect(resolveData(null)).toEqual(defaults);
 		expect(resolveData({ navigator: "x" })).toEqual(defaults);
 		expect(resolveData({ navigator: { openOnStartup: "yes" } })).toEqual(defaults);

@@ -1,4 +1,4 @@
-import { type DailyNotesValues, readDailyNotes, readObsidianDailyNotes, settingsFilePath, validDailyNotes, writeDailyNotes } from "./core/storage/settingsFile";
+import { type DailyNotesValues, readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, settingsFilePath, validDailyNotes, writeDailyNotes, writeTaskLinkBoxes } from "./core/storage/settingsFile";
 import { type ViewKind, viewKinds } from "./ui/navigator/views";
 
 export interface TaDaSettings {
@@ -43,6 +43,8 @@ export function cleanedFolder(text: string): string {
 export interface TaDaData extends TaDaSettings {
 	navigator: NavigatorData;
 	dailyNotes: DailyNotesData;
+	/** Draw a task's status box before wikilinks to it; `editor.taskLinkBoxes` in the vault's settings file. */
+	taskLinkBoxes: boolean;
 }
 
 /** Folders tidied and an empty template read as none. */
@@ -67,6 +69,7 @@ export function resolveData(saved: unknown): TaDaData {
 			collapseListPane: typeof stored.collapseListPane === "boolean" ? stored.collapseListPane : defaultNavigator.collapseListPane,
 		},
 		dailyNotes: { ...defaultDailyNotes, ...normalizedDailyNotes(validDailyNotes(data.dailyNotes)) },
+		taskLinkBoxes: true,
 	};
 }
 
@@ -90,7 +93,7 @@ export interface SettingsFiles {
  * order asked; its old `dailyNotes` is kept as it was, for the fallback. The daily notes are in `Ta Da/settings.json`.
  */
 export class SettingsStore {
-	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes } };
+	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes }, taskLinkBoxes: true };
 	private queue: Promise<void> = Promise.resolve();
 	private pendingWrites = 0;
 	private savedDailyNotes: unknown;
@@ -107,18 +110,22 @@ export class SettingsStore {
 		this.data.navigator = loaded.navigator;
 		this.savedDailyNotes = typeof saved === "object" && saved !== null ? (saved as { dailyNotes?: unknown }).dailyNotes : undefined;
 		this.data.dailyNotes = await this.readDailyNotes();
+		this.data.taskLinkBoxes = readTaskLinkBoxes(await this.files.read(settingsFilePath));
 	}
 
 	/**
-	 * Reads the daily notes again from the settings file, after any write already waiting. Returns whether they
-	 * changed. A read made while a newer change is still being written is dropped.
+	 * Reads the daily notes and the task link boxes again from the settings file, after any write already waiting.
+	 * Returns whether they changed. A read made while a newer change is still being written is dropped.
 	 */
-	reloadDailyNotes(): Promise<boolean> {
+	reloadSettingsFile(): Promise<boolean> {
 		const reloaded = this.queue.then(async () => {
 			const values = await this.readDailyNotes();
-			if (this.pendingWrites > 0 || JSON.stringify(values) === JSON.stringify(this.data.dailyNotes)) return false;
+			const taskLinkBoxes = readTaskLinkBoxes(await this.files.read(settingsFilePath));
+			if (this.pendingWrites > 0) return false;
+			const changed = JSON.stringify(values) !== JSON.stringify(this.data.dailyNotes) || taskLinkBoxes !== this.data.taskLinkBoxes;
 			this.data.dailyNotes = values;
-			return true;
+			this.data.taskLinkBoxes = taskLinkBoxes;
+			return changed;
 		});
 		this.queue = reloaded.then(() => undefined, () => undefined);
 		return reloaded;
@@ -160,6 +167,18 @@ export class SettingsStore {
 		this.data.dailyNotes = { ...this.data.dailyNotes, ...change };
 		this.pendingWrites++;
 		const written = this.queue.then(() => this.files.update(settingsFilePath, (text) => writeDailyNotes(text, this.data.dailyNotes)));
+		this.queue = written.then(
+			() => void this.pendingWrites--,
+			() => void this.pendingWrites--,
+		);
+		return written;
+	}
+
+	/** Sets the value, then writes `editor.taskLinkBoxes`, keeping the settings file's other keys. */
+	updateTaskLinkBoxes(value: boolean): Promise<void> {
+		this.data.taskLinkBoxes = value;
+		this.pendingWrites++;
+		const written = this.queue.then(() => this.files.update(settingsFilePath, (text) => writeTaskLinkBoxes(text, value)));
 		this.queue = written.then(
 			() => void this.pendingWrites--,
 			() => void this.pendingWrites--,

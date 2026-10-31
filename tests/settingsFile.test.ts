@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readDailyNotes, readObsidianDailyNotes, writeDailyNotes } from "../src/core/storage/settingsFile";
+import { readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeTaskLinkBoxes } from "../src/core/storage/settingsFile";
 import { defaultDailyNotes } from "../src/settingsData";
 
 describe("readDailyNotes", () => {
@@ -43,5 +43,28 @@ describe("readObsidianDailyNotes", () => {
 	it("leaves out an empty template, and reads nothing from text that isn't JSON", () => {
 		expect(readObsidianDailyNotes('{ "folder": "", "template": "" }')).toEqual({ dailyFolder: "" });
 		expect(readObsidianDailyNotes("nope")).toEqual({});
+	});
+});
+
+describe("readTaskLinkBoxes", () => {
+	it("is on when missing, unreadable or not a boolean", () => {
+		for (const text of [null, "{ nope", "[1]", "{}", '{ "editor": 3 }', '{ "editor": { "autocomplete": {} } }', '{ "editor": { "taskLinkBoxes": "no" } }']) expect(readTaskLinkBoxes(text)).toBe(true);
+	});
+
+	it("reads the key", () => {
+		expect(readTaskLinkBoxes('{ "editor": { "taskLinkBoxes": false } }')).toBe(false);
+		expect(readTaskLinkBoxes('{ "editor": { "taskLinkBoxes": true } }')).toBe(true);
+	});
+});
+
+describe("writeTaskLinkBoxes", () => {
+	it("sets the key and keeps the other groups and keys, editor's included", () => {
+		const existing = JSON.stringify({ theme: { themeSet: "Ayu" }, editor: { autocomplete: { tags: true } }, dailyNotes: { dailyFolder: "Old" } });
+		expect(JSON.parse(writeTaskLinkBoxes(existing, false))).toEqual({ theme: { themeSet: "Ayu" }, editor: { autocomplete: { tags: true }, taskLinkBoxes: false }, dailyNotes: { dailyFolder: "Old" } });
+	});
+
+	it("creates the file's text, or starts again from text that can't be read", () => {
+		expect(writeTaskLinkBoxes(null, false)).toBe(`${JSON.stringify({ editor: { taskLinkBoxes: false } }, null, 2)}\n`);
+		expect(JSON.parse(writeTaskLinkBoxes("{ nope", true))).toEqual({ editor: { taskLinkBoxes: true } });
 	});
 });

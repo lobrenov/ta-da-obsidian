@@ -33,7 +33,7 @@ const resolve = (linkpath: string): string | null => {
 	const titled = [...index.items.keys()].filter((path) => path.toLowerCase().endsWith(`/${linkpath}.md`.toLowerCase()));
 	return named[0] ?? titled[0] ?? null;
 };
-const host = (over: Partial<LinkBoxHost> = {}): LinkBoxHost => ({ index, resolve, draw, ...over });
+const host = (over: Partial<LinkBoxHost> = {}): LinkBoxHost => ({ index, resolve, draw, enabled: () => true, ...over });
 const editor = { sourceOf: () => "Notes/Source.md", isLivePreview: () => true };
 
 describe("linkedTaskStatus", () => {
@@ -107,6 +107,18 @@ describe("linkBoxExtension", () => {
 		expect(boxes(make2(linkBoxExtension(host(), { ...editor, isLivePreview: () => false })))).toEqual([]);
 	});
 
+	it("draws none while the setting is off, and draws them when it turns on", () => {
+		let on = false;
+		const view = new EditorView({ state: EditorState.create({ doc: text, selection: EditorSelection.cursor(0), extensions: [markdown(), linkBoxExtension(host({ enabled: () => on }), editor)] }), parent: document.body });
+		expect(boxes(view)).toEqual([]);
+		on = true;
+		view.dispatch({ effects: refreshLinkBoxes.of(null) });
+		expect(boxes(view)).toHaveLength(2);
+		on = false;
+		view.dispatch({ effects: refreshLinkBoxes.of(null) });
+		expect(boxes(view)).toEqual([]);
+	});
+
 	it("redraws from the index on the refresh effect", () => {
 		const live = new VaultIndex([makeItem("Ta Da/tasks/Doing.md", "type: task\nstatus: Doing")]);
 		const liveHost = host({ index: live, resolve: () => "Ta Da/tasks/Doing.md" });
@@ -151,6 +163,16 @@ describe("linkBoxProcessor", () => {
 		expect(el.querySelectorAll(".ta-da-link-box")).toHaveLength(3);
 		expect(el.querySelector(".ta-da-link-box .is-done")).not.toBeNull();
 		expect(el.querySelector(".ta-da-link-box .is-doing")).toBeNull();
+	});
+
+	it("draws none while the setting is off, and clears those drawn", () => {
+		let on = true;
+		const { el, children } = section({ enabled: () => on });
+		children[0]?.draw();
+		expect(el.querySelectorAll(".ta-da-link-box")).toHaveLength(1);
+		on = false;
+		children[0]?.draw();
+		expect(el.querySelectorAll(".ta-da-link-box")).toHaveLength(0);
 	});
 
 	it("adds no child to a section without links", () => {

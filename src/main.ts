@@ -34,7 +34,7 @@ export default class TaDaPlugin extends Plugin {
 		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file));
 		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
-		registerLinkBoxes(this, this.taDaIndex);
+		const refreshLinkBoxes = registerLinkBoxes(this, this.taDaIndex, () => this.settings.taskLinkBoxes);
 		const navigator = registerNavigator(this, this.store, newTask);
 		const tab = new TaDaSettingTab(
 			this.app,
@@ -45,14 +45,19 @@ export default class TaDaPlugin extends Plugin {
 				header.refresh();
 			},
 			navigator,
+			(value) => {
+				void this.store.updateTaskLinkBoxes(value);
+				refreshLinkBoxes();
+			},
 		);
 		this.addSettingTab(tab);
 		this.app.workspace.onLayoutReady(() => {
 			const reload = (file: TAbstractFile): void => {
 				if (file.path !== settingsFilePath) return;
-				void this.store.reloadDailyNotes().then((changed) => {
+				void this.store.reloadSettingsFile().then((changed) => {
 					if (!changed) return;
 					navigator.notify();
+					refreshLinkBoxes();
 					tab.refresh();
 				});
 			};

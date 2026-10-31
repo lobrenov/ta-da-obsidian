@@ -23,13 +23,14 @@ class LinkBoxSection extends MarkdownRenderChild {
 	}
 }
 
-/** Registers the Live Preview extension and the Reading view post-processor; open editors redraw when the index changes. */
-export function registerLinkBoxes(plugin: Plugin, taDaIndex: TaDaIndex): void {
+/** Registers the Live Preview extension and the Reading view post-processor; open editors and sections redraw when the index changes. Returns the redraw for when `enabled` changes. */
+export function registerLinkBoxes(plugin: Plugin, taDaIndex: TaDaIndex, enabled: () => boolean): () => void {
 	const { app } = plugin;
 	const host: LinkBoxHost = {
 		index: taDaIndex.index,
 		resolve: (linkpath, sourcePath) => app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath)?.path ?? null,
 		draw: drawRowBox,
+		enabled,
 	};
 	plugin.registerEditorExtension(
 		linkBoxExtension(host, {
@@ -37,7 +38,15 @@ export function registerLinkBoxes(plugin: Plugin, taDaIndex: TaDaIndex): void {
 			isLivePreview: (state) => state.field(editorLivePreviewField, false) === true,
 		}),
 	);
-	plugin.registerMarkdownPostProcessor(linkBoxProcessor(host, (section, draw) => new LinkBoxSection(section, draw, (listener) => taDaIndex.onChange(listener))));
+	const sections = new Set<() => void>();
+	plugin.registerMarkdownPostProcessor(linkBoxProcessor(host, (section, draw) => new LinkBoxSection(section, draw, (listener) => {
+				const stop = taDaIndex.onChange(listener);
+				sections.add(listener);
+				return () => {
+					stop();
+					sections.delete(listener);
+				};
+			})));
 	const refresh = (): void => {
 		for (const leaf of app.workspace.getLeavesOfType("markdown")) {
 			if (!(leaf.view instanceof MarkdownView) || leaf.view.getMode() !== "source") continue;
@@ -47,4 +56,8 @@ export function registerLinkBoxes(plugin: Plugin, taDaIndex: TaDaIndex): void {
 	};
 	plugin.register(taDaIndex.onChange(refresh));
 	void taDaIndex.ready.then(refresh);
+	return () => {
+		refresh();
+		for (const draw of [...sections]) draw();
+	};
 }

@@ -1,14 +1,15 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
-import type { TaDaSettings } from "./settingsData";
+import type { TaDaData } from "./settingsData";
 import { displayDailyNotesSettings, displayNavigatorSettings, type NavigatorSettings } from "./ui/navigator/navigatorSettings";
 
 export class TaDaSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
 		plugin: Plugin,
-		private readonly settings: TaDaSettings,
+		private readonly settings: TaDaData,
 		private readonly changed: () => void,
 		private readonly navigator: NavigatorSettings,
+		private readonly setTaskLinkBoxes: (value: boolean) => void,
 	) {
 		super(app, plugin);
 	}
@@ -29,6 +30,7 @@ export class TaDaSettingTab extends PluginSettingTab {
 					this.changed();
 				}),
 			);
+		new Setting(this.containerEl).setName("Task checkboxes on links").addToggle((toggle) => toggle.setValue(this.settings.taskLinkBoxes).onChange(this.setTaskLinkBoxes));
 		displayNavigatorSettings(this.containerEl, this.navigator);
 		displayDailyNotesSettings(this.containerEl, this.navigator);
 	}
