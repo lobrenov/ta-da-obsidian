@@ -1,14 +1,14 @@
-import { type Menu, Notice, type Plugin, TFile } from "obsidian";
+import { type Menu, type Plugin, TFile } from "obsidian";
 import type { VaultIndex } from "../core/index/vaultIndex";
 import type { Item } from "../core/model/item";
-import type { RepeatRule } from "../core/model/repeatRule";
 import { isClosed, statusChoices } from "../core/model/status";
 import type { Edit, Writer } from "../Writer";
 import { localToday } from "./dates";
-import { agreedDate, agreedParent, fileSetKind } from "./fileActions";
-import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit } from "./header/edits";
+import { fileSetKind } from "./fileActions";
+import { dateFiles, moveFiles, writeEdit } from "./fileEdits";
+import { addTagEdit, removeTagEdit } from "./header/edits";
 import { buildHeaderModel, statusLabel } from "./header/headerModel";
-import { openDatePicker, openParentPicker, openTagPicker, type PickerHost } from "./header/pickers";
+import { openTagPicker, type PickerHost } from "./header/pickers";
 import { moveNote, statusContext, statusTitle } from "./repeatWording";
 import type { StatusActions } from "./statusActions";
 
@@ -18,11 +18,7 @@ import type { StatusActions } from "./statusActions";
  */
 export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: StatusActions, convert: (file: TFile) => void, writer: Writer): void {
 	const host: PickerHost = { app: plugin.app, index, today: localToday };
-	const write = (file: TFile, edit: Edit): void => {
-		writer.apply(file, edit).catch((error: unknown) => {
-			new Notice(`Couldn't save the change: ${error instanceof Error ? error.message : String(error)}`);
-		});
-	};
+	const write = (file: TFile, edit: Edit): void => writeEdit(writer, file, edit);
 	const section = (menu: Menu, title: string, icon: string, onClick: () => void): void => {
 		menu.addItem((entry) => entry.setTitle(title).setIcon(icon).setSection("ta-da").onClick(onClick));
 	};
@@ -49,31 +45,11 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 	};
 
 	const addMove = (menu: Menu, files: TFile[], kind: "task" | "project"): void => {
-		section(menu, "Move…", "folder-tree", () => {
-			const parents = files.flatMap((file) => {
-				const item = index.get(file.path);
-				return item ? [buildHeaderModel(item, index, localToday())?.parent ?? null] : [];
-			});
-			const agreed = agreedParent(parents);
-			openParentPicker(host, kind, agreed ?? null, null, (parent) => {
-				for (const file of files) write(file, parentEdit(parent));
-			}, agreed !== undefined);
-		});
+		section(menu, "Move…", "folder-tree", () => moveFiles(host, writer, files, kind));
 	};
 
 	const addDate = (menu: Menu, files: TFile[], key: "dueDate" | "deadline"): void => {
-		section(menu, key === "dueDate" ? "Schedule…" : "Set deadline…", key === "dueDate" ? "calendar" : "flag", () => {
-			const items = files.flatMap((file) => index.get(file.path) ?? []);
-			const [only] = items;
-			const [first] = files;
-			const repeat =
-				key === "dueDate" && first && only?.properties.kind === "task" && items.length === 1
-					? { item: only, index, set: (rule: RepeatRule | null) => write(first, repeatEdit(rule, first.path, localToday())) }
-					: undefined;
-			openDatePicker(host, key, agreedDate(items, key), null, (date) => {
-				for (const file of files) write(file, dateEdit(key, date));
-			}, repeat);
-		});
+		section(menu, key === "dueDate" ? "Schedule…" : "Set deadline…", key === "dueDate" ? "calendar" : "flag", () => dateFiles(host, writer, files, key));
 	};
 
 	const addTags = (menu: Menu, file: TFile, item: Item): void => {

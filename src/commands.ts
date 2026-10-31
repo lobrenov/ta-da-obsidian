@@ -1,23 +1,40 @@
-import { type Editor, MarkdownView, Notice, type Plugin, TFile } from "obsidian";
+import { type App, type Editor, MarkdownView, type Plugin, TFile } from "obsidian";
 import { extract } from "./core/writing/subtaskExtraction";
+import type { VaultIndex } from "./core/index/vaultIndex";
 import type { Writer } from "./Writer";
 import type { TaDaIndex } from "./TaDaIndex";
 import { localToday } from "./ui/dates";
+import { fileSetKind } from "./ui/fileActions";
+import { dateFiles, moveFiles } from "./ui/fileEdits";
 import { extractSubtask } from "./ui/extractTask";
 import { openConvertModal } from "./ui/convert/ConvertModal";
-import { parentEdit } from "./ui/header/edits";
-import { buildHeaderModel } from "./ui/header/headerModel";
-import { openParentPicker } from "./ui/header/pickers";
 import { NavigatorView } from "./ui/navigator/NavigatorView";
 import { viewKinds, viewSpecs } from "./ui/navigator/views";
 import { NewTaskModal } from "./ui/newTask/NewTaskModal";
 import { type NewTaskContext, prefillDraft } from "./ui/newTask/prefill";
 import { type StatusActions, statusItem } from "./ui/statusActions";
 
+/** The files a command acts on and what they are. */
+export interface FileTargets {
+	files: TFile[];
+	kind: "task" | "project" | "mixed";
+}
+
+/** The active Ta Da view's picks when it has any, else the active file; null unless they are all tasks or projects. */
+export function fileTargets(app: App, index: VaultIndex): FileTargets | null {
+	const picks = app.workspace.getActiveViewOfType(NavigatorView)?.picks ?? [];
+	const active = app.workspace.getActiveFile();
+	const paths = picks.length > 0 ? picks : active instanceof TFile ? [active.path] : [];
+	const kind = fileSetKind(index, paths);
+	if (!kind) return null;
+	const files = paths.flatMap((path) => app.vault.getFileByPath(path) ?? []);
+	return files.length === paths.length ? { files, kind } : null;
+}
+
 /** What the commands need from the plugin. */
 export type CommandsPlugin = Plugin & { taDaIndex: TaDaIndex; writer: Writer; statusActions: StatusActions };
 
-/** New task, Complete, Move to project or area, Convert task to project, and Extract subtask to task. None has a default hotkey. */
+/** New task, Complete, Move to project or area, Schedule, Set deadline, Convert task to project, and Extract subtask to task. None has a default hotkey. */
 /** Returns the New task action, for the views' header buttons. */
 export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: NewTaskContext) => void } {
 	const { app } = plugin;
@@ -51,24 +68,33 @@ export function registerCommands(plugin: CommandsPlugin): { newTask: (context?: 
 		},
 	});
 
+	/** The files Move, Schedule and Set deadline act on, and what they are. */
+	const targets = (): FileTargets | null => fileTargets(app, index);
 	plugin.addCommand({
 		id: "move-to-project-or-area",
 		name: "Move to project or area",
 		checkCallback: (checking) => {
-			const active = activeItem();
-			if (!active) return false;
-			if (!checking) {
-				const item = index.get(active.file.path);
-				const current = item ? (buildHeaderModel(item, index, localToday())?.parent ?? null) : null;
-				openParentPicker(host, active.kind, current, null, (parent) => {
-					plugin.writer.apply(active.file, parentEdit(parent)).catch((error: unknown) => {
-						new Notice(`Couldn't move the file: ${error instanceof Error ? error.message : String(error)}`);
-					});
-				});
-			}
+			const target = targets();
+			if (!target || target.kind === "mixed") return false;
+			if (!checking) moveFiles(host, plugin.writer, target.files, target.kind);
 			return true;
 		},
 	});
+	for (const [id, name, key] of [
+		["schedule", "Schedule", "dueDate"],
+		["set-deadline", "Set deadline", "deadline"],
+	] as const) {
+		plugin.addCommand({
+			id,
+			name,
+			checkCallback: (checking) => {
+				const target = targets();
+				if (!target) return false;
+				if (!checking) dateFiles(host, plugin.writer, target.files, key);
+				return true;
+			},
+		});
+	}
 
 	plugin.addCommand({
 		id: "convert-task-to-project",
