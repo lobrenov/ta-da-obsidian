@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import { filesToLog, loggedProjectsWithOpenTasks, reopenedLogged } from "../src/core/index/logQueries";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { LocalDate } from "../src/core/model/localDate";
+import type { Item } from "../src/core/model/item";
+import { isClosed } from "../src/core/model/status";
 import { parseItem } from "../src/core/parsing/parseItem";
 import { setStatus } from "../src/core/writing/completion";
 import { planLog, type LogPlan } from "../src/core/writing/log";
-import { planUnlog, relinkEdit, type UnlogPlan } from "../src/core/writing/unlog";
+import { moveName, planUnlog, relinkEdit, resolveRelinks, type FileMove, type UnlogPlan } from "../src/core/writing/unlog";
 import { taDaRepo } from "./taDaRepo";
 
 interface Step {
@@ -57,9 +59,11 @@ function changed(before: Files, after: Files): Record<string, string> {
 	return Object.fromEntries([...after].filter(([path, text]) => before.get(path) !== text));
 }
 
+/** `renameFile`: throws when there's no file at `from` or one at `to`. */
 function rename(files: Files, from: string, to: string): void {
 	const text = files.get(from);
 	if (text === undefined) throw new Error(`No file at ${from}`);
+	if (files.has(to)) throw new Error(`${to} exists`);
 	files.delete(from);
 	files.set(to, text);
 }
@@ -70,30 +74,56 @@ function splice(files: Files, path: string, edit: (text: string) => string | nul
 	if (result !== null) files.set(path, result);
 }
 
-/** Applies a plan as step 4 will: a file no longer at its path is skipped, a forward edit that leaves it closed is skipped. Returns the moved paths. */
-function applyLog(files: Files, plan: LogPlan): Record<string, string> {
+/** Moves a file as step 4 does: the name is picked now, from the folder's names now. Returns the new path. */
+function moveNow(files: Files, index: VaultIndex, planned: FileMove, named: Set<string>): string {
+	const item = index.get(planned.from) as Item;
+	const folder = planned.to.slice(0, planned.to.lastIndexOf("/"));
+	const name = moveName(item, filenamesIn(files)(folder), named, index.projectFilenames(item.path));
+	const to = `${folder}/${name}`;
+	rename(files, planned.from, to);
+	if (item.properties.kind === "project") named.add(name);
+	return to;
+}
+
+/**
+ * Applies a plan as step 4 will: a file no longer at its path is skipped, a forward edit that leaves it closed is
+ * skipped, any other failure is recorded and the rest go on. Fails only when nothing moved and nothing rolled forward.
+ */
+function applyLog(files: Files, index: VaultIndex, plan: LogPlan): Record<string, string> {
 	const moved: Record<string, string> = {};
-	for (const { path, edit } of plan.forward) splice(files, path, (text) => edit(text));
-	for (const { from, to } of plan.moves) {
-		if (!files.has(from)) continue;
-		rename(files, from, to);
-		moved[from] = to;
+	const named = new Set<string>();
+	let rolled = false;
+	let firstError: unknown;
+	for (const { path, edit } of plan.forward) {
+		const text = files.get(path);
+		if (text === undefined) continue;
+		const result = edit(text);
+		const item = parseItem(result, path);
+		if (item && !isClosed(item.properties.status)) {
+			files.set(path, result);
+			rolled = true;
+		}
 	}
-	for (const { project, path, from, to } of plan.relinks) {
-		if (project in moved) splice(files, path, relinkEdit(path, from, to));
+	for (const move of plan.moves) {
+		if (!files.has(move.from)) continue;
+		try {
+			moved[move.from] = moveNow(files, index, move, named);
+		} catch (error) {
+			firstError ??= error;
+		}
 	}
+	if (firstError !== undefined && Object.keys(moved).length === 0 && !rolled) throw firstError;
+	for (const { path, from, to } of resolveRelinks(plan.relinks, moved)) splice(files, path, relinkEdit(path, from, to));
 	return moved;
 }
 
-/** Applies a plan as step 4 will: a file no longer at its path fails the step. Returns the moved paths. */
-function applyUnlog(files: Files, plan: UnlogPlan): Record<string, string> {
+/** Applies a plan as step 4 will: names are picked at each move, and the first failure ends the step. Returns the moved paths. */
+function applyUnlog(files: Files, index: VaultIndex, plan: UnlogPlan): Record<string, string> {
 	const moved: Record<string, string> = {};
-	for (const { from, to } of plan.moves) {
-		rename(files, from, to);
-		moved[from] = to;
-	}
-	for (const path of plan.doing) splice(files, path, (text) => setStatus("Doing", text, today));
-	for (const { path, from, to } of plan.relinks) splice(files, path, relinkEdit(path, from, to));
+	const named = new Set<string>();
+	for (const move of plan.moves) moved[move.from] = moveNow(files, index, move, named);
+	for (const path of plan.doing) splice(files, moved[plan.moves.find((move) => move.to === path)?.from ?? ""] ?? path, (text) => setStatus("Doing", text, today));
+	for (const { path, from, to } of resolveRelinks(plan.relinks, moved)) splice(files, path, relinkEdit(path, from, to));
 	return moved;
 }
 
@@ -110,8 +140,8 @@ function runStep(files: Files, name: Step["step"], stale?: { index: VaultIndex; 
 	const step = { step: name, paths, moved: {}, threw: false, index };
 	if (paths.length === 0) return step;
 	try {
-		if (name === "log") step.moved = applyLog(files, planLog(index, paths, today, filenamesIn(files)));
-		else step.moved = applyUnlog(files, planUnlog(index, paths, filenamesIn(files), name === "unlogWaiting" ? paths : []));
+		if (name === "log") step.moved = applyLog(files, index, planLog(index, paths, today, filenamesIn(files)));
+		else step.moved = applyUnlog(files, index, planUnlog(index, paths, filenamesIn(files), name === "unlogWaiting" ? paths : []));
 	} catch {
 		step.threw = true;
 	}
@@ -135,8 +165,9 @@ describe("logging: log", () => {
 	it.each(fixture.log.map((entry) => [entry.name, entry] as const))("%s", (_, entry) => {
 		const files = loadFiles();
 		const before = new Map(files);
-		const plan = planLog(indexOf(files), entry.paths, today, filenamesIn(files));
-		expect(applyLog(files, plan)).toEqual(entry.moved);
+		const index = indexOf(files);
+		const plan = planLog(index, entry.paths, today, filenamesIn(files));
+		expect(applyLog(files, index, plan)).toEqual(entry.moved);
 		expect(changed(before, files)).toEqual(entry.written);
 		expect(plan.folders).toEqual([...new Set(plan.moves.map((move) => move.to.slice(0, move.to.lastIndexOf("/"))))]);
 	});

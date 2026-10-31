@@ -13,7 +13,7 @@ import {
 	type StatusPlan,
 	type UnlogRequest,
 } from "../core/writing/statusRules";
-import { planUnlog, relinkEdit } from "../core/writing/unlog";
+import { planUnlog, relinkEdit, resolveRelinks } from "../core/writing/unlog";
 import { folderOf } from "../core/storage/vault";
 import type { Writer } from "../Writer";
 import { applyStatus } from "./navigator/actions";
@@ -101,12 +101,14 @@ export class StatusActions {
 	/** Puts logged files back: moves through `FileManager` so links follow, then Doing and the project links at the new paths. */
 	private async unlog(request: UnlogRequest): Promise<void> {
 		const plan = planUnlog(this.index, request.paths, (folder) => this.filenamesIn(folder), request.doing);
+		const moved = new Map<string, string>();
 		for (const { from, to } of plan.moves) {
 			const file = this.app.vault.getFileByPath(from);
 			try {
 				if (!file) throw new Error("it isn't in the vault");
 				await this.ensureFolder(folderOf(to));
 				await this.app.fileManager.renameFile(file, to);
+				moved.set(from, to);
 			} catch (error) {
 				new Notice(`Couldn't put “${titleOfPath(from)}” back: ${error instanceof Error ? error.message : String(error)}`);
 				break;
@@ -114,7 +116,7 @@ export class StatusActions {
 		}
 		const back = plan.doing.filter((path) => this.app.vault.getFileByPath(path));
 		await this.apply(back.map((path) => ({ path, status: "Doing" })));
-		for (const { path, from, to } of plan.relinks) {
+		for (const { path, from, to } of resolveRelinks(plan.relinks, moved)) {
 			const file = this.app.vault.getFileByPath(path);
 			if (file) await this.writer.apply(file, relinkEdit(path, from, to)).catch(() => undefined);
 		}

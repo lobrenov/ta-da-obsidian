@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
-import { planUnlog, relinkEdit } from "../src/core/writing/unlog";
+import { planUnlog, relinkEdit, resolveRelinks } from "../src/core/writing/unlog";
 import { makeItem } from "./support";
 
 const project = (path: string, status = "Done") =>
@@ -24,7 +24,11 @@ describe("planUnlog", () => {
 				{ from: "Ta Da/logbook/2026-09/Photos.md", to: "Ta Da/tasks/Photos 2.md" },
 			],
 			doing: ["Ta Da/projects/Kombi.md"],
-			relinks: [],
+			relinks: [
+				{ task: "Ta Da/logbook/2026-09/Listing.md", project: "Ta Da/logbook/2026-09/Kombi.md", from: "Kombi" },
+				{ task: "Ta Da/logbook/2026-09/Photos.md", project: "Ta Da/logbook/2026-09/Kombi.md", from: "Kombi" },
+				{ task: "Ta Da/tasks/Photos.md", project: "Ta Da/logbook/2026-09/Kombi.md", from: "Kombi" },
+			],
 		});
 	});
 
@@ -33,7 +37,7 @@ describe("planUnlog", () => {
 		expect(planUnlog(index, ["Ta Da/logbook/2026-09/Kombi.md"], none)).toEqual({
 			moves: [{ from: "Ta Da/logbook/2026-09/Kombi.md", to: "Ta Da/projects/Kombi.md" }],
 			doing: [],
-			relinks: [],
+			relinks: [{ task: "Ta Da/logbook/2026-09/Listing.md", project: "Ta Da/logbook/2026-09/Kombi.md", from: "Kombi" }],
 		});
 	});
 
@@ -46,7 +50,8 @@ describe("planUnlog", () => {
 		]);
 		const plan = planUnlog(index, ["Ta Da/logbook/2026-08/Accounts.md"], none);
 		expect(plan.moves).toEqual([{ from: "Ta Da/logbook/2026-08/Accounts.md", to: "Ta Da/projects/Accounts 3.md" }]);
-		expect(plan.relinks).toEqual([{ path: "Ta Da/logbook/2026-08/File them.md", from: "Accounts", to: "Accounts 3" }]);
+		const moved = new Map(plan.moves.map((move) => [move.from, move.to]));
+		expect(resolveRelinks(plan.relinks, moved)).toEqual([{ path: "Ta Da/logbook/2026-08/File them.md", from: "Accounts", to: "Accounts 3" }]);
 	});
 
 	it("relinks no task for a logged project that a live project of its title shadows", () => {
@@ -56,7 +61,7 @@ describe("planUnlog", () => {
 			task("Ta Da/logbook/2026-08/Open.md", "Doing", "Accounts"),
 		]);
 		const plan = planUnlog(index, ["Ta Da/logbook/2026-08/Accounts.md", "Ta Da/logbook/2026-08/Open.md"], none);
-		expect(plan.relinks).toEqual([]);
+		expect(resolveRelinks(plan.relinks, new Map(plan.moves.map((move) => [move.from, move.to])))).toEqual([]);
 	});
 
 	it("numbers two projects of one title moved together and skips files that aren't logged or aren't there", () => {

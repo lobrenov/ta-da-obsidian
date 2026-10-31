@@ -12,8 +12,8 @@ import { setProperty } from "./frontmatterEditor";
  * project is logged brings it back too, set to Doing. When a project's name had to change, its tasks' links follow.
  */
 
-/** What the plan reads from the index. */
-export interface UnlogIndex {
+/** What a plan reads from the index. */
+export interface MoveIndex {
 	get(path: string): Item | undefined;
 	projectOf(task: Item): Item | null;
 	tasksIn(project: Item, includingLogged?: boolean): Item[];
@@ -21,14 +21,21 @@ export interface UnlogIndex {
 	projectFilenames(excluding?: string): Set<string>;
 }
 
-export interface UnlogMove {
+/** A file's move, with the destination planned from the folder's names at planning time. */
+export interface FileMove {
 	from: string;
 	to: string;
 }
 
-/** A task's `project` link that names `from` is pointed at `to`. */
+/** A task's `project` link that names the project's old title is pointed at the project's new one. Paths are from before the moves. */
+export interface ProjectRelink {
+	task: string;
+	project: string;
+	from: string;
+}
+
+/** A `project` link to point at `to`, at the task's path once the moves are done. */
 export interface Relink {
-	/** The task's path once the moves are done. */
 	path: string;
 	from: string;
 	to: string;
@@ -36,9 +43,58 @@ export interface Relink {
 
 /** Moves in order (a project before its task), then the paths, once moved, to set to Doing, then the links to follow. */
 export interface UnlogPlan {
-	moves: UnlogMove[];
+	moves: FileMove[];
 	doing: string[];
-	relinks: Relink[];
+	relinks: ProjectRelink[];
+}
+
+/**
+ * The filename a file takes in a folder when it moves: its own, or number-suffixed when `children` (the folder's names
+ * now) hold it. A project's also avoids `named` (the project filenames chosen so far in the run, which the caller adds
+ * each project's name to) and `projectFilenames`.
+ */
+export function moveName(item: Item, children: Iterable<string>, named: Iterable<string>, projectFilenames: Iterable<string>): string {
+	const taken = item.properties.kind === "project" ? [...children, ...named, ...projectFilenames] : [...children];
+	return movedName(item.path, taken);
+}
+
+/** Plans each item's move into the folder `folderFor` gives it, in order, with the folders the moves need. */
+export function planMoves(
+	index: MoveIndex,
+	items: Item[],
+	folderFor: (item: Item) => string,
+	filenamesIn: (folder: string) => Iterable<string>,
+): { moves: FileMove[]; folders: string[] } {
+	const claimed = new Map<string, Set<string>>();
+	const named = new Set<string>();
+	const moves: FileMove[] = [];
+	for (const item of items) {
+		const folder = folderFor(item);
+		const existing = claimed.get(folder) ?? new Set(filenamesIn(folder));
+		claimed.set(folder, existing);
+		const name = moveName(item, existing, named, index.projectFilenames(item.path));
+		existing.add(name);
+		if (item.properties.kind === "project") named.add(name);
+		moves.push({ from: item.path, to: `${folder}/${name}` });
+	}
+	return { moves, folders: [...claimed.keys()] };
+}
+
+/** The links of every task of each project in `items`, to follow if the project's title changes when it moves. */
+export function planRelinks(index: MoveIndex, items: Item[]): ProjectRelink[] {
+	return items
+		.filter((item) => item.properties.kind === "project")
+		.flatMap((project) => index.tasksIn(project, true).map((task) => ({ task: task.path, project: project.path, from: project.title })));
+}
+
+/** The relinks to apply: those of projects that moved and whose title changed, at their tasks' paths after `moved`. */
+export function resolveRelinks(relinks: ProjectRelink[], moved: ReadonlyMap<string, string> | Record<string, string>): Relink[] {
+	const at = (path: string): string | undefined => (moved instanceof Map ? moved.get(path) : Object.hasOwn(moved, path) ? (moved as Record<string, string>)[path] : undefined);
+	return relinks.flatMap(({ task, project, from }) => {
+		const destination = at(project);
+		const to = destination === undefined ? null : titleOfPath(destination);
+		return to === null || to === from ? [] : [{ path: at(task) ?? task, from, to }];
+	});
 }
 
 /**
@@ -47,7 +103,7 @@ export interface UnlogPlan {
  * for a task.
  */
 export function planUnlog(
-	index: UnlogIndex,
+	index: MoveIndex,
 	paths: string[],
 	filenamesIn: (folder: string) => Iterable<string>,
 	doing: string[] = [],
@@ -59,34 +115,11 @@ export function planUnlog(
 		if (!project || !isLogged(project) || paths.includes(project.path) || parents.some((p) => p.path === project.path)) continue;
 		parents.push(project);
 	}
-	const moved = new Map<string, string>();
-	const claimed = new Map<string, Set<string>>();
-	const named = new Set<string>();
-	const moves: UnlogMove[] = [];
-	for (const item of [...parents, ...items]) {
-		if (moved.has(item.path)) continue;
-		const isProject = item.properties.kind === "project";
-		const folder = isProject ? projectFolder : taskFolder;
-		const existing = claimed.get(folder) ?? new Set(filenamesIn(folder));
-		claimed.set(folder, existing);
-		const taken = isProject ? [...existing, ...named, ...index.projectFilenames(item.path)] : [...existing];
-		const name = movedName(item.path, taken);
-		existing.add(name);
-		if (isProject) named.add(name);
-		const to = `${folder}/${name}`;
-		moved.set(item.path, to);
-		moves.push({ from: item.path, to });
-	}
-	const relinks: Relink[] = [];
-	for (const project of [...parents, ...items]) {
-		const to = moved.get(project.path);
-		if (project.properties.kind !== "project" || to === undefined || titleOfPath(to) === project.title) continue;
-		for (const task of index.tasksIn(project, true)) {
-			relinks.push({ path: moved.get(task.path) ?? task.path, from: project.title, to: titleOfPath(to) });
-		}
-	}
+	const ordered = [...parents, ...items].filter((item, at, all) => all.findIndex((other) => other.path === item.path) === at);
+	const { moves } = planMoves(index, ordered, (item) => (item.properties.kind === "project" ? projectFolder : taskFolder), filenamesIn);
+	const moved = new Map(moves.map((move) => [move.from, move.to]));
 	const settled = [...parents.map((parent) => parent.path), ...doing].flatMap((path) => moved.get(path) ?? []);
-	return { moves, doing: [...new Set(settled)], relinks };
+	return { moves, doing: [...new Set(settled)], relinks: planRelinks(index, ordered) };
 }
 
 /** The filename a file keeps in a folder, or its number-suffixed name when `existing` holds it, ignoring case. */
