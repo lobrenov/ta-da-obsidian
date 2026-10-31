@@ -140,6 +140,21 @@ describe("SettingsStore", () => {
 		expect(held.dailyNotes).toEqual(defaultDailyNotes);
 	});
 
+	it("keeps a daily notes change, a task link boxes change and a reload made together", async () => {
+		const files = memoryFiles({ "Ta Da/settings.json": JSON.stringify({ editor: { autocomplete: { tags: true } } }) });
+		const store = new SettingsStore(makePlugin().plugin, files);
+		await store.load();
+		const daily = store.updateDailyNotes({ dailyFolder: "A" });
+		const boxes = store.updateTaskLinkBoxes(false);
+		const reloaded = store.reloadSettingsFile();
+		await Promise.all([daily, boxes]);
+		expect(await reloaded).toBe(false);
+		expect(store.data.taskLinkBoxes).toBe(false);
+		const file = JSON.parse(files.files.get("Ta Da/settings.json") ?? "") as { editor: unknown; dailyNotes: { dailyFolder: string } };
+		expect(file.editor).toEqual({ autocomplete: { tags: true }, taskLinkBoxes: false });
+		expect(file.dailyNotes.dailyFolder).toBe("A");
+	});
+
 	it("drops a reload that reads while a newer change is being written", async () => {
 		const files = memoryFiles();
 		const update = files.update;

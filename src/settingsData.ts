@@ -90,7 +90,7 @@ export interface SettingsFiles {
 /**
  * The one in-memory copy of the settings, shared by the header and the navigator. `data` keeps its identity, so what
  * holds it sees every change. `data.json` takes the header's and the navigator's, saved whole, one at a time, in the
- * order asked; its old `dailyNotes` is kept as it was, for the fallback. The daily notes are in `Ta Da/settings.json`.
+ * order asked; its old `dailyNotes` is kept as it was, for the fallback. The daily notes and `editor.taskLinkBoxes` are in `Ta Da/settings.json`.
  */
 export class SettingsStore {
 	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes }, taskLinkBoxes: true };
@@ -109,8 +109,9 @@ export class SettingsStore {
 		this.data.hideProperties = loaded.hideProperties;
 		this.data.navigator = loaded.navigator;
 		this.savedDailyNotes = typeof saved === "object" && saved !== null ? (saved as { dailyNotes?: unknown }).dailyNotes : undefined;
-		this.data.dailyNotes = await this.readDailyNotes();
-		this.data.taskLinkBoxes = readTaskLinkBoxes(await this.files.read(settingsFilePath));
+		const text = await this.files.read(settingsFilePath);
+		this.data.dailyNotes = await this.readDailyNotes(text);
+		this.data.taskLinkBoxes = readTaskLinkBoxes(text);
 	}
 
 	/**
@@ -119,8 +120,9 @@ export class SettingsStore {
 	 */
 	reloadSettingsFile(): Promise<boolean> {
 		const reloaded = this.queue.then(async () => {
-			const values = await this.readDailyNotes();
-			const taskLinkBoxes = readTaskLinkBoxes(await this.files.read(settingsFilePath));
+			const text = await this.files.read(settingsFilePath);
+			const values = await this.readDailyNotes(text);
+			const taskLinkBoxes = readTaskLinkBoxes(text);
 			if (this.pendingWrites > 0) return false;
 			const changed = JSON.stringify(values) !== JSON.stringify(this.data.dailyNotes) || taskLinkBoxes !== this.data.taskLinkBoxes;
 			this.data.dailyNotes = values;
@@ -132,8 +134,8 @@ export class SettingsStore {
 	}
 
 	/** Per key: the settings file, else `data.json`'s earlier value, else (folder and template) Obsidian's Daily notes setting, else the default. */
-	private async readDailyNotes(): Promise<DailyNotesData> {
-		const file = normalizedDailyNotes(readDailyNotes(await this.files.read(settingsFilePath)));
+	private async readDailyNotes(settingsText: string | null): Promise<DailyNotesData> {
+		const file = normalizedDailyNotes(readDailyNotes(settingsText));
 		const earlier = normalizedDailyNotes(validDailyNotes(this.savedDailyNotes));
 		const obsidianText = await this.files.read(`${this.files.configDir}/daily-notes.json`);
 		const obsidian = normalizedDailyNotes(obsidianText === null ? {} : readObsidianDailyNotes(obsidianText));

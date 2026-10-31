@@ -20,7 +20,7 @@ export default class TaDaPlugin extends Plugin {
 	writer!: Writer;
 	statusActions!: StatusActions;
 	store = new SettingsStore(this, vaultSettingsFiles(this.app));
-	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes`. */
+	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes` and `taskLinkBoxes`. */
 	override settings: TaDaData = this.store.data;
 
 	override async onload(): Promise<void> {
