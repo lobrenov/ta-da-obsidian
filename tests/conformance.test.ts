@@ -9,7 +9,7 @@ import { type TagNode, itemsTagged, tagBrowser, tagSuggestions, tagTree, untagge
 import { type Item, isLogged, type Warning } from "../src/core/model/item";
 import { LocalDate } from "../src/core/model/localDate";
 import { parseItem } from "../src/core/parsing/parseItem";
-import { readDailyNotes, readObsidianDailyNotes, writeDailyNotes, type DailyNotesValues } from "../src/core/storage/settingsFile";
+import { readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeTaskLinkBoxes, type DailyNotesValues } from "../src/core/storage/settingsFile";
 import { contentsOf, tasksOf, trashedItems, type TrashedItem } from "../src/core/storage/trash";
 import { compareCodeUnits } from "../src/core/text";
 import { itemJson } from "./itemJson";
@@ -225,24 +225,31 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 });
 
 interface SettingsExport {
-	read: { name: string; input: string | null; expected: { dailyNotes: Partial<DailyNotesValues> } }[];
+	read: { name: string; input: string | null; expected: { dailyNotes: Partial<DailyNotesValues>; editor?: { taskLinkBoxes?: boolean } } }[];
 	obsidianDailyNotes: { name: string; input: string; expected: Record<string, unknown> }[];
 	write: { name: string; input: string | null; dailyNotes: DailyNotesValues; expected: unknown }[];
+	writeTaskLinkBoxes: { name: string; input: string | null; taskLinkBoxes: boolean; expected: unknown }[];
 }
 
 /** The settings fixture is skipped until the Swift side has written it. */
 const hasSettingsExport = existsSync(join(conformanceFolder, "settings.json"));
-const settingsExport = hasSettingsExport ? loadJson<SettingsExport>("settings.json") : { read: [], obsidianDailyNotes: [], write: [] };
+const settingsExport = hasSettingsExport ? loadJson<SettingsExport>("settings.json") : { read: [], obsidianDailyNotes: [], write: [], writeTaskLinkBoxes: [] };
 
 describe.skipIf(!hasSettingsExport)("settings", () => {
 	it.each(settingsExport.read)("read: $name", ({ input, expected }) => {
 		expect(readDailyNotes(input)).toEqual(expected.dailyNotes);
+		expect(readTaskLinkBoxes(input)).toBe(expected.editor?.taskLinkBoxes ?? true);
 	});
 	it.each(settingsExport.obsidianDailyNotes)("obsidianDailyNotes: $name", ({ input, expected }) => {
 		expect(readObsidianDailyNotes(input)).toEqual(expected);
 	});
 	it.each(settingsExport.write)("write: $name", ({ input, dailyNotes, expected }) => {
 		const text = writeDailyNotes(input, dailyNotes);
+		expect(text.endsWith("\n")).toBe(true);
+		expect(JSON.parse(text)).toEqual(expected);
+	});
+	it.each(settingsExport.writeTaskLinkBoxes)("writeTaskLinkBoxes: $name", ({ input, taskLinkBoxes, expected }) => {
+		const text = writeTaskLinkBoxes(input, taskLinkBoxes);
 		expect(text.endsWith("\n")).toBe(true);
 		expect(JSON.parse(text)).toEqual(expected);
 	});
