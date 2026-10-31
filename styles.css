@@ -1273,7 +1273,7 @@
 
 /* Status checkbox */
 
-.ta-da-navigator .ta-da-checkbox {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox {
 	display: flex;
 	flex: none;
 	align-items: center;
@@ -1294,38 +1294,57 @@
 	cursor: pointer;
 }
 
-.ta-da-navigator .ta-da-checkbox.is-doing { border-color: var(--ta-da-doing); }
-.ta-da-navigator .ta-da-checkbox.is-blocked { border-color: var(--ta-da-blocked); }
-.ta-da-navigator .ta-da-checkbox.is-cancelled { border-color: var(--text-muted); color: var(--text-muted); }
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox.is-doing { border-color: var(--ta-da-doing); }
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox.is-blocked { border-color: var(--ta-da-blocked); }
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox.is-cancelled { border-color: var(--text-muted); color: var(--text-muted); }
 
-.ta-da-navigator .ta-da-checkbox.is-ongoing {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox.is-ongoing {
 	border-color: var(--ta-da-doing);
 	color: var(--ta-da-doing);
 }
 
-.ta-da-navigator .ta-da-checkbox.is-done {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox.is-done {
 	border-color: var(--ta-da-done);
 	background: var(--ta-da-done);
 }
 
-.ta-da-navigator .ta-da-checkbox svg {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox svg {
 	width: 11px;
 	height: 11px;
 	stroke-width: 2.4;
 }
 
-.ta-da-navigator .ta-da-checkbox-mark.is-square {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox-mark.is-square {
 	width: 6px;
 	height: 6px;
 	border-radius: 1.5px;
 	background: var(--ta-da-doing);
 }
 
-.ta-da-navigator .ta-da-checkbox-mark.is-bar {
+:is(.ta-da-navigator, .ta-da-link-box) .ta-da-checkbox-mark.is-bar {
 	width: 8px;
 	height: 1.5px;
 	border-radius: 1px;
 	background: var(--ta-da-blocked);
+}
+
+/* Status box before a link to a task, in Live Preview and Reading view */
+
+.ta-da-link-box {
+	--ta-da-done: var(--color-green);
+	--ta-da-doing: var(--color-cyan);
+	--ta-da-blocked: var(--color-orange);
+
+	display: inline-flex;
+	vertical-align: -0.15em;
+	margin-right: 0.35em;
+}
+
+.ta-da-link-box .ta-da-checkbox {
+	margin: 0;
+	width: 1em;
+	height: 1em;
+	border-radius: 0.25em;
 }
 
 /* Agenda */

@@ -9,6 +9,7 @@ import { localToday } from "./ui/dates";
 import { openConvertModal } from "./ui/convert/ConvertModal";
 import { registerFileMenu } from "./ui/fileMenu";
 import { registerHeader } from "./ui/header/registerHeader";
+import { registerLinkBoxes } from "./ui/registerLinkBoxes";
 import { registerNavigator } from "./ui/navigator/register";
 import { StatusActions } from "./ui/statusActions";
 import { vaultSettingsFiles } from "./vaultFiles";
@@ -33,6 +34,7 @@ export default class TaDaPlugin extends Plugin {
 		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file));
 		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
+		registerLinkBoxes(this, this.taDaIndex);
 		const navigator = registerNavigator(this, this.store, newTask);
 		const tab = new TaDaSettingTab(
 			this.app,
