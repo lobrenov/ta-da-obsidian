@@ -1,7 +1,7 @@
 import { type App, type TFile } from "obsidian";
 import { VaultIndex } from "./core/index/vaultIndex";
 import type { LocalDate } from "./core/model/localDate";
-import { titleOfPath } from "./core/model/item";
+import { isLogged, titleOfPath } from "./core/model/item";
 import { isClosed } from "./core/model/status";
 import { parseItem } from "./core/parsing/parseItem";
 import { folderOf } from "./core/storage/vault";
@@ -61,7 +61,7 @@ export class Logbook {
 				if (status !== undefined && !isClosed(status)) rolled = true;
 				else stayed.push(path);
 			} catch (error) {
-				firstError ??= error;
+				if (await this.exists(path)) firstError ??= error;
 			}
 		}
 		await this.reread(edited);
@@ -69,12 +69,11 @@ export class Logbook {
 		const moves: FileMove[] = [...plan.moves, ...again.flatMap((replanned) => replanned.moves)];
 		for (const move of moves) {
 			const file = this.app.vault.getFileByPath(move.from);
-			const item = this.index.get(move.from);
-			if (!file || !item) continue;
+			if (!file || !(await this.stillCompleted(move.from))) continue;
 			try {
 				moved.set(move.from, await this.moveFile(file, move, named));
 			} catch (error) {
-				firstError ??= error;
+				if (await this.exists(move.from)) firstError ??= error;
 			}
 		}
 		if (firstError !== undefined && moved.size === 0 && !rolled) throw firstError;
@@ -94,11 +93,13 @@ export class Logbook {
 		const named = new Set<string>();
 		let failed: UnlogFailure | null = null;
 		for (const move of plan.moves) {
+			const file = this.app.vault.getFileByPath(move.from);
+			const item = this.index.get(move.from);
+			if (!file || !item || !isLogged(item)) continue;
 			try {
-				const file = this.app.vault.getFileByPath(move.from);
-				if (!file) throw new Error("it isn't in the vault");
 				moved.set(move.from, await this.moveFile(file, move, named));
 			} catch (error) {
+				if (!(await this.exists(move.from))) continue;
 				failed = { path: move.from, error: error instanceof Error ? error : new Error(String(error)) };
 				break;
 			}
@@ -112,6 +113,23 @@ export class Logbook {
 		const relinked = await this.relink(plan.relinks, moved);
 		await this.reread([...settled, ...relinked]);
 		return { moved, failed };
+	}
+
+	/** Whether a file is still there to move; another logger may have moved it. */
+	private exists(path: string): Promise<boolean> {
+		return this.app.vault.adapter.exists(path);
+	}
+
+	/** Whether the file at `path`, as it is now, is still a live Done or Cancelled task or project: a reopen since the plan stops its move. */
+	private async stillCompleted(path: string): Promise<boolean> {
+		const file = this.app.vault.getFileByPath(path);
+		if (!file) return false;
+		try {
+			const item = parseItem(await this.writer.read(file), path);
+			return item !== null && !isLogged(item) && isClosed(item.properties.status);
+		} catch {
+			return false;
+		}
 	}
 
 	/** Moves a file into the folder of its planned destination, under the name that folder allows now. Returns the new path. */

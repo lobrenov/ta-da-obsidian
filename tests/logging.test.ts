@@ -4,7 +4,7 @@ import { LocalDate } from "../src/core/model/localDate";
 import { parseItem } from "../src/core/parsing/parseItem";
 
 const notices: string[] = [];
-const asked: { project: string; tasks: string[]; answer: (as: "Done" | "Cancelled") => void }[] = [];
+const asked: { project: string; tasks: string[]; answer: (as: "Done" | "Cancelled") => void; close: () => void }[] = [];
 vi.mock("obsidian", () => ({
 	Notice: class {
 		constructor(message: string) {
@@ -15,8 +15,9 @@ vi.mock("obsidian", () => ({
 }));
 vi.mock("../src/ui/CompletionModal", () => ({
 	CompletionModal: class {
+		onClose = () => undefined;
 		constructor(_app: unknown, question: { project: { title: string }; tasks: { title: string }[] }, answer: (as: "Done" | "Cancelled") => void) {
-			asked.push({ project: question.project.title, tasks: question.tasks.map((task) => task.title), answer });
+			asked.push({ close: () => this.onClose(), project: question.project.title, tasks: question.tasks.map((task) => task.title), answer });
 		}
 		open(): void {}
 	},
@@ -53,6 +54,7 @@ function setup(initial: Record<string, string>) {
 				for (const path of files.keys()) if (path.startsWith(`${folder}/`)) names.add(path.slice(folder.length + 1).split("/")[0] as string);
 				return names.size > 0 || folders.has(folder) ? { children: [...names].map((name) => ({ name })) } : null;
 			},
+			adapter: { exists: async (path: string) => files.has(path) },
 			createFolder: async (folder: string) => {
 				hooks.beforeFolder();
 				folders.add(folder);
@@ -245,5 +247,123 @@ describe("Logbook header", () => {
 		const none = setup({ "Ta Da/logbook/2026-09/A.md": done() });
 		expect(list({ kind: "logbook" }, context(waiting.index, today)).header.logNow).toEqual({ enabled: true });
 		expect(list({ kind: "logbook" }, context(none.index, today)).header.logNow).toEqual({ enabled: false });
+	});
+});
+
+describe("review fixes", () => {
+	it("the minute check runs once a day after a failed run, and again at the day change", async () => {
+		const { files, hooks, daily } = setup({ "Ta Da/tasks/A.md": done() });
+		let tries = 0;
+		hooks.beforeRename = () => {
+			tries++;
+			throw new Error("disk full");
+		};
+		await daily.logIfDue();
+		await daily.atDayChange();
+		await daily.atDayChange();
+		expect(tries).toBe(1);
+		await daily.logIfDue();
+		expect(tries).toBe(2);
+		expect(files.has("Ta Da/tasks/A.md")).toBe(true);
+	});
+
+	it("runs the minute check when nothing has been attempted", async () => {
+		const { files, daily } = setup({ "Ta Da/tasks/A.md": done() });
+		await daily.atDayChange();
+		expect(files.has("Ta Da/logbook/2026-10/A.md")).toBe(true);
+	});
+
+	it("Log now asks about each project in turn, then logs", async () => {
+		const { files, daily } = setup({
+			"Ta Da/projects/P.md": project("Done"),
+			"Ta Da/projects/Q.md": project("Done"),
+			"Ta Da/tasks/T.md": open('project: "[[P]]"\n'),
+			"Ta Da/tasks/U.md": open('project: "[[Q]]"\n'),
+		});
+		await daily.logNow();
+		expect(asked.map((question) => question.project)).toEqual(["P"]);
+		asked[0]?.answer("Done");
+		await waitFor(() => expect(asked.map((question) => question.project)).toEqual(["P", "Q"]));
+		asked[1]?.answer("Cancelled");
+		await waitFor(() => expect(files.has("Ta Da/logbook/2026-10/Q.md")).toBe(true));
+		expect(files.get("Ta Da/logbook/2026-10/U.md")).toContain("status: Cancelled");
+	});
+
+	it("cancelling Log now's question logs the rest without asking again", async () => {
+		const { files, daily } = setup({
+			"Ta Da/projects/P.md": project("Done"),
+			"Ta Da/tasks/T.md": open('project: "[[P]]"\n'),
+			"Ta Da/tasks/D.md": done(),
+		});
+		await daily.logNow();
+		asked[0]?.close();
+		await waitFor(() => expect(files.has("Ta Da/logbook/2026-10/D.md")).toBe(true));
+		expect(asked).toHaveLength(1);
+		expect(files.has("Ta Da/projects/P.md")).toBe(true);
+	});
+
+	it("Log now does nothing while a run is in progress", async () => {
+		const { files, hooks, daily } = setup({ "Ta Da/tasks/A.md": done(), "Ta Da/tasks/B.md": done() });
+		let during: Promise<void> | undefined;
+		hooks.beforeRename = (from) => {
+			if (from === "Ta Da/tasks/A.md") during = daily.logNow();
+		};
+		await daily.logIfDue();
+		await during;
+		expect(asked).toEqual([]);
+		expect(files.has("Ta Da/logbook/2026-10/B.md")).toBe(true);
+	});
+
+	it("skips a file that vanishes during its move, with no error", async () => {
+		const { files, hooks, logbook } = setup({ "Ta Da/tasks/A.md": done(), "Ta Da/tasks/B.md": done() });
+		hooks.beforeRename = (from) => {
+			if (from === "Ta Da/tasks/A.md") {
+				files.delete(from);
+				throw new Error("ENOENT");
+			}
+		};
+		expect(await logbook.log(["Ta Da/tasks/A.md", "Ta Da/tasks/B.md"], today)).toEqual({ "Ta Da/tasks/B.md": "Ta Da/logbook/2026-10/B.md" });
+		const { logbook: only, hooks: onlyHooks, files: onlyFiles } = setup({ "Ta Da/tasks/A.md": done() });
+		onlyHooks.beforeRename = (from) => {
+			onlyFiles.delete(from);
+			throw new Error("ENOENT");
+		};
+		expect(await only.log(["Ta Da/tasks/A.md"], today)).toEqual({});
+	});
+
+	it("puts back the rest when a file vanishes during its move", async () => {
+		const { files, hooks, logbook } = setup({ "Ta Da/logbook/2026-09/A.md": open(), "Ta Da/logbook/2026-09/B.md": open() });
+		hooks.beforeRename = (from) => {
+			if (from.endsWith("A.md")) {
+				files.delete(from);
+				throw new Error("ENOENT");
+			}
+		};
+		const { moved, failed } = await logbook.unlog({ paths: ["Ta Da/logbook/2026-09/A.md", "Ta Da/logbook/2026-09/B.md"], doing: [] });
+		expect(failed).toBeNull();
+		expect([...moved]).toEqual([["Ta Da/logbook/2026-09/B.md", "Ta Da/tasks/B.md"]]);
+	});
+
+	it("doesn't log a file that was reopened after the plan", async () => {
+		const { files, hooks, logbook } = setup({ "Ta Da/tasks/A.md": done(), "Ta Da/tasks/B.md": done() });
+		hooks.beforeRename = (from) => {
+			if (from === "Ta Da/tasks/A.md") files.set("Ta Da/tasks/B.md", open());
+		};
+		expect(await logbook.log(["Ta Da/tasks/A.md", "Ta Da/tasks/B.md"], today)).toEqual({ "Ta Da/tasks/A.md": "Ta Da/logbook/2026-10/A.md" });
+		expect(files.has("Ta Da/tasks/B.md")).toBe(true);
+	});
+
+	it("doesn't put back a file that another logger already moved", async () => {
+		const { files, index, hooks, logbook } = setup({ "Ta Da/logbook/2026-09/A.md": open(), "Ta Da/logbook/2026-09/B.md": open() });
+		hooks.beforeRename = (from) => {
+			if (from.endsWith("A.md")) {
+				files.set("Ta Da/tasks/B.md", files.get("Ta Da/logbook/2026-09/B.md") as string);
+				files.delete("Ta Da/logbook/2026-09/B.md");
+				index.remove("Ta Da/logbook/2026-09/B.md");
+			}
+		};
+		const { moved, failed } = await logbook.unlog({ paths: ["Ta Da/logbook/2026-09/A.md", "Ta Da/logbook/2026-09/B.md"], doing: [] });
+		expect(failed).toBeNull();
+		expect([...moved.keys()]).toEqual(["Ta Da/logbook/2026-09/A.md"]);
 	});
 });

@@ -24,6 +24,8 @@ const paths = (items: Item[]): string[] => items.map((item) => item.path);
  */
 export class DailyLog {
 	private running = false;
+	/** The day the run last started, in memory: a failed run isn't tried again until the next open or day change. */
+	private attempted: LocalDate | null = null;
 
 	constructor(
 		private readonly app: App,
@@ -43,6 +45,7 @@ export class DailyLog {
 		const day = this.today();
 		if (this.running || this.settings.lastLogged?.equals(day)) return;
 		this.running = true;
+		this.attempted = day;
 		try {
 			let succeeded = await this.step("log the files", async () => void (await this.logbook.log(paths(filesToLog(this.index, day)), day)));
 			succeeded = (await this.step("put back the reopened files", () => this.putBack(paths(reopenedLogged(this.index)), []))) && succeeded;
@@ -54,23 +57,51 @@ export class DailyLog {
 		}
 	}
 
-	/** Logs every completed file. A completed project that still has open tasks asks first, and logging goes on once it's answered. */
+	/** The minute check: runs when the day isn't the one the run last started on. */
+	async atDayChange(): Promise<void> {
+		if (!this.attempted?.equals(this.today())) await this.logIfDue();
+	}
+
+	/**
+	 * Logs every completed file. A completed project that still has open tasks asks first, one project at a time, and
+	 * logging goes on once it's answered. Cancelling the question logs without asking again: the waiting projects stay.
+	 */
 	async logNow(): Promise<void> {
+		if (this.running) return;
 		const project = this.index.projects
 			.filter((item) => isClosed(item.properties.status) && this.index.openTasksIn(item).length > 0)
 			.sort(byTitle)[0];
 		if (!project) {
-			await this.step("log the files", async () => void (await this.logbook.log(paths(filesToLog(this.index, null)))));
+			await this.logAll();
 			return;
 		}
-		const tasks = this.index.openTasksIn(project);
-		const question = { project, status: project.properties.status as ClosedStatus, tasks };
-		new CompletionModal(this.app, question, (tasksAs) => {
+		const question = { project, status: project.properties.status as ClosedStatus, tasks: this.index.openTasksIn(project) };
+		let answered = false;
+		const modal = new CompletionModal(this.app, question, (tasksAs) => {
+			answered = true;
 			void this.status
 				.answer(question, tasksAs)
 				.then((changed) => this.logbook.reread(changed))
-				.then(() => this.step("log the files", async () => void (await this.logbook.log(paths(filesToLog(this.index, null))))));
-		}).open();
+				.then(() => this.logNow());
+		});
+		const onClose = modal.onClose.bind(modal);
+		modal.onClose = () => {
+			onClose();
+			queueMicrotask(() => {
+				if (!answered) void this.logAll();
+			});
+		};
+		modal.open();
+	}
+
+	private async logAll(): Promise<void> {
+		if (this.running) return;
+		this.running = true;
+		try {
+			await this.step("log the files", async () => void (await this.logbook.log(paths(filesToLog(this.index, null)))));
+		} finally {
+			this.running = false;
+		}
 	}
 
 	private async putBack(files: string[], doing: string[]): Promise<void> {

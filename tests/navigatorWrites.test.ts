@@ -32,6 +32,31 @@ function makePlugin(): { plugin: never; handlers: Record<string, Handler>; unloa
 const file = (path: string): object => Object.assign(new TFile(), { path, extension: "md" });
 const task = (status: string): string => `---\ntype: task\nstatus: ${status}\n---\n`;
 
+describe("TaDaIndex.built", () => {
+	const withFiles = (plugin: never, count: number): void => {
+		(plugin as { app: { vault: { getFiles: () => object[] } } }).app.vault.getFiles = () => Array.from({ length: count }, (_, at) => file(`Ta Da/tasks/${at}.md`));
+	};
+
+	it("is true once every file is read", async () => {
+		const { plugin } = makePlugin();
+		withFiles(plugin, 3);
+		const index = new TaDaIndex(plugin);
+		index.start();
+		await index.ready;
+		expect(index.built).toBe(true);
+	});
+
+	it("stays false when the plugin unloads first, though ready resolves", async () => {
+		const { plugin, unload } = makePlugin();
+		withFiles(plugin, 200);
+		const index = new TaDaIndex(plugin);
+		index.start();
+		unload();
+		await index.ready;
+		expect(index.built).toBe(false);
+	});
+});
+
 describe("TaDaIndex.onChange", () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());

@@ -18,6 +18,8 @@ export class TaDaIndex {
 	readonly index = new VaultIndex();
 	/** Resolves once every file has been read, or the plugin unloaded first. */
 	readonly ready: Promise<void>;
+	/** Whether every file has been read: false until then, and for good if the plugin unloaded first. */
+	built = false;
 	private resolveReady: () => void = () => undefined;
 	private unloaded = false;
 	private lastGeneration = 0;
@@ -73,6 +75,7 @@ export class TaDaIndex {
 		for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
 			await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
 		}
+		if (!this.unloaded) this.built = true;
 		this.resolveReady();
 		this.changed();
 	}

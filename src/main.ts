@@ -36,6 +36,7 @@ export default class TaDaPlugin extends Plugin {
 		this.logbook = logbook;
 		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday, logbook);
 		this.dailyLog = new DailyLog(this.app, this.taDaIndex.index, logbook, this.statusActions, this.store, localToday);
+		this.registerInterval(window.setInterval(() => void (this.taDaIndex.built ? this.dailyLog.atDayChange() : undefined), 60_000));
 		this.addStatusCommands();
 		const { index } = this.taDaIndex;
 		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file), this.writer);
@@ -60,8 +61,7 @@ export default class TaDaPlugin extends Plugin {
 		this.addSettingTab(tab);
 		this.app.workspace.onLayoutReady(() => {
 			void this.taDaIndex.ready.then(() => {
-				void this.dailyLog.logIfDue();
-				this.registerInterval(window.setInterval(() => void this.dailyLog.logIfDue(), 60_000));
+				if (this.taDaIndex.built) void this.dailyLog.logIfDue();
 			});
 			const reload = (file: TAbstractFile): void => {
 				if (file.path !== settingsFilePath) return;
