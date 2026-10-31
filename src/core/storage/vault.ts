@@ -1,3 +1,5 @@
+import type { LocalDate } from "../model/localDate";
+
 /** Ta Da's own folder, at the top level: what Ta Da creates goes in it. */
 export const home = "Ta Da";
 export const taskFolder = `${home}/tasks`;
@@ -6,6 +8,11 @@ export const areaFolder = `${home}/areas`;
 export const attachmentFolder = `${home}/attachments`;
 export const logbookFolder = `${home}/logbook`;
 export const trashFolder = ".trash";
+
+/** `Ta Da/logbook/2026-10` for a file completed in October 2026. */
+export function logbookFolderFor(date: LocalDate): string {
+	return `${logbookFolder}/${date.toString().slice(0, 7)}`;
+}
 
 /** The spec's image extensions, lowercase. */
 export const imageExtensions: ReadonlySet<string> = new Set([

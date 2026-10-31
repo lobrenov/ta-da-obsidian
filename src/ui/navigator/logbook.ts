@@ -1,12 +1,15 @@
 import { repeatMove } from "../../core/index/repeatMove";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { byTitle } from "../../core/index/vaultIndex";
+import { waitsForOpenTasks } from "../../core/index/logQueries";
 import { type Item, isLogged, subtasks } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed } from "../../core/model/status";
 import { monthTitle } from "../dates";
 import { dayMonth, wideWeekdayDayMonth } from "./dates";
 import type { ArchiveRowModel } from "./rows";
+
+export { waitsForOpenTasks };
 
 export type LogbookGroupKind = "logsTonight" | "waitsForOpenTasks" | "logged";
 
@@ -23,13 +26,6 @@ export function logbookItems(index: VaultIndex): Item[] {
 	return [...index.items.values()]
 		.filter((item) => item.properties.kind !== "area" && item.properties.kind !== "note" && (isLogged(item) || isClosed(item.properties.status)))
 		.sort(byTitle);
-}
-
-/** Whether a file waits to be logged: a live Done or Cancelled project that still has open tasks, or one of its tasks. */
-export function waitsForOpenTasks(index: VaultIndex, item: Item): boolean {
-	const project = item.properties.kind === "project" ? item : index.projectOf(item);
-	if (!project || isLogged(project) || !isClosed(project.properties.status)) return false;
-	return index.openTasksIn(project).length > 0;
 }
 
 /**

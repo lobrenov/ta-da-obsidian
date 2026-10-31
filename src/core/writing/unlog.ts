@@ -90,7 +90,7 @@ export function planUnlog(
 }
 
 /** The filename a file keeps in a folder, or its number-suffixed name when `existing` holds it, ignoring case. */
-function movedName(path: string, existing: Iterable<string>): string {
+export function movedName(path: string, existing: Iterable<string>): string {
 	const current = path.split("/").pop() ?? path;
 	const taken = [...existing];
 	if (!taken.some((name) => identityKey(name) === identityKey(current))) return current;
