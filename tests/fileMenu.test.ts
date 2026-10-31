@@ -9,6 +9,8 @@ vi.mock("obsidian", () => ({
 	ItemView: class {},
 	Keymap: {},
 	Platform: {},
+	Modal: class {},
+	SuggestModal: class {},
 	Menu: class {
 		showAtMouseEvent(event: unknown): void {
 			shown.push(event);
@@ -66,31 +68,36 @@ function setup() {
 		makeItem("Ta Da/tasks/Last.md", "type: task\nstatus: Doing\ndueDate: 2026-10-05\nrepeat: every week until 2026-10-06"),
 		makeItem("Notes/Plain.md", ""),
 	]);
-	let handler: (menu: unknown, file: unknown) => void = () => undefined;
+	const handlers = new Map<string, (menu: unknown, file: unknown) => void>();
 	const names: string[] = [];
 	const plugin = {
-		app: { workspace: { on: (name: string, callback: typeof handler) => void (names.push(name), (handler = callback)) } },
+		app: { workspace: { on: (name: string, callback: (menu: unknown, file: unknown) => void) => void (names.push(name), handlers.set(name, callback)) } },
 		registerEvent: () => undefined,
 	};
 	const set = vi.fn();
 	const convert = vi.fn();
-	registerFileMenu(plugin as never, index, { set } as never, convert);
+	registerFileMenu(plugin as never, index, { set } as never, convert, { apply: vi.fn() } as never);
+	const handler = (): ((menu: unknown, file: unknown) => void) => handlers.get("file-menu") ?? (() => undefined);
 	return { open: (path: string) => {
 		const { menu, entries } = recorder();
-		handler(menu, file(path));
+		handlers.get("file-menu")?.(menu, file(path));
 		return entries;
-	}, set, convert, names, handler: () => handler };
+	}, openAll: (paths: string[]) => {
+		const { menu, entries } = recorder();
+		handlers.get("files-menu")?.(menu, paths.map(file));
+		return entries;
+	}, set, convert, names, handler };
 }
 
 describe("the file menu's Status…", () => {
 	it("registers on file-menu", () => {
-		expect(setup().names).toEqual(["file-menu"]);
+		expect(setup().names).toEqual(["file-menu", "files-menu"]);
 	});
 
 	it("is added to a task with every status but Ongoing, the current one checked", () => {
 		const { open } = setup();
 		const [status, ...rest] = open("Ta Da/tasks/Trip.md");
-		expect(rest.map((entry) => entry.title)).toEqual(["Convert to project…"]);
+		expect(rest.map((entry) => entry.title)).toEqual(["Move…", "Schedule…", "Set deadline…", "Tags…", "Convert to project…"]);
 		expect(status?.title).toBe("Status…");
 		expect(status?.section).toBe("ta-da");
 		expect(status?.sub.map((entry) => entry.title)).toEqual(["Not started", "Doing", "Blocked", "|", "Done", "Cancelled"]);
@@ -125,14 +132,14 @@ describe("the file menu's Status…", () => {
 
 	it("adds Convert to project… after Status… in the same section on a task, and opens it for the file", () => {
 		const { open, convert } = setup();
-		const [status, convertItem] = open("Ta Da/tasks/Trip.md");
+		const [status, , , , , convertItem] = open("Ta Da/tasks/Trip.md");
 		expect(convertItem?.section).toBe(status?.section);
 		convertItem?.click();
 		expect(convert).toHaveBeenCalledWith(expect.objectContaining({ path: "Ta Da/tasks/Trip.md" }));
 	});
 
 	it("does not offer Convert to project… on a project", () => {
-		expect(setup().open("Ta Da/projects/Home.md").map((entry) => entry.title)).toEqual(["Status…"]);
+		expect(setup().open("Ta Da/projects/Home.md").map((entry) => entry.title)).toEqual(["Status…", "Move…", "Schedule…", "Set deadline…", "Tags…"]);
 	});
 
 	it("is not added for other files or for folders", () => {
@@ -159,11 +166,70 @@ describe("a row's right-click", () => {
 		const view = Object.assign(Object.create(NavigatorView.prototype), {
 			app: { vault: { getFileByPath: (path: string) => (path === target.path ? target : null) }, workspace: { trigger } },
 			leaf,
+			pickedRows: { paths: [], anchor: null },
 		});
 		const event = { preventDefault: vi.fn() };
 		(view as unknown as { fileMenu: (path: string, event: unknown) => void }).fileMenu(target.path, event);
 		expect(trigger).toHaveBeenCalledWith("file-menu", expect.anything(), target, "ta-da", leaf);
 		expect(shown).toEqual([event]);
 		expect(event.preventDefault).toHaveBeenCalled();
+	});
+});
+
+describe("the files menu", () => {
+	const titles = (paths: string[]) => setup().openAll(paths).map((entry) => entry.title);
+	const all = ["Status…", "Move…", "Schedule…", "Set deadline…"];
+
+	it("offers every item for tasks only and for projects only", () => {
+		expect(titles(["Ta Da/tasks/Trip.md", "Ta Da/tasks/Water.md"])).toEqual(all);
+		expect(titles(["Ta Da/projects/Home.md"])).toEqual(all);
+	});
+
+	it("leaves Move… out of a mix of tasks and projects", () => {
+		expect(titles(["Ta Da/tasks/Trip.md", "Ta Da/projects/Home.md"])).toEqual(["Status…", "Schedule…", "Set deadline…"]);
+	});
+
+	it("offers nothing when a file in the set isn't a Ta Da task or project", () => {
+		expect(titles(["Ta Da/tasks/Trip.md", "Notes/Plain.md"])).toEqual([]);
+		expect(titles([])).toEqual([]);
+	});
+
+	it("sets the chosen status on every file", () => {
+		const { openAll, set } = setup();
+		openAll(["Ta Da/tasks/Trip.md", "Ta Da/tasks/Water.md"])[0]?.sub.find((entry) => entry.title.startsWith("Done"))?.click();
+		expect(set.mock.calls.map(([target, status]) => [(target as { path: string }).path, status])).toEqual([
+			["Ta Da/tasks/Trip.md", "Done"],
+			["Ta Da/tasks/Water.md", "Done"],
+		]);
+	});
+});
+
+describe("a row's right-click with picks", () => {
+	function view(picked: string[]) {
+		const files = new Map(["a", "b", "c"].map((name) => [name, file(name)]));
+		const trigger = vi.fn();
+		const leaf = {};
+		const instance = Object.assign(Object.create(NavigatorView.prototype), {
+			app: { vault: { getFileByPath: (path: string) => files.get(path) ?? null }, workspace: { trigger } },
+			leaf,
+			pickedRows: { paths: picked, anchor: picked[0] ?? null },
+			highlight: () => undefined,
+		});
+		const event = { preventDefault: vi.fn() };
+		const open = (path: string) => (instance as unknown as { fileMenu: (path: string, event: unknown) => void }).fileMenu(path, event);
+		return { files, trigger, leaf, instance, open };
+	}
+
+	it("opens the files menu for the picks when the row is one of several", () => {
+		const { files, trigger, leaf, open } = view(["a", "c"]);
+		open("c");
+		expect(trigger).toHaveBeenCalledWith("files-menu", expect.anything(), [files.get("a"), files.get("c")], "ta-da", leaf);
+	});
+
+	it("clears the picks and opens the file menu on a row that isn't picked", () => {
+		const { files, trigger, instance, open } = view(["a", "c"]);
+		open("b");
+		expect(trigger).toHaveBeenCalledWith("file-menu", expect.anything(), files.get("b"), "ta-da", expect.anything());
+		expect(instance.picks).toEqual([]);
 	});
 });

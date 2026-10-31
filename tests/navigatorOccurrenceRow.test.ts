@@ -47,6 +47,7 @@ describe("an occurrence row", () => {
 		const view = Object.assign(Object.create(NavigatorView.prototype) as object, {
 			rowEls: new Map<string, HTMLElement[]>(),
 			selected: null,
+			pickedRows: { paths: [], anchor: null },
 			app: { vault: { getFileByPath: () => file }, workspace: { getLeaf: () => ({ openFile: () => Promise.resolve() }) } },
 		}) as unknown as { renderRow(parent: HTMLElement, row: unknown): void };
 		const parent = document.createElement("div");

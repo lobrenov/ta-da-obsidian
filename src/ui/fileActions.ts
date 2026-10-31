@@ -1,0 +1,21 @@
+import type { VaultIndex } from "../core/index/vaultIndex";
+import type { Item } from "../core/model/item";
+import type { LocalDate } from "../core/model/localDate";
+
+/** What a set of files is, for the items the file menus offer: all tasks, all projects, a mix, or not all Ta Da tasks and projects (null). */
+export function fileSetKind(index: VaultIndex, paths: readonly string[]): "task" | "project" | "mixed" | null {
+	const kinds = new Set<string>();
+	for (const path of paths) {
+		const kind = index.get(path)?.properties.kind;
+		if (kind !== "task" && kind !== "project") return null;
+		kinds.add(kind);
+	}
+	return kinds.size === 0 ? null : kinds.size === 1 ? (kinds.has("task") ? "task" : "project") : "mixed";
+}
+
+/** The date every item has for `key`, null when they differ or have none. */
+export function agreedDate(items: readonly Item[], key: "dueDate" | "deadline"): LocalDate | null {
+	const [first, ...rest] = items.map((item) => item.properties[key]);
+	if (!first) return null;
+	return rest.every((date) => date?.equals(first)) ? first : null;
+}

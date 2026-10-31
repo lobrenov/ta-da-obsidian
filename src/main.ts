@@ -31,7 +31,7 @@ export default class TaDaPlugin extends Plugin {
 		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday);
 		this.addStatusCommands();
 		const { index } = this.taDaIndex;
-		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file));
+		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file), this.writer);
 		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
 		const refreshLinkBoxes = registerLinkBoxes(this, this.taDaIndex, () => this.settings.taskLinkBoxes);

@@ -25,7 +25,7 @@ import { buildList, type ListContext, type ListModel, type SectionHeader, type S
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
-import { moveSelection } from "./selection";
+import { moveSelection, type Picks, pickClick } from "./selection";
 import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
 import { defaultDomain, offersDomain, type ViewKind, viewSpecs } from "./views";
@@ -59,6 +59,7 @@ export class NavigatorView extends ItemView {
 	private readonly expanded = new Set<string>();
 	private query = "";
 	private selected: string | null = null;
+	private pickedRows: Picks = { paths: [], anchor: null };
 	private trash: TrashedItem[] = [];
 	private today: LocalDate = localToday();
 	private paths: string[] = [];
@@ -337,11 +338,37 @@ export class NavigatorView extends ItemView {
 
 	/** Highlights a path's rows, which follows the active file. */
 	private select(path: string | null, scroll: boolean): void {
-		if (this.selected !== null) for (const el of this.rowEls.get(this.selected) ?? []) el.removeClass("is-selected");
 		this.selected = path;
-		const rows = path === null ? [] : (this.rowEls.get(path) ?? []);
-		for (const el of rows) el.addClass("is-selected");
-		if (scroll) rows[0]?.scrollIntoView({ block: "nearest" });
+		this.highlight();
+		if (scroll && path !== null) this.rowEls.get(path)?.[0]?.scrollIntoView({ block: "nearest" });
+	}
+
+	/** The files picked in the list with ⌘-click (Ctrl-click) and Shift-click, in list order. */
+	get picks(): readonly string[] {
+		return this.pickedRows.paths;
+	}
+
+	/** Marks the picked rows, or the selected file's when nothing is picked. */
+	private highlight(): void {
+		const marked = new Set(this.pickedRows.paths.length > 0 ? this.pickedRows.paths : this.selected === null ? [] : [this.selected]);
+		for (const [path, els] of this.rowEls) for (const el of els) el.classList.toggle("is-selected", marked.has(path));
+	}
+
+	private setPicks(picks: Picks): void {
+		this.pickedRows = picks;
+		this.highlight();
+	}
+
+	/** A click on a task or project row picks it, on desktop with ⌘ (Ctrl) or Shift held; returns whether it did. Any other click clears the picks. */
+	private pickRow(path: string, event: MouseEvent): boolean {
+		const mode = event.shiftKey ? "range" : Keymap.isModifier(event, "Mod") ? "toggle" : null;
+		if (mode === null || Platform.isMobile) {
+			if (this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });
+			return false;
+		}
+		const anchor = this.pickedRows.anchor ?? this.selected;
+		this.setPicks(pickClick(this.paths, { paths: this.pickedRows.paths, anchor }, path, mode));
+		return true;
 	}
 
 	private toggleFold(id: string): void {
@@ -387,20 +414,33 @@ export class NavigatorView extends ItemView {
 		if (file) this.deps.status.set(file, row.closed ? "Not Started" : "Done");
 	}
 
-	/** Obsidian's file menu for a row's file, with the items plugins add to it. */
+	/**
+	 * Obsidian's file menu for a row's file, with the items plugins add to it: its files menu for the picks when the row
+	 * is one of several. A row that isn't picked clears the picks.
+	 */
 	private fileMenu(path: string, event: MouseEvent): void {
 		const file = this.app.vault.getFileByPath(path);
 		if (!file) return;
 		event.preventDefault();
 		const menu = new Menu();
-		this.app.workspace.trigger("file-menu", menu, file, "ta-da", this.leaf);
+		const picked = this.pickedRows.paths;
+		if (picked.length > 1 && picked.includes(path)) {
+			const files = picked.flatMap((pick) => this.app.vault.getFileByPath(pick) ?? []);
+			this.app.workspace.trigger("files-menu", menu, files, "ta-da", this.leaf);
+		} else {
+			if (picked.length > 0) this.setPicks({ paths: [], anchor: null });
+			this.app.workspace.trigger("file-menu", menu, file, "ta-da", this.leaf);
+		}
 		menu.showAtMouseEvent(event);
 	}
 
 	// Keys
 
 	private onListKey(event: KeyboardEvent): void {
-		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+		if (event.key === "Escape" && this.pickedRows.paths.length > 0) {
+			event.preventDefault();
+			this.setPicks({ paths: [], anchor: null });
+		} else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 			event.preventDefault();
 			this.move(event.key === "ArrowDown" ? 1 : -1);
 		} else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && this.domain.kind === "agenda" && this.query.trim() === "") {
@@ -425,6 +465,7 @@ export class NavigatorView extends ItemView {
 	}
 
 	private move(delta: 1 | -1): void {
+		if (this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });
 		const next = moveSelection(this.paths, this.selected, delta);
 		if (next !== null) this.select(next, true);
 	}
@@ -486,7 +527,9 @@ export class NavigatorView extends ItemView {
 		if (list.empty !== null) body.createDiv({ cls: "ta-da-empty", text: list.empty });
 		for (const section of list.sections) this.renderSection(body, section, list);
 		body.scrollTop = scrollTop;
-		if (this.selected !== null) for (const el of this.rowEls.get(this.selected) ?? []) el.addClass("is-selected");
+		const paths = this.pickedRows.paths.filter((path) => this.paths.includes(path));
+		this.pickedRows = { paths, anchor: paths.length > 0 ? this.pickedRows.anchor : null };
+		this.highlight();
 	}
 
 	private renderHead(list: ListModel): void {
@@ -734,7 +777,12 @@ export class NavigatorView extends ItemView {
 		if (row.path === null) return;
 		const path = row.path;
 		this.track(path, el);
-		el.addEventListener("click", (event) => this.openPath(path, event));
+		const pickable = row.type === "task" || row.type === "project";
+		el.addEventListener("click", (event) => {
+			if (pickable && this.pickRow(path, event)) return;
+			if (!pickable && this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });
+			this.openPath(path, event);
+		});
 	}
 
 	/** A day in a week's list: its note's first paragraph, what's due, and its dots. Clicking it picks the day. */

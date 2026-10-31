@@ -32,6 +32,12 @@ export function openBelow(modal: Modal, anchor: HTMLElement): void {
 	if (!Platform.isPhone) placeBelow(modal, anchor);
 }
 
+/** Opens a modal below its anchor; without one it opens where Obsidian puts it. */
+function openAt(modal: Modal, anchor: HTMLElement | null): void {
+	if (anchor) openBelow(modal, anchor);
+	else modal.open();
+}
+
 /** What a repeating task's status menu says: where completing it moves it. */
 export interface StatusRepeat {
 	move: RepeatMove | null;
@@ -63,27 +69,26 @@ export function openParentPicker(host: PickerHost, kind: Kind, current: Parent |
 	const choices = parentChoices(kind, host.index, current);
 	const placeholder = kind === "project" ? "Set the area" : "Move to a project or area";
 	const modal = new ParentModal(host.app, placeholder, choices, (choice) => choose(choice.parent));
-	if (anchor) openBelow(modal, anchor);
-	else modal.open();
+	openAt(modal, anchor);
 }
 
-/** The date menu; `repeat` gives a task's due date menu its Repeat section. */
+/** The date menu; `repeat` gives a task's due date menu its Repeat section. Without an anchor the modal opens where Obsidian puts it. */
 export function openDatePicker(
 	host: PickerHost,
 	key: "dueDate" | "deadline",
 	current: LocalDate | null,
-	anchor: HTMLElement,
+	anchor: HTMLElement | null,
 	choose: (date: LocalDate | null) => void,
 	repeat?: DateRepeat,
 ): void {
 	const modal = new DateModal(host.app, key === "dueDate" ? "Due date" : "Deadline", current, host.today(), dayOrderOf(), firstWeekdayOf(), choose, repeat);
-	openBelow(modal, anchor);
+	openAt(modal, anchor);
 }
 
-/** The tag menu; `onFile` are the names already on the file or draft, which a pick removes. */
-export function openTagPicker(host: PickerHost, onFile: string[], anchor: HTMLElement, choose: (choice: TagChoice) => void): void {
+/** The tag menu; `onFile` are the names already on the file or draft, which a pick removes. Without an anchor the modal opens where Obsidian puts it. */
+export function openTagPicker(host: PickerHost, onFile: string[], anchor: HTMLElement | null, choose: (choice: TagChoice) => void): void {
 	const vaultTags = pickerTags(host.index.carriedTags, host.app.metadataCache.getTags?.() ?? {});
-	openBelow(new TagModal(host.app, (query) => tagChoices(vaultTags, onFile, query), choose), anchor);
+	openAt(new TagModal(host.app, (query) => tagChoices(vaultTags, onFile, query), choose), anchor);
 }
 
 /** Moves an open modal to the anchor's left edge, below it, or above it when it doesn't fit; kept 8px inside the window. */
