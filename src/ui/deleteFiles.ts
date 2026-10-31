@@ -3,15 +3,21 @@ import type { VaultIndex } from "../core/index/vaultIndex";
 import { areaTrashMessage, areaTrashTitle, filesToTrash } from "../core/storage/trashPlan";
 import { DeleteAreaModal } from "./DeleteAreaModal";
 
-/** Moves each path's file to `.trash/` (Obsidian numbers a taken name), the first path first. A file already gone is skipped; a failure is a notice and the rest still go. */
+/**
+ * Moves each path's file to `.trash/` (Obsidian numbers a taken name), the first path first. A file already gone is
+ * skipped. The first failure stops the rest, so a project or area that can't move keeps its contents; one notice says
+ * which file failed and how many didn't move.
+ */
 export async function trashPaths(app: App, paths: string[]): Promise<void> {
-	for (const path of paths) {
+	for (const [at, path] of paths.entries()) {
 		const file = app.vault.getFileByPath(path);
 		if (!file) continue;
 		try {
 			await app.vault.trash(file, false);
 		} catch (error) {
-			new Notice(`Couldn't delete “${file.basename}”: ${error instanceof Error ? error.message : String(error)}`);
+			const left = paths.length - at;
+			new Notice(`Couldn't delete “${file.basename}”: ${error instanceof Error ? error.message : String(error)}. ${left === 1 ? "1 file" : `${left} files`} didn't move.`);
+			return;
 		}
 	}
 }

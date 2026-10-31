@@ -1,13 +1,13 @@
 import type { VaultIndex } from "../index/vaultIndex";
 import type { Item } from "../model/item";
 
-/** The paths deleting a file moves to `.trash/`, the file first: a project takes its live tasks, an area its projects, their tasks and its own tasks. */
+/** The paths deleting a file moves to `.trash/`, the file first and each once: a project takes its live tasks, an area its projects, their tasks and its own tasks. */
 export function filesToTrash(index: VaultIndex, path: string): string[] {
 	const item = index.get(path);
 	const paths = [path];
 	if (item?.properties.kind === "project") paths.push(...index.tasksIn(item).map((task) => task.path));
 	if (item?.properties.kind === "area") paths.push(...index.projectsIn(item).map((project) => project.path), ...index.allTasksIn(item).map((task) => task.path));
-	return paths;
+	return [...new Set(paths)];
 }
 
 const count = (n: number, noun: string): string => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);

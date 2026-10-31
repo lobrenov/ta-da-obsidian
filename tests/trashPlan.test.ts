@@ -3,7 +3,15 @@ import { VaultIndex } from "../src/core/index/vaultIndex";
 import { areaTrashMessage, areaTrashTitle, filesToTrash } from "../src/core/storage/trashPlan";
 import { makeItem } from "./support";
 
-vi.mock("obsidian", () => ({ Notice: class {}, Modal: class {} }));
+const notices: string[] = [];
+vi.mock("obsidian", () => ({
+	Notice: class {
+		constructor(message: string) {
+			notices.push(message);
+		}
+	},
+	Modal: class {},
+}));
 const { trashPaths } = await import("../src/ui/deleteFiles");
 
 const index = new VaultIndex([
@@ -35,6 +43,16 @@ describe("filesToTrash", () => {
 		);
 	});
 
+	it("lists a task once when it links both a project and that project's area", () => {
+		const both = new VaultIndex([
+			...index.items.values(),
+			makeItem("Ta Da/tasks/Both.md", 'type: task\nproject: "[[Reno]]"\narea: "[[Home]]"'),
+		]);
+		const paths = filesToTrash(both, "Ta Da/areas/Home.md");
+		expect(paths.filter((path) => path === "Ta Da/tasks/Both.md")).toHaveLength(1);
+		expect(new Set(paths).size).toBe(paths.length);
+	});
+
 	it("is just the file for a task", () => {
 		expect(filesToTrash(index, "Ta Da/tasks/Loose.md")).toEqual(["Ta Da/tasks/Loose.md"]);
 	});
@@ -58,20 +76,42 @@ describe("the area's delete confirmation", () => {
 });
 
 describe("trashPaths", () => {
-	it("moves each file in order, skipping one that is gone and carrying on past a failure", async () => {
+	function setup(failing: string[] = []) {
 		const trashed: string[] = [];
-		const files = new Map(["a", "b", "c"].map((path) => [path, { path, basename: path }]));
+		const notices: string[] = [];
+		const files = new Map(["a", "b", "c", "d"].map((path) => [path, { path, basename: path }]));
 		const app = {
 			vault: {
 				getFileByPath: (path: string) => files.get(path) ?? null,
 				trash: async (file: { path: string }, system: boolean) => {
-					if (file.path === "b") throw new Error("locked");
+					if (failing.includes(file.path)) throw new Error("locked");
 					expect(system).toBe(false);
 					trashed.push(file.path);
 				},
 			},
 		};
+		return { app, trashed, notices };
+	}
+
+	it("moves each file in order, skipping one that is gone", async () => {
+		const { app, trashed } = setup();
 		await trashPaths(app as never, ["a", "missing", "b", "c"]);
-		expect(trashed).toEqual(["a", "c"]);
+		expect(trashed).toEqual(["a", "b", "c"]);
+	});
+
+	it("stops at the first failure and says which file and how many didn't move", async () => {
+		notices.length = 0;
+		const { app, trashed } = setup(["b"]);
+		await trashPaths(app as never, ["a", "b", "missing", "c", "d"]);
+		expect(trashed).toEqual(["a"]);
+		expect(notices).toEqual(["Couldn't delete “b”: locked. 4 files didn't move."]);
+	});
+
+	it("moves nothing from an area whose own file can't move", async () => {
+		notices.length = 0;
+		const { app, trashed } = setup(["a"]);
+		await trashPaths(app as never, ["a", "b", "c"]);
+		expect(trashed).toEqual([]);
+		expect(notices).toEqual(["Couldn't delete “a”: locked. 3 files didn't move."]);
 	});
 });
