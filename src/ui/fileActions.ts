@@ -30,3 +30,14 @@ export function agreedParent(parents: readonly (Parent | null)[]): Parent | null
 		a === null || b === null ? a === b : a.kind === b.kind && identityKey(a.title) === identityKey(b.title);
 	return rest.every((parent) => same(parent, first)) ? first : undefined;
 }
+
+/**
+ * The parent a drop of `paths` onto a project or area row files them under: tasks go onto a project or area, projects
+ * onto an area. Null refuses it: a mix, a file that isn't a task or project, or a project onto a project.
+ */
+export function dropParent(index: VaultIndex, paths: readonly string[], target: { kind: "project" | "area"; path: string }): Parent | null {
+	const kind = fileSetKind(index, paths);
+	const title = index.get(target.path)?.title;
+	if (!title || (kind !== "task" && !(kind === "project" && target.kind === "area"))) return null;
+	return { kind: target.kind, title };
+}

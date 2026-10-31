@@ -25,6 +25,8 @@ import { buildList, type ListContext, type ListHeader, type ListModel, type Sect
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
+import { dropParent } from "../fileActions";
+import { moveFilesTo } from "../fileEdits";
 import { moveSelection, type Picks, pickClick } from "./selection";
 import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
@@ -515,7 +517,50 @@ export class NavigatorView extends ItemView {
 		self.createDiv({ cls: `tree-item-inner${item.strong ? " is-strong" : ""}`, text: item.label });
 		if (item.count !== null && item.count > 0) self.createDiv({ cls: "tree-item-flair-outer" }).createSpan({ cls: "tree-item-flair", text: String(item.count) });
 		self.addEventListener("click", () => this.show(item.domain));
+		if (item.domain.kind === "project" || item.domain.kind === "area") this.dropTarget(self, { kind: item.domain.kind, path: item.domain.path });
 		return outer;
+	}
+
+	/** Makes a project or area row take files dragged onto it, from the list or the file explorer, and file them under it. */
+	private dropTarget(el: HTMLElement, target: { kind: "project" | "area"; path: string }): void {
+		const manager = this.app.dragManager;
+		if (!manager || Platform.isMobile) return;
+		const dragged = (): string[] => {
+			const draggable = manager.draggable;
+			const files = draggable?.type === "file" ? [draggable.file] : draggable?.type === "files" ? (draggable.files ?? []) : [];
+			return files.flatMap((file) => (file ? [file.path] : []));
+		};
+		const accepts = (): boolean => dropParent(this.deps.taDaIndex.index, dragged(), target) !== null;
+		el.addEventListener("dragover", (event) => {
+			if (!accepts()) return;
+			event.preventDefault();
+			if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+			el.addClass("is-being-dragged-over");
+		});
+		el.addEventListener("dragleave", () => el.removeClass("is-being-dragged-over"));
+		el.addEventListener("drop", (event) => {
+			el.removeClass("is-being-dragged-over");
+			const parent = dropParent(this.deps.taDaIndex.index, dragged(), target);
+			if (!parent) return;
+			event.preventDefault();
+			moveFilesTo(this.deps.writer, dragged().flatMap((path) => this.app.vault.getFileByPath(path) ?? []), parent);
+		});
+	}
+
+	/** Starts Obsidian's own drag of a row's file, or of every pick when the row is one of them, so a drop in the editor links as the file explorer's does. */
+	private dragRow(el: HTMLElement, path: string): void {
+		const manager = this.app.dragManager;
+		if (!manager?.dragFile || !manager.onDragStart || Platform.isMobile) return;
+		el.setAttribute("draggable", "true");
+		el.addEventListener("dragstart", (event) => {
+			const picked = this.pickedRows.paths;
+			const several = picked.length > 1 && picked.includes(path) && manager.dragFiles;
+			const file = this.app.vault.getFileByPath(path);
+			const data = several
+				? manager.dragFiles?.(event, picked.flatMap((pick) => this.app.vault.getFileByPath(pick) ?? []))
+				: file && manager.dragFile?.(event, file);
+			if (data) manager.onDragStart?.(event, data);
+		});
 	}
 
 	// List pane
@@ -795,7 +840,10 @@ export class NavigatorView extends ItemView {
 		const path = row.path;
 		this.track(path, el);
 		const pickable = row.type === "task" || row.type === "project";
-		if (pickable) this.pickable.push(path);
+		if (pickable) {
+			this.pickable.push(path);
+			this.dragRow(el, path);
+		}
 		el.addEventListener("click", (event) => {
 			if (pickable && this.pickRow(path, event)) return;
 			if (!pickable && this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });

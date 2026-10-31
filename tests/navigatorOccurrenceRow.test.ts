@@ -7,6 +7,8 @@ vi.mock("obsidian", () => ({
 	ItemView: class {},
 	Keymap: { isModEvent: () => false },
 	Menu: class {},
+	Modal: class {},
+	SuggestModal: class {},
 	Notice: class {},
 	Platform: {},
 	TFile: class {},

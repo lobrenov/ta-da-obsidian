@@ -1,4 +1,5 @@
 import { Notice, type TFile } from "obsidian";
+import type { Parent } from "../core/writing/parent";
 import type { RepeatRule } from "../core/model/repeatRule";
 import type { Edit, Writer } from "../Writer";
 import { localToday } from "./dates";
@@ -21,9 +22,12 @@ export function moveFiles(host: PickerHost, writer: Writer, files: TFile[], kind
 		return item ? [buildHeaderModel(item, host.index, localToday())?.parent ?? null] : [];
 	});
 	const agreed = agreedParent(parents);
-	openParentPicker(host, kind, agreed ?? null, null, (parent) => {
-		for (const file of files) writeEdit(writer, file, parentEdit(parent));
-	}, agreed !== undefined);
+	openParentPicker(host, kind, agreed ?? null, null, (parent) => moveFilesTo(writer, files, parent), agreed !== undefined);
+}
+
+/** Files each file under `parent`. */
+export function moveFilesTo(writer: Writer, files: TFile[], parent: Parent | null): void {
+	for (const file of files) writeEdit(writer, file, parentEdit(parent));
 }
 
 /** Opens the date picker for the files' due date or deadline, filled when they agree. Exactly one task gets the Repeat section. */
