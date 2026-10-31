@@ -45,7 +45,8 @@ export class StatusActions {
 		const kindOf = (file: TFile): string | undefined => this.index.get(file.path)?.properties.kind;
 		for (const file of [...files.filter((f) => kindOf(f) === "task"), ...files.filter((f) => kindOf(f) !== "task")]) {
 			const item = this.index.get(file.path);
-			await this.runAsync(item ? planStatus(this.index, item, status) : { changes: [{ path: file.path, status }] });
+			const plan = item ? planStatus(this.index, item, status) : { changes: [{ path: file.path, status }] };
+			await this.runAsync("ask" in plan ? withoutSet(plan, files) : plan);
 		}
 	}
 
@@ -69,9 +70,10 @@ export class StatusActions {
 		}
 		await new Promise<void>((resolve) => {
 			let answered = false;
-			const modal = new CompletionModal(this.app, plan.ask, (tasksAs: ClosedStatus) => {
+			const { ask } = plan;
+			const modal = new CompletionModal(this.app, ask, (tasksAs: ClosedStatus) => {
 				answered = true;
-				void this.apply(planAnswer(this.index, plan.ask, tasksAs)).then(resolve);
+				void this.apply(answerChanges(ask, tasksAs)).then(resolve);
 			});
 			const onClose = modal.onClose.bind(modal);
 			modal.onClose = () => {
@@ -129,6 +131,18 @@ export class StatusActions {
 			if (!this.app.vault.getFolderByPath(path)) await this.app.vault.createFolder(path);
 		}
 	}
+}
+
+/** A project's question without the tasks set with it, which the index may not show closed yet; no question when none are left. */
+function withoutSet(plan: { ask: CompletionQuestion }, files: TFile[]): StatusPlan {
+	const set = new Set(files.map((file) => file.path));
+	const tasks = plan.ask.tasks.filter((task) => !set.has(task.path));
+	return tasks.length > 0 ? { ask: { ...plan.ask, tasks } } : { changes: [{ path: plan.ask.project.path, status: plan.ask.status }] };
+}
+
+/** The project's status, then the question's tasks as `tasksAs`. */
+function answerChanges(question: CompletionQuestion, tasksAs: ClosedStatus): StatusChange[] {
+	return [{ path: question.project.path, status: question.status }, ...question.tasks.map((task) => ({ path: task.path, status: tasksAs }))];
 }
 
 /** The item at the file's path when it's a task or project, for commands that only apply to those. */

@@ -17,7 +17,7 @@ vi.mock("../src/ui/CompletionModal", () => ({
 
 const { StatusActions } = await import("../src/ui/statusActions");
 
-function setup() {
+function setup(updatesIndex = true) {
 	asked.length = 0;
 	const index = new VaultIndex([
 		makeItem("Ta Da/projects/P1.md", "type: project\nstatus: Doing"),
@@ -35,7 +35,7 @@ function setup() {
 			const text = `---\ntype: ${item?.properties.kind}\nstatus: Doing${item?.properties.kind === "task" ? `\nproject: "[[${index.projectOf(item)?.title}]]"` : ""}\n---\n`;
 			const changed = edit(text);
 			if (changed !== null) set.push(file.path);
-			if (item) index.update(makeItem(file.path, `type: ${item.properties.kind}\nstatus: Done${item.properties.kind === "task" ? `\nproject: "[[${index.projectOf(item)?.title}]]"` : ""}`));
+			if (item && updatesIndex) index.update(makeItem(file.path, `type: ${item.properties.kind}\nstatus: Done${item.properties.kind === "task" ? `\nproject: "[[${index.projectOf(item)?.title}]]"` : ""}`));
 		},
 	};
 	const app = { vault: { getFileByPath: (path: string) => files.get(path) ?? null } };
@@ -78,5 +78,22 @@ describe("StatusActions.setAll", () => {
 		expect(asked.map((question) => question.project)).toEqual(["P1", "P2"]);
 		asked[1]?.answer("Done");
 		await done;
+	});
+
+	it("leaves the tasks set with a project out of its question, without waiting on the index", async () => {
+		const { actions, files, set } = setup(false);
+		const done = actions.setAll(["Ta Da/projects/P1.md", "Ta Da/tasks/A.md"].map((path) => files.get(path)) as never, "Done");
+		await tick();
+		expect(asked[0]?.tasks).toEqual(["B"]);
+		asked[0]?.answer("Cancelled");
+		await done;
+		expect(set).toEqual(["Ta Da/tasks/A.md", "Ta Da/projects/P1.md", "Ta Da/tasks/B.md"]);
+	});
+
+	it("doesn't ask when every open task is in the set", async () => {
+		const { actions, files, set } = setup(false);
+		await actions.setAll(["Ta Da/projects/P1.md", "Ta Da/tasks/A.md", "Ta Da/tasks/B.md"].map((path) => files.get(path)) as never, "Done");
+		expect(asked).toEqual([]);
+		expect(set).toEqual(["Ta Da/tasks/A.md", "Ta Da/tasks/B.md", "Ta Da/projects/P1.md"]);
 	});
 });
