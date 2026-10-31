@@ -25,7 +25,7 @@ export interface ParentSource {
  * None, then for a task the projects without an area, then each area followed by its projects; for a project the
  * areas. Completed projects are left out unless the file is filed under one. The current choice is marked, never hidden.
  */
-export function parentChoices(kind: Kind, source: ParentSource, current: Parent | null): ParentChoice[] {
+export function parentChoices(kind: Kind, source: ParentSource, current: Parent | null, noneCurrent = true): ParentChoice[] {
 	const isCurrent = (parent: Parent): boolean =>
 		current !== null && current.kind === parent.kind && identityKey(current.title) === identityKey(parent.title);
 	const choice = (parent: Parent, detail: string | null): ParentChoice => ({
@@ -34,7 +34,7 @@ export function parentChoices(kind: Kind, source: ParentSource, current: Parent 
 		detail,
 		current: isCurrent(parent),
 	});
-	const choices: ParentChoice[] = [{ parent: null, label: "None", detail: null, current: current === null }];
+	const choices: ParentChoice[] = [{ parent: null, label: "None", detail: null, current: current === null && noneCurrent }];
 	const areas = [...source.areas].sort(byTitle);
 	if (kind === "project") {
 		for (const area of areas) choices.push(choice({ kind: "area", title: area.title }, null));

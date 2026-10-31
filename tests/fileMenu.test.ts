@@ -7,7 +7,7 @@ vi.mock("obsidian", () => ({
 	TFile: class {},
 	Notice: class {},
 	ItemView: class {},
-	Keymap: {},
+	Keymap: { isModifier: (event: { metaKey?: boolean }) => event.metaKey === true },
 	Platform: {},
 	Modal: class {},
 	SuggestModal: class {},
@@ -75,8 +75,9 @@ function setup() {
 		registerEvent: () => undefined,
 	};
 	const set = vi.fn();
+	const setAll = vi.fn();
 	const convert = vi.fn();
-	registerFileMenu(plugin as never, index, { set } as never, convert, { apply: vi.fn() } as never);
+	registerFileMenu(plugin as never, index, { set, setAll } as never, convert, { apply: vi.fn() } as never);
 	const handler = (): ((menu: unknown, file: unknown) => void) => handlers.get("file-menu") ?? (() => undefined);
 	return { open: (path: string) => {
 		const { menu, entries } = recorder();
@@ -86,7 +87,7 @@ function setup() {
 		const { menu, entries } = recorder();
 		handlers.get("files-menu")?.(menu, paths.map(file));
 		return entries;
-	}, set, convert, names, handler };
+	}, set, setAll, convert, names, handler };
 }
 
 describe("the file menu's Status…", () => {
@@ -152,9 +153,9 @@ describe("the file menu's Status…", () => {
 	});
 
 	it("sets the chosen status on the file", () => {
-		const { open, set } = setup();
+		const { open, setAll } = setup();
 		open("Ta Da/tasks/Trip.md")[0]?.sub.find((entry) => entry.title === "Done")?.click();
-		expect(set).toHaveBeenCalledWith(expect.objectContaining({ path: "Ta Da/tasks/Trip.md" }), "Done");
+		expect(setAll).toHaveBeenCalledWith([expect.objectContaining({ path: "Ta Da/tasks/Trip.md" })], "Done");
 	});
 });
 
@@ -194,13 +195,11 @@ describe("the files menu", () => {
 		expect(titles([])).toEqual([]);
 	});
 
-	it("sets the chosen status on every file", () => {
-		const { openAll, set } = setup();
+	it("sets the chosen status on every file in one go", () => {
+		const { openAll, setAll } = setup();
 		openAll(["Ta Da/tasks/Trip.md", "Ta Da/tasks/Water.md"])[0]?.sub.find((entry) => entry.title.startsWith("Done"))?.click();
-		expect(set.mock.calls.map(([target, status]) => [(target as { path: string }).path, status])).toEqual([
-			["Ta Da/tasks/Trip.md", "Done"],
-			["Ta Da/tasks/Water.md", "Done"],
-		]);
+		expect(setAll.mock.calls[0]?.[0].map((target: { path: string }) => target.path)).toEqual(["Ta Da/tasks/Trip.md", "Ta Da/tasks/Water.md"]);
+		expect(setAll.mock.calls[0]?.[1]).toBe("Done");
 	});
 });
 
@@ -231,5 +230,35 @@ describe("a row's right-click with picks", () => {
 		open("b");
 		expect(trigger).toHaveBeenCalledWith("file-menu", expect.anything(), files.get("b"), "ta-da", expect.anything());
 		expect(instance.picks).toEqual([]);
+	});
+});
+
+describe("picking a row", () => {
+	function view(pickable: string[], selected: string | null) {
+		const instance = Object.assign(Object.create(NavigatorView.prototype), {
+			pickable,
+			selected,
+			pickedRows: { paths: [], anchor: null },
+			highlight: () => undefined,
+		});
+		const click = (path: string, init: { metaKey?: boolean; shiftKey?: boolean }) =>
+			(instance as unknown as { pickRow: (path: string, event: unknown) => boolean }).pickRow(path, init);
+		return { instance, click };
+	}
+
+	it("ranges over the task and project rows only, from the anchor", () => {
+		const { instance, click } = view(["t1", "t2", "t3"], null);
+		click("t1", { metaKey: true });
+		click("t3", { shiftKey: true });
+		expect(instance.picks).toEqual(["t1", "t2", "t3"]);
+	});
+
+	it("ignores a selected file that isn't a pickable row, and starts from the active row when it is", () => {
+		const note = view(["t1", "t2"], "note");
+		note.click("t2", { metaKey: true });
+		expect(note.instance.picks).toEqual(["t2"]);
+		const active = view(["t1", "t2"], "t1");
+		active.click("t2", { metaKey: true });
+		expect(active.instance.picks).toEqual(["t1", "t2"]);
 	});
 });

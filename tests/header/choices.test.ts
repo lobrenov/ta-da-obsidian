@@ -68,3 +68,9 @@ describe("pickerTags", () => {
 		expect(tagChoices(tags, [], "home").map((choice) => choice.name)).toEqual(["Home"]);
 	});
 });
+
+describe("parentChoices with no one current parent", () => {
+	it("leaves None unmarked", () => {
+		expect(parentChoices("task", index, null, false)[0]).toMatchObject({ label: "None", current: false });
+	});
+});

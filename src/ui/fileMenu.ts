@@ -5,7 +5,7 @@ import type { RepeatRule } from "../core/model/repeatRule";
 import { isClosed, statusChoices } from "../core/model/status";
 import type { Edit, Writer } from "../Writer";
 import { localToday } from "./dates";
-import { agreedDate, fileSetKind } from "./fileActions";
+import { agreedDate, agreedParent, fileSetKind } from "./fileActions";
 import { addTagEdit, dateEdit, parentEdit, removeTagEdit, repeatEdit } from "./header/edits";
 import { buildHeaderModel, statusLabel } from "./header/headerModel";
 import { openDatePicker, openParentPicker, openTagPicker, type PickerHost } from "./header/pickers";
@@ -42,9 +42,7 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 					const note = move && isClosed(option) && option !== current ? ` · ${moveNote(move, today)}` : "";
 					sub.setTitle(`${statusTitle(option, repeating, statusLabel(option))}${note}`);
 					if (item) sub.setChecked(option === current);
-					sub.onClick(() => {
-						for (const file of files) status.set(file, option);
-					});
+					sub.onClick(() => void status.setAll(files, option));
 				});
 			}
 		});
@@ -52,12 +50,14 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 
 	const addMove = (menu: Menu, files: TFile[], kind: "task" | "project"): void => {
 		section(menu, "Move…", "folder-tree", () => {
-			const [only] = files;
-			const item = files.length === 1 && only ? index.get(only.path) : undefined;
-			const current = item ? (buildHeaderModel(item, index, localToday())?.parent ?? null) : null;
-			openParentPicker(host, kind, current, null, (parent) => {
-				for (const file of files) write(file, parentEdit(parent));
+			const parents = files.flatMap((file) => {
+				const item = index.get(file.path);
+				return item ? [buildHeaderModel(item, index, localToday())?.parent ?? null] : [];
 			});
+			const agreed = agreedParent(parents);
+			openParentPicker(host, kind, agreed ?? null, null, (parent) => {
+				for (const file of files) write(file, parentEdit(parent));
+			}, agreed !== undefined);
 		});
 	};
 

@@ -17,7 +17,7 @@ export interface Picks {
 
 /**
  * The picks after a click on `path` among the list's `paths` top to bottom. A toggle adds or removes the row and makes it
- * the anchor. A range picks everything from the anchor to the row (the whole range replaces the picks; the anchor stays),
+ * the anchor; with nothing picked, a toggle starts the picks from the anchor too. A range picks everything from the anchor to the row (the whole range replaces the picks; the anchor stays),
  * or just the row when the anchor isn't in the list. Picks come back in list order.
  */
 export function pickClick(paths: readonly string[], picks: Picks, path: string, mode: "toggle" | "range"): Picks {
@@ -25,6 +25,7 @@ export function pickClick(paths: readonly string[], picks: Picks, path: string, 
 	if (at < 0) return picks;
 	if (mode === "toggle") {
 		const next = new Set(picks.paths);
+		if (next.size === 0 && picks.anchor !== null && picks.anchor !== path && paths.includes(picks.anchor)) next.add(picks.anchor);
 		if (!next.delete(path)) next.add(path);
 		return { paths: paths.filter((candidate) => next.has(candidate)), anchor: path };
 	}

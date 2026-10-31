@@ -1,6 +1,8 @@
 import type { VaultIndex } from "../core/index/vaultIndex";
 import type { Item } from "../core/model/item";
 import type { LocalDate } from "../core/model/localDate";
+import { identityKey } from "../core/text";
+import type { Parent } from "../core/writing/parent";
 
 /** What a set of files is, for the items the file menus offer: all tasks, all projects, a mix, or not all Ta Da tasks and projects (null). */
 export function fileSetKind(index: VaultIndex, paths: readonly string[]): "task" | "project" | "mixed" | null {
@@ -18,4 +20,13 @@ export function agreedDate(items: readonly Item[], key: "dueDate" | "deadline"):
 	const [first, ...rest] = items.map((item) => item.properties[key]);
 	if (!first) return null;
 	return rest.every((date) => date?.equals(first)) ? first : null;
+}
+
+/** The parent every file has (null for none), or undefined when they differ. */
+export function agreedParent(parents: readonly (Parent | null)[]): Parent | null | undefined {
+	const [first, ...rest] = parents;
+	if (first === undefined) return undefined;
+	const same = (a: Parent | null, b: Parent | null): boolean =>
+		a === null || b === null ? a === b : a.kind === b.kind && identityKey(a.title) === identityKey(b.title);
+	return rest.every((parent) => same(parent, first)) ? first : undefined;
 }

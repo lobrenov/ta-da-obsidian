@@ -63,6 +63,8 @@ export class NavigatorView extends ItemView {
 	private trash: TrashedItem[] = [];
 	private today: LocalDate = localToday();
 	private paths: string[] = [];
+	/** The task and project rows shown, top to bottom: the rows that can be picked. */
+	private pickable: string[] = [];
 	private lastKey = "";
 	private opened = false;
 	private closed = false;
@@ -366,8 +368,9 @@ export class NavigatorView extends ItemView {
 			if (this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });
 			return false;
 		}
-		const anchor = this.pickedRows.anchor ?? this.selected;
-		this.setPicks(pickClick(this.paths, { paths: this.pickedRows.paths, anchor }, path, mode));
+		const active = this.selected !== null && this.pickable.includes(this.selected) ? this.selected : null;
+		const anchor = this.pickedRows.paths.length > 0 ? this.pickedRows.anchor : active;
+		this.setPicks(pickClick(this.pickable, { paths: this.pickedRows.paths, anchor }, path, mode));
 		return true;
 	}
 
@@ -524,10 +527,11 @@ export class NavigatorView extends ItemView {
 		const body = this.listBodyEl;
 		body.empty();
 		this.rowEls.clear();
+		this.pickable = [];
 		if (list.empty !== null) body.createDiv({ cls: "ta-da-empty", text: list.empty });
 		for (const section of list.sections) this.renderSection(body, section, list);
 		body.scrollTop = scrollTop;
-		const paths = this.pickedRows.paths.filter((path) => this.paths.includes(path));
+		const paths = this.pickedRows.paths.filter((path) => this.pickable.includes(path));
 		this.pickedRows = { paths, anchor: paths.length > 0 ? this.pickedRows.anchor : null };
 		this.highlight();
 	}
@@ -778,6 +782,7 @@ export class NavigatorView extends ItemView {
 		const path = row.path;
 		this.track(path, el);
 		const pickable = row.type === "task" || row.type === "project";
+		if (pickable) this.pickable.push(path);
 		el.addEventListener("click", (event) => {
 			if (pickable && this.pickRow(path, event)) return;
 			if (!pickable && this.pickedRows.paths.length > 0) this.setPicks({ paths: [], anchor: null });

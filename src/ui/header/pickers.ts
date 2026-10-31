@@ -64,9 +64,9 @@ export function openStatusMenu(anchor: HTMLElement, kind: Kind, current: Status,
 	menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 }, anchor.ownerDocument);
 }
 
-/** The project or area menu. Without an anchor the modal opens where Obsidian puts it. */
-export function openParentPicker(host: PickerHost, kind: Kind, current: Parent | null, anchor: HTMLElement | null, choose: (parent: Parent | null) => void): void {
-	const choices = parentChoices(kind, host.index, current);
+/** The project or area menu; `noneCurrent` false leaves None unmarked when there is no one current parent. Without an anchor the modal opens where Obsidian puts it. */
+export function openParentPicker(host: PickerHost, kind: Kind, current: Parent | null, anchor: HTMLElement | null, choose: (parent: Parent | null) => void, noneCurrent = true): void {
+	const choices = parentChoices(kind, host.index, current, noneCurrent);
 	const placeholder = kind === "project" ? "Set the area" : "Move to a project or area";
 	const modal = new ParentModal(host.app, placeholder, choices, (choice) => choose(choice.parent));
 	openAt(modal, anchor);

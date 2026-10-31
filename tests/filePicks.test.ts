@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
-import { agreedDate, fileSetKind } from "../src/ui/fileActions";
+import { agreedDate, agreedParent, fileSetKind } from "../src/ui/fileActions";
 import { pickClick } from "../src/ui/navigator/selection";
 import { makeItem } from "./support";
 
@@ -25,6 +25,12 @@ describe("pickClick", () => {
 	it("picks just the row for a range with no anchor in the list", () => {
 		expect(pickClick(paths, none, "d", "range")).toEqual({ paths: ["d"], anchor: "d" });
 		expect(pickClick(paths, { paths: ["x"], anchor: "x" }, "d", "range")).toEqual({ paths: ["d"], anchor: "d" });
+	});
+
+	it("starts the picks from the anchor when nothing is picked and a toggle is on another row", () => {
+		expect(pickClick(paths, { paths: [], anchor: "b" }, "d", "toggle")).toEqual({ paths: ["b", "d"], anchor: "d" });
+		expect(pickClick(paths, { paths: [], anchor: "b" }, "b", "toggle")).toEqual({ paths: ["b"], anchor: "b" });
+		expect(pickClick(paths, { paths: [], anchor: "x" }, "d", "toggle")).toEqual({ paths: ["d"], anchor: "d" });
 	});
 
 	it("ignores a row that isn't in the list", () => {
@@ -67,5 +73,20 @@ describe("agreedDate", () => {
 		expect(agreedDate([item("dueDate: 2026-10-05"), item("dueDate: 2026-10-06")], "dueDate")).toBeNull();
 		expect(agreedDate([item("dueDate: 2026-10-05"), item("status: Doing")], "dueDate")).toBeNull();
 		expect(agreedDate([item("deadline: 2026-10-05"), item("deadline: 2026-10-05")], "dueDate")).toBeNull();
+	});
+});
+
+describe("agreedParent", () => {
+	const kombi = { kind: "project", title: "Sell the Kombi" } as const;
+
+	it("is the parent every file has, compared by kind and title", () => {
+		expect(agreedParent([kombi, { kind: "project", title: "sell the kombi" }])).toEqual(kombi);
+		expect(agreedParent([null, null])).toBeNull();
+	});
+
+	it("is undefined when they differ", () => {
+		expect(agreedParent([kombi, null])).toBeUndefined();
+		expect(agreedParent([kombi, { kind: "area", title: "Sell the Kombi" }])).toBeUndefined();
+		expect(agreedParent([])).toBeUndefined();
 	});
 });

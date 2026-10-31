@@ -37,6 +37,18 @@ export class StatusActions {
 		this.run(item ? planStatus(this.index, item, status) : { changes: [{ path: file.path, status }] });
 	}
 
+	/**
+	 * Sets several files' status: tasks first, then projects, each one after the last is applied and any question answered,
+	 * so a project asks only about open tasks that weren't in the set.
+	 */
+	async setAll(files: TFile[], status: Status): Promise<void> {
+		const kindOf = (file: TFile): string | undefined => this.index.get(file.path)?.properties.kind;
+		for (const file of [...files.filter((f) => kindOf(f) === "task"), ...files.filter((f) => kindOf(f) !== "task")]) {
+			const item = this.index.get(file.path);
+			await this.runAsync(item ? planStatus(this.index, item, status) : { changes: [{ path: file.path, status }] });
+		}
+	}
+
 	/** Completes an open file or reopens a closed one. */
 	toggle(file: TFile): void {
 		const item = this.index.get(file.path);
@@ -46,6 +58,30 @@ export class StatusActions {
 	private run(plan: StatusPlan): void {
 		if ("ask" in plan) this.ask(plan.ask);
 		else void this.apply(plan.changes).then(() => (plan.unlog ? this.unlog(plan.unlog) : undefined));
+	}
+
+	/** Resolves once the plan is applied, or the question is cancelled. */
+	private async runAsync(plan: StatusPlan): Promise<void> {
+		if (!("ask" in plan)) {
+			await this.apply(plan.changes);
+			if (plan.unlog) await this.unlog(plan.unlog);
+			return;
+		}
+		await new Promise<void>((resolve) => {
+			let answered = false;
+			const modal = new CompletionModal(this.app, plan.ask, (tasksAs: ClosedStatus) => {
+				answered = true;
+				void this.apply(planAnswer(this.index, plan.ask, tasksAs)).then(resolve);
+			});
+			const onClose = modal.onClose.bind(modal);
+			modal.onClose = () => {
+				onClose();
+				queueMicrotask(() => {
+					if (!answered) resolve();
+				});
+			};
+			modal.open();
+		});
 	}
 
 	private ask(question: CompletionQuestion): void {
