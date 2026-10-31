@@ -1799,3 +1799,16 @@
 	gap: 6px;
 	color: var(--text-muted);
 }
+
+/* Logbook: Log now */
+.ta-da-navigator .ta-da-log-now {
+	margin-inline-start: auto;
+}
+
+.ta-da-navigator .ta-da-log-now .ta-da-pill-label {
+	color: var(--text-normal);
+}
+
+.ta-da-navigator .ta-da-log-now:disabled {
+	opacity: 0.5;
+}

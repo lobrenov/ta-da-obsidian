@@ -1,3 +1,4 @@
+import { LocalDate } from "./core/model/localDate";
 import { type DailyNotesValues, readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, settingsFilePath, validDailyNotes, writeDailyNotes, writeTaskLinkBoxes } from "./core/storage/settingsFile";
 import { type ViewKind, viewKinds } from "./ui/navigator/views";
 
@@ -97,6 +98,8 @@ export class SettingsStore {
 	private queue: Promise<void> = Promise.resolve();
 	private pendingWrites = 0;
 	private savedDailyNotes: unknown;
+	/** The day the daily logging run last succeeded; `lastLogged` in `data.json`. */
+	lastLogged: LocalDate | null = null;
 
 	constructor(
 		private readonly plugin: DataPlugin,
@@ -108,6 +111,8 @@ export class SettingsStore {
 		const loaded = resolveData(saved);
 		this.data.hideProperties = loaded.hideProperties;
 		this.data.navigator = loaded.navigator;
+		const day = typeof saved === "object" && saved !== null ? (saved as { lastLogged?: unknown }).lastLogged : undefined;
+		this.lastLogged = typeof day === "string" ? LocalDate.parse(day) : null;
 		this.savedDailyNotes = typeof saved === "object" && saved !== null ? (saved as { dailyNotes?: unknown }).dailyNotes : undefined;
 		const text = await this.files.read(settingsFilePath);
 		this.data.dailyNotes = await this.readDailyNotes(text);
@@ -153,10 +158,16 @@ export class SettingsStore {
 	save(): Promise<void> {
 		const saved = this.queue.then(() => {
 			const { hideProperties, navigator } = this.data;
-			return this.plugin.saveData({ hideProperties, navigator, ...(this.savedDailyNotes === undefined ? {} : { dailyNotes: this.savedDailyNotes }) });
+			return this.plugin.saveData({ hideProperties, navigator, ...(this.lastLogged === null ? {} : { lastLogged: this.lastLogged.toString() }), ...(this.savedDailyNotes === undefined ? {} : { dailyNotes: this.savedDailyNotes }) });
 		});
 		this.queue = saved.catch(() => undefined);
 		return saved;
+	}
+
+	/** Keeps the day the daily logging run succeeded. */
+	setLastLogged(day: LocalDate): Promise<void> {
+		this.lastLogged = day;
+		return this.save();
 	}
 
 	updateNavigator(change: Partial<NavigatorData>): Promise<void> {

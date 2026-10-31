@@ -88,6 +88,8 @@ export interface ListHeader {
 	file: { path: string; label: string } | null;
 	/** Child tags, each opening its page. */
 	chips: { label: string; count: number; domain: Domain; icon: IconSpec }[];
+	/** The Logbook's Log now button, enabled when a file waits to be logged. */
+	logNow?: { enabled: boolean };
 }
 
 export interface FilterModel {
@@ -445,7 +447,7 @@ function logbookList(ctx: ListContext): ListModel {
 	const waiting = groups.filter((group) => group.kind !== "logged").reduce((sum, group) => sum + group.items.length, 0);
 	return {
 		domain: { kind: "logbook" },
-		header: { ...noHeader, title: "Logbook", icon: { type: "icon", name: "book-check", tint: "done" }, lines: waiting > 0 ? [`${waiting} completed, still in place`] : [] },
+		header: { ...noHeader, title: "Logbook", icon: { type: "icon", name: "book-check", tint: "done" }, lines: waiting > 0 ? [`${waiting} completed, still in place`] : [], logNow: { enabled: waiting > 0 } },
 		groupList: null,
 		grouping: null,
 		filter: null,

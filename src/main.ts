@@ -3,6 +3,8 @@ import { registerCommands } from "./commands";
 import { statuses } from "./core/model/status";
 import { TaDaSettingTab } from "./settings";
 import { settingsFilePath } from "./core/storage/settingsFile";
+import { DailyLog } from "./DailyLog";
+import { Logbook } from "./Logbook";
 import { SettingsStore, type TaDaData } from "./settingsData";
 import { TaDaIndex } from "./TaDaIndex";
 import { localToday } from "./ui/dates";
@@ -19,6 +21,8 @@ export default class TaDaPlugin extends Plugin {
 	taDaIndex!: TaDaIndex;
 	writer!: Writer;
 	statusActions!: StatusActions;
+	logbook!: Logbook;
+	dailyLog!: DailyLog;
 	store = new SettingsStore(this, vaultSettingsFiles(this.app));
 	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes` and `taskLinkBoxes`. */
 	override settings: TaDaData = this.store.data;
@@ -28,7 +32,10 @@ export default class TaDaPlugin extends Plugin {
 		this.taDaIndex = new TaDaIndex(this);
 		this.taDaIndex.start();
 		this.writer = new Writer(this.app);
-		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday);
+		const logbook = new Logbook(this.app, this.taDaIndex.index, this.writer, localToday);
+		this.logbook = logbook;
+		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday, logbook);
+		this.dailyLog = new DailyLog(this.app, this.taDaIndex.index, logbook, this.statusActions, this.store, localToday);
 		this.addStatusCommands();
 		const { index } = this.taDaIndex;
 		registerFileMenu(this, index, this.statusActions, (file) => void openConvertModal({ app: this.app, index, writer: this.writer, today: localToday }, file), this.writer);
@@ -52,6 +59,10 @@ export default class TaDaPlugin extends Plugin {
 		);
 		this.addSettingTab(tab);
 		this.app.workspace.onLayoutReady(() => {
+			void this.taDaIndex.ready.then(() => {
+				void this.dailyLog.logIfDue();
+				this.registerInterval(window.setInterval(() => void this.dailyLog.logIfDue(), 60_000));
+			});
 			const reload = (file: TAbstractFile): void => {
 				if (file.path !== settingsFilePath) return;
 				void this.store.reloadSettingsFile().then((changed) => {

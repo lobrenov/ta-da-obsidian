@@ -21,7 +21,7 @@ import {
 	readGroupings,
 	sameDomain,
 } from "./domain";
-import { buildList, type ListContext, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
+import { buildList, type ListContext, type ListHeader, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
@@ -40,6 +40,8 @@ export interface NavigatorDeps {
 	settings: NavigatorSettings;
 	/** Opens the New task window, filled from what the view shows; each view's header button. */
 	newTask: (context: NewTaskContext) => void;
+	/** The Logbook's Log now button. */
+	logNow?: () => void;
 }
 
 const noPicked: ReadonlySet<string> = new Set();
@@ -556,6 +558,7 @@ export class NavigatorView extends ItemView {
 		const file = header.file;
 		if (file) this.iconButton(actions, "file-text", file.label, () => this.openPath(file.path));
 		this.groupButton(actions, list);
+		this.logNowButton(actions, header);
 		for (const line of header.lines) head.createDiv({ cls: "ta-da-list-line", text: line });
 		if (header.chips.length > 0) {
 			const chips = head.createDiv({ cls: "ta-da-chips" });
@@ -568,6 +571,16 @@ export class NavigatorView extends ItemView {
 			}
 		}
 		this.renderFilter(head, list);
+	}
+
+	/** The Logbook's Log now pill, disabled while no file waits to be logged. */
+	private logNowButton(parent: HTMLElement, header: ListHeader): void {
+		const { logNow } = header;
+		if (!logNow) return;
+		const pill = parent.createEl("button", { cls: "ta-da-pill ta-da-log-now", attr: { "aria-label": "Log now" } });
+		pill.createSpan({ cls: "ta-da-pill-label", text: "Log now" });
+		pill.disabled = !logNow.enabled;
+		pill.addEventListener("click", () => this.deps.logNow?.());
 	}
 
 	/** The Group pill, on lists that have a Group choice: `Group Status ▾`, opening the menu. */
