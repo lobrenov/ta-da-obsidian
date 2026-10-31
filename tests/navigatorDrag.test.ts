@@ -34,6 +34,8 @@ const index = new VaultIndex([
 	makeItem("Ta Da/projects/Home.md", "type: project"),
 	makeItem("Ta Da/projects/Work.md", "type: project"),
 	makeItem("Ta Da/areas/Personal.md", "type: area"),
+	makeItem("Ta Da/tasks/InHome.md", 'type: task\nproject: "[[Ta Da/projects/Home|Home]]"'),
+	makeItem("Ta Da/tasks/AlsoHome.md", 'type: task\nproject: "[[Home]]"'),
 	makeItem("Notes/Plain.md", ""),
 ]);
 
@@ -60,10 +62,11 @@ function dropOnto(draggable: Draggable, target: { kind: "project" | "area"; path
 	const el = document.createElement("div");
 	view.dropTarget(el, target);
 	const over = new window.Event("dragover", { cancelable: true });
-	el.dispatchEvent(over);
 	const drop = new window.Event("drop", { cancelable: true });
+	const stops = [over, drop].map((event) => vi.spyOn(event, "stopPropagation"));
+	el.dispatchEvent(over);
 	el.dispatchEvent(drop);
-	return { accepted: over.defaultPrevented, highlighted: el.classList.contains("is-being-dragged-over"), apply, dropped: drop.defaultPrevented, el };
+	return { accepted: over.defaultPrevented, stopped: stops.every((stop) => stop.mock.calls.length > 0), highlighted: el.classList.contains("is-being-dragged-over"), apply, dropped: drop.defaultPrevented, el };
 }
 
 const files = (...paths: string[]) => ({ type: "files", files: paths.map((path) => ({ path })) });
@@ -101,6 +104,35 @@ describe("a drop onto a project or area row", () => {
 		expect(apply.mock.calls.map(([file]) => (file as unknown as { path: string }).path)).toEqual(["Ta Da/tasks/A.md", "Ta Da/tasks/B.md"]);
 		const edit = apply.mock.calls[0]?.[1] as unknown as (text: string) => string;
 		expect(edit("---\ntype: task\n---\n")).toContain('project: "[[Home]]"');
+	});
+
+	it("stops an accepted drag from reaching the workspace, and lets a refused one through", () => {
+		expect(dropOnto(files("Ta Da/tasks/A.md"), project).stopped).toBe(true);
+		const refused = dropOnto(files("Notes/Plain.md"), project);
+		expect(refused.stopped).toBe(false);
+	});
+
+	it("clears the highlight on dragleave without a drop", () => {
+		const { view } = setup(files("Ta Da/tasks/A.md"));
+		const el = document.createElement("div");
+		view.dropTarget(el, project);
+		el.dispatchEvent(new window.Event("dragover", { cancelable: true }));
+		expect(el.classList.contains("is-being-dragged-over")).toBe(true);
+		el.dispatchEvent(new window.Event("dragleave"));
+		expect(el.classList.contains("is-being-dragged-over")).toBe(false);
+	});
+
+	it("refuses a dragged folder", () => {
+		expect(dropOnto({ type: "folder" }, project).accepted).toBe(false);
+	});
+
+	it("writes nothing for files already under the target, whatever their link looks like", () => {
+		expect(dropOnto(files("Ta Da/tasks/InHome.md", "Ta Da/tasks/AlsoHome.md"), project).apply).not.toHaveBeenCalled();
+	});
+
+	it("writes only the files that aren't already under the target", () => {
+		const { apply } = dropOnto(files("Ta Da/tasks/InHome.md", "Ta Da/tasks/A.md"), project);
+		expect(apply.mock.calls.map(([file]) => (file as unknown as { path: string }).path)).toEqual(["Ta Da/tasks/A.md"]);
 	});
 
 	it("is not a drop target without a dragManager", () => {
@@ -142,6 +174,18 @@ describe("dragging a row", () => {
 		const alone = drag("Ta Da/projects/Home.md", picked);
 		expect(alone.dragFiles).not.toHaveBeenCalled();
 		expect(alone.dragFile).toHaveBeenCalled();
+	});
+
+	it("starts no drag when the row's file is gone", () => {
+		const { view, files: all } = setup(null, { dragFile: vi.fn(() => "one"), onDragStart: vi.fn() });
+		const onDragStart = vi.fn();
+		const manager = (view as unknown as { app: { dragManager: { onDragStart: unknown } } }).app.dragManager;
+		manager.onDragStart = onDragStart;
+		all.delete("Ta Da/tasks/A.md");
+		const el = document.createElement("div");
+		view.dragRow(el, "Ta Da/tasks/A.md");
+		el.dispatchEvent(new window.Event("dragstart"));
+		expect(onDragStart).not.toHaveBeenCalled();
 	});
 
 	it("leaves the row undraggable without a dragManager", () => {

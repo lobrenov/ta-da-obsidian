@@ -26,7 +26,7 @@ import { ancestorsOf, buildNav, type NavItem } from "./navModel";
 import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
 import { createPeriodNote } from "./periodNotes";
 import { dropParent } from "../fileActions";
-import { moveFilesTo } from "../fileEdits";
+import { filesNotUnder, moveFilesTo } from "../fileEdits";
 import { moveSelection, type Picks, pickClick } from "./selection";
 import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
@@ -534,6 +534,7 @@ export class NavigatorView extends ItemView {
 		el.addEventListener("dragover", (event) => {
 			if (!accepts()) return;
 			event.preventDefault();
+			event.stopPropagation();
 			if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 			el.addClass("is-being-dragged-over");
 		});
@@ -543,7 +544,10 @@ export class NavigatorView extends ItemView {
 			const parent = dropParent(this.deps.taDaIndex.index, dragged(), target);
 			if (!parent) return;
 			event.preventDefault();
-			moveFilesTo(this.deps.writer, dragged().flatMap((path) => this.app.vault.getFileByPath(path) ?? []), parent);
+			event.stopPropagation();
+			const host = { app: this.app, index: this.deps.taDaIndex.index, today: localToday };
+			const files = filesNotUnder(host, dragged().flatMap((path) => this.app.vault.getFileByPath(path) ?? []), parent);
+			if (files.length > 0) moveFilesTo(this.deps.writer, files, parent);
 		});
 	}
 

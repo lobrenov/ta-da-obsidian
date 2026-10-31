@@ -22,13 +22,16 @@ export function agreedDate(items: readonly Item[], key: "dueDate" | "deadline"):
 	return rest.every((date) => date?.equals(first)) ? first : null;
 }
 
+/** Whether two parents are the same project or area, by kind and title. */
+export function sameParent(a: Parent | null, b: Parent | null): boolean {
+	return a === null || b === null ? a === b : a.kind === b.kind && identityKey(a.title) === identityKey(b.title);
+}
+
 /** The parent every file has (null for none), or undefined when they differ. */
 export function agreedParent(parents: readonly (Parent | null)[]): Parent | null | undefined {
 	const [first, ...rest] = parents;
 	if (first === undefined) return undefined;
-	const same = (a: Parent | null, b: Parent | null): boolean =>
-		a === null || b === null ? a === b : a.kind === b.kind && identityKey(a.title) === identityKey(b.title);
-	return rest.every((parent) => same(parent, first)) ? first : undefined;
+	return rest.every((parent) => sameParent(parent, first)) ? first : undefined;
 }
 
 /**
