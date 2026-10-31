@@ -4,6 +4,7 @@ import type { Item } from "../core/model/item";
 import { isClosed, statusChoices } from "../core/model/status";
 import type { Edit, Writer } from "../Writer";
 import { localToday } from "./dates";
+import { deleteItem } from "./deleteFiles";
 import { fileSetKind } from "./fileActions";
 import { dateFiles, moveFiles, writeEdit } from "./fileEdits";
 import { addTagEdit, removeTagEdit } from "./header/edits";
@@ -14,7 +15,7 @@ import type { StatusActions } from "./statusActions";
 
 /**
  * Adds the plugin's items to Obsidian's file menu (one file) and files menu (several), wherever they show, for task and
- * project files: Status…, Move…, Schedule…, Set deadline…, Tags… (one file), and Convert to project… on a task.
+ * project files: Status…, Move…, Schedule…, Set deadline…, Tags… (one file), and Convert to project… on a task. An area has Tags… only. In the plugin's own views (source `ta-da`) a project or area also has Delete.
  */
 export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: StatusActions, convert: (file: TFile) => void, writer: Writer): void {
 	const host: PickerHost = { app: plugin.app, index, today: localToday };
@@ -61,19 +62,25 @@ export function registerFileMenu(plugin: Plugin, index: VaultIndex, status: Stat
 	};
 
 	plugin.registerEvent(
-		plugin.app.workspace.on("file-menu", (menu, file) => {
+		plugin.app.workspace.on("file-menu", (menu, file, source) => {
 			if (!(file instanceof TFile)) return;
 			const item = index.get(file.path);
 			if (!item) return;
 			const { kind } = item.properties;
-			if (kind !== "task" && kind !== "project") return;
-			addStatus(menu, [file], kind);
-			addMove(menu, [file], kind);
-			addDate(menu, [file], "dueDate");
-			addDate(menu, [file], "deadline");
+			if (kind !== "task" && kind !== "project" && kind !== "area") return;
+			if (kind !== "area") {
+				addStatus(menu, [file], kind);
+				addMove(menu, [file], kind);
+				addDate(menu, [file], "dueDate");
+				addDate(menu, [file], "deadline");
+			}
 			addTags(menu, file, item);
-			if (kind !== "task") return;
-			section(menu, "Convert to project…", "folder-input", () => convert(file));
+			if (kind === "task") section(menu, "Convert to project…", "folder-input", () => convert(file));
+			if (kind !== "task" && source === "ta-da") {
+				menu.addItem((entry) =>
+					entry.setTitle(`Delete ${kind}`).setIcon("trash-2").setSection("danger").setWarning(true).onClick(() => deleteItem(plugin.app, index, file)),
+				);
+			}
 		}),
 	);
 

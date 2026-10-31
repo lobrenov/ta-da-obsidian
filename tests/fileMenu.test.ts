@@ -32,6 +32,7 @@ interface Entry {
 	title: string;
 	icon?: string;
 	section?: string;
+	warning?: boolean;
 	checked?: boolean;
 	click: () => void;
 	sub: Entry[];
@@ -47,6 +48,7 @@ function recorder(): { menu: { addItem: (add: (item: unknown) => void) => unknow
 				setTitle: (title: string) => ((entry.title = title), item),
 				setIcon: (icon: string) => ((entry.icon = icon), item),
 				setSection: (section: string) => ((entry.section = section), item),
+				setWarning: (warning: boolean) => ((entry.warning = warning), item),
 				setChecked: (checked: boolean) => ((entry.checked = checked), item),
 				onClick: (click: () => void) => ((entry.click = click), item),
 				setSubmenu: () => make(entry.sub),
@@ -66,6 +68,7 @@ function setup() {
 		makeItem("Ta Da/projects/Home.md", "type: project\nstatus: Ongoing"),
 		makeItem("Ta Da/tasks/Water.md", "type: task\nstatus: Doing\ndueDate: 2026-10-05\nrepeat: every week on Mon"),
 		makeItem("Ta Da/tasks/Last.md", "type: task\nstatus: Doing\ndueDate: 2026-10-05\nrepeat: every week until 2026-10-06"),
+		makeItem("Ta Da/areas/Personal.md", "type: area"),
 		makeItem("Notes/Plain.md", ""),
 	]);
 	const handlers = new Map<string, (menu: unknown, file: unknown) => void>();
@@ -79,9 +82,9 @@ function setup() {
 	const convert = vi.fn();
 	registerFileMenu(plugin as never, index, { set, setAll } as never, convert, { apply: vi.fn() } as never);
 	const handler = (): ((menu: unknown, file: unknown) => void) => handlers.get("file-menu") ?? (() => undefined);
-	return { open: (path: string) => {
+	return { open: (path: string, source?: string) => {
 		const { menu, entries } = recorder();
-		handlers.get("file-menu")?.(menu, file(path));
+		(handlers.get("file-menu") as ((menu: unknown, file: unknown, source?: string) => void) | undefined)?.(menu, file(path), source);
 		return entries;
 	}, openAll: (paths: string[]) => {
 		const { menu, entries } = recorder();
@@ -260,5 +263,25 @@ describe("picking a row", () => {
 		const active = view(["t1", "t2"], "t1");
 		active.click("t2", { metaKey: true });
 		expect(active.instance.picks).toEqual(["t1", "t2"]);
+	});
+});
+
+describe("Delete on the file menu", () => {
+	const titles = (path: string, source?: string) => setup().open(path, source).map((entry) => entry.title);
+
+	it("gives an area Tags… only, and no Delete outside the plugin's views", () => {
+		expect(titles("Ta Da/areas/Personal.md")).toEqual(["Tags…"]);
+		expect(titles("Ta Da/areas/Personal.md", "file-explorer-context-menu")).toEqual(["Tags…"]);
+	});
+
+	it("adds Delete area and Delete project as a warning in the danger section, only for source ta-da", () => {
+		const [, remove] = setup().open("Ta Da/areas/Personal.md", "ta-da");
+		expect(remove).toMatchObject({ title: "Delete area", icon: "trash-2", section: "danger", warning: true });
+		expect(titles("Ta Da/projects/Home.md", "ta-da")).toEqual(["Status…", "Move…", "Schedule…", "Set deadline…", "Tags…", "Delete project"]);
+		expect(titles("Ta Da/projects/Home.md", "file-explorer-context-menu")).not.toContain("Delete project");
+	});
+
+	it("doesn't add Delete to a task", () => {
+		expect(titles("Ta Da/tasks/Trip.md", "ta-da")).not.toContain("Delete task");
 	});
 });

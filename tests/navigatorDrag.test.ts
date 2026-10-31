@@ -17,7 +17,21 @@ vi.mock("obsidian", () => ({
 	debounce: (fn: unknown) => fn,
 	setIcon: () => undefined,
 }));
+type Options = { cls?: string; text?: string };
+const createEl = function (this: HTMLElement, tag: string, options: Options = {}) {
+	const el = this.ownerDocument.createElement(tag);
+	if (options.cls) el.className = options.cls;
+	if (options.text) el.textContent = options.text;
+	this.appendChild(el);
+	return el;
+};
 Object.assign(window.HTMLElement.prototype, {
+	createDiv(this: HTMLElement, options?: Options) {
+		return createEl.call(this, "div", options);
+	},
+	createSpan(this: HTMLElement, options?: Options) {
+		return createEl.call(this, "span", options);
+	},
 	addClass(this: HTMLElement, name: string) {
 		this.classList.add(name);
 	},
@@ -193,5 +207,37 @@ describe("dragging a row", () => {
 		const el = document.createElement("div");
 		view.dragRow(el, "Ta Da/tasks/A.md");
 		expect(el.getAttribute("draggable")).toBeNull();
+	});
+});
+
+describe("a right-click on a navigation row", () => {
+	function navRow(domain: object) {
+		const target = { path: "Ta Da/areas/Personal.md" };
+		const trigger = vi.fn();
+		const view = Object.assign(Object.create(NavigatorView.prototype) as object, {
+			app: { vault: { getFileByPath: () => target }, workspace: { trigger }, dragManager: undefined },
+			deps: { taDaIndex: { index } },
+			pickedRows: { paths: ["x", "y"], anchor: null },
+			highlight: () => undefined,
+			leaf: {},
+		}) as unknown as { navRow(parent: HTMLElement, item: object, active: boolean, icon: boolean): HTMLElement };
+		const item = { id: "i", domain, label: "L", icon: { type: "area" }, count: null, depth: 0, gap: false, strong: false, expanded: null };
+		const outer = view.navRow(document.createElement("div"), item, false, false);
+		const event = new window.Event("contextmenu", { cancelable: true });
+		(outer.firstElementChild as HTMLElement).dispatchEvent(event);
+		return { trigger, target, event, view: view as unknown as { picks: string[] } };
+	}
+
+	it("opens the file menu for a project or area, clearing the picks", () => {
+		for (const domain of [{ kind: "area", path: "Ta Da/areas/Personal.md" }, { kind: "project", path: "Ta Da/projects/Home.md" }]) {
+			const { trigger, target, event, view } = navRow(domain);
+			expect(trigger).toHaveBeenCalledWith("file-menu", expect.anything(), target, "ta-da", {});
+			expect(event.defaultPrevented).toBe(true);
+			expect(view.picks).toEqual([]);
+		}
+	});
+
+	it("leaves other rows alone", () => {
+		expect(navRow({ kind: "loose" }).trigger).not.toHaveBeenCalled();
 	});
 });

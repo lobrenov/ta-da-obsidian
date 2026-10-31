@@ -517,7 +517,11 @@ export class NavigatorView extends ItemView {
 		self.createDiv({ cls: `tree-item-inner${item.strong ? " is-strong" : ""}`, text: item.label });
 		if (item.count !== null && item.count > 0) self.createDiv({ cls: "tree-item-flair-outer" }).createSpan({ cls: "tree-item-flair", text: String(item.count) });
 		self.addEventListener("click", () => this.show(item.domain));
-		if (item.domain.kind === "project" || item.domain.kind === "area") this.dropTarget(self, { kind: item.domain.kind, path: item.domain.path });
+		if (item.domain.kind === "project" || item.domain.kind === "area") {
+			const { path } = item.domain;
+			this.dropTarget(self, { kind: item.domain.kind, path });
+			self.addEventListener("contextmenu", (event) => this.fileMenu(path, event));
+		}
 		return outer;
 	}
 
@@ -985,7 +989,7 @@ export class NavigatorView extends ItemView {
 		}
 		if (row.open !== null) el.createSpan({ cls: "ta-da-row-trailing ta-da-row-count", text: String(row.open) });
 		if (row.variant === "card") setIcon(el.createSpan({ cls: "ta-da-row-chevron" }), "chevron-right");
-		if (row.type === "project") el.addEventListener("contextmenu", (event) => this.fileMenu(row.path, event));
+		if (row.type === "project" || row.type === "area") el.addEventListener("contextmenu", (event) => this.fileMenu(row.path, event));
 		return el;
 	}
 
