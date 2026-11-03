@@ -5,7 +5,10 @@ Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YA
 > [!NOTE]
 > **AI Disclaimer:** Ta Da and its Obsidian plugin version are 100% vibe-coded. I've no intention of claiming that "I made" Ta Da or could quickly or easily re-create it myself. It almost definitely has many AI-isms in its visual design and codebase.
 
-<img alt="Ta Da in Obsidian: a task's header, Tasks and the Agenda" src="docs/images/agenda-light.png">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/agenda-dark.png">
+  <img alt="Ta Da in Obsidian: a task's header, Tasks and the Agenda" src="docs/images/agenda-light.png">
+</picture>
 
 ## What it does
 - **Header**: a row of chips on task, project and area files for status, project or area, dates and tags. Each chip opens its menu and changes one line of the file. Obsidian's Properties are behind the header's Properties button.
@@ -17,8 +20,26 @@ Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YA
 - **Repeating tasks**, **Extract to task**, **Convert to project**, and Ta Da's **status rules**.
 
 <p>
-  <img alt="Tasks: a project's open tasks" src="docs/images/tasks-light.png" width="49%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/tasks-dark.png">
+    <img alt="Tasks: a project's open tasks" src="docs/images/tasks-light.png" width="49%">
+  </picture>
   <img alt="New task" src="docs/images/quick-entry.png" width="49%">
+</p>
+
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/phone-agenda-dark.png">
+    <img alt="Phone: Agenda" src="docs/images/phone-agenda-light.png" width="32%">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/phone-tasks-dark.png">
+    <img alt="Phone: Tasks" src="docs/images/phone-tasks-light.png" width="32%">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/phone-taskfile-dark.png">
+    <img alt="Phone: a task" src="docs/images/phone-taskfile-light.png" width="32%">
+  </picture>
 </p>
 
 ## Install
