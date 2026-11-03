@@ -41,4 +41,4 @@ The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaC
 - Tests use Vitest, with jsdom for DOM tests.
 
 ## Versioning
-`x.y.z`, as the Ta Da repo's `docs/versioning.md` says. A new version sets `version` in `manifest.json` and `package.json`, adds its `versions.json` entry, is tagged `v<x.y.z>`, and adds its row to that file's pairing table.
+`x.y.z`, as the Ta Da repo's `docs/versioning.md` says. A new version sets `version` in `manifest.json` and `package.json`, adds its `versions.json` entry, is tagged `<x.y.z>` (no `v`, to match `manifest.json`), and adds its row to that file's pairing table. Pushing the tag runs `.github/workflows/release.yml`, which builds and publishes the GitHub release with `main.js`, `manifest.json` and `styles.css`.
