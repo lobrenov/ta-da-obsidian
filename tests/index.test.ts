@@ -255,7 +255,7 @@ describe("queries", () => {
 		]);
 		expect(titles(q.search(search, "WEBSITE"))).toEqual(["Update Dan’s website", "Other"]);
 		expect(titles(q.search(search, "cafe err"))).toEqual(["Café run"]);
-		expect(titles(q.search(search, "gamejams dan"))).toEqual(["Update Dan’s website"]);
+		expect(titles(q.search(search, "jams dan"))).toEqual(["Update Dan’s website"]);
 		expect(q.search(search, "  ")).toEqual([]);
 	});
 
