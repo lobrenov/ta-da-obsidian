@@ -1,6 +1,8 @@
 # Ta Da for Obsidian
 
-Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YAML frontmatter, so the plugin works over the same vault as the [Ta Da](https://github.com/lobrenov/ta-da-swift) Mac and iPhone apps, or on its own. Works on desktop and mobile.
+Ta Da for Obsidian is a standalone plugin that replicates most of the capabilities of the [Ta Da](https://github.com/lobrenov/ta-da-swift) app for macOS and iOS. It can be run standalone or concurrently, and works on desktop and mobile.
+
+Ta Da is a "one task, one file" based to-do list concept, with tasks, projects, and areas, tag organisation, repeating tasks, in-task checkboxes for subtasks, and periodical notes. 
 
 > **AI Disclaimer:** Ta Da and its Obsidian plugin version are 100% vibe-coded. I've no intention of claiming that "I made" Ta Da or could quickly or easily re-create it myself. It almost definitely has many AI-isms in its visual design and codebase.
 
@@ -9,14 +11,15 @@ Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YA
   <img alt="Ta Da in Obsidian: a task's header, Tasks and the Agenda" src="docs/images/agenda-light.png">
 </picture>
 
-## What it does
-- **Header**: a row of chips on task, project and area files for status, project or area, dates and tags. Each chip opens its menu and changes one line of the file. Obsidian's Properties are behind the header's Properties button.
-- **Agenda**: a week or month strip and a day's or a week's tasks, with the daily or week note.
-- **Tasks and Tags**: areas with their projects, Loose tasks, the Logbook and Trash, and the tag tree, each in a sidebar tab with grouping and a tag filter.
-- **New task**: a modal for a task, project or area, starting in the project, area, tag or day on screen.
-- **File menu**: Move, Schedule, Set deadline, Tags and Status on one file, or on several picked rows. Rows drag onto a project or area.
-- **Logging**: once a day, completed tasks and projects move to the Logbook and completed repeating tasks move forward, as in the apps.
-- **Repeating tasks**, **Extract to task**, **Convert to project**, and Ta Da's **status rules**.
+## How it works
+- **Tasks, Projects, Areas**: one file per task, project or area. Properties, e.g. status, due dates, deadlines, repeats, are defined in YAML frontmatter. Ta Da uses `type: task, project, area` to identify Ta Da files. 
+- **Custom properties header**: Ta Da files have a custom-rendered properties row for status, project, area, dates and tags.
+- **Dates and repetitions**: due dates, deadlines and repetition log are parsed using natural language.
+- **Agenda view**: a week or month strip and a day's or a week's tasks, with the daily or weekly note.
+- **Tasks and Tags views**: areas with their projects, Loose tasks, the Logbook and Trash, and the tag tree, each in a sidebar tab with grouping and a tag filter.
+- **New task menu**: a new task command for a task, project or area. I recommend binding to e.g. `CTRL / ⌘ + Shift + N`.
+- **File menu**: Move, Schedule, Set deadline, Tags and Status on one file, or on several picked rows. 
+- **Logging**: once a day, completed tasks and projects move to the Logbook and completed repeating tasks move forward.
 
 <p>
   <picture>
@@ -42,15 +45,12 @@ Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YA
 </p>
 
 ## Install
-Until Ta Da is in Community plugins:
+- via the Community plugins store.
 - With [BRAT](https://github.com/TfTHacker/obsidian42-brat): add `lobrenov/ta-da-obsidian`.
 - By hand: download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/lobrenov/ta-da-obsidian/releases/latest) into `<vault>/.obsidian/plugins/ta-da/`, then turn on Ta Da in Settings ▸ Community plugins.
 
 ## Files
 The plugin creates files where the apps do, in `Ta Da/` at the vault's top level, and edits them by changing only the lines it needs. Calendar events and reminders stay with the apps. The format is in Ta Da's [`docs/file-format.md`](https://github.com/lobrenov/ta-da-swift/blob/main/docs/file-format.md).
-
-## Commands
-New task, Complete, Move to project or area, Schedule, Set deadline, Set status, Extract subtask to task, Convert task to project, and Open Ta Da: Agenda, Tasks or Tags. None has a default hotkey.
 
 ## Settings
 - Hide properties on Ta Da files.
