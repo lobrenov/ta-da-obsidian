@@ -2,7 +2,6 @@
 
 Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YAML frontmatter, so the plugin works over the same vault as the [Ta Da](https://github.com/lobrenov/ta-da-swift) Mac and iPhone apps, or on its own. Works on desktop and mobile.
 
-> [!NOTE]
 > **AI Disclaimer:** Ta Da and its Obsidian plugin version are 100% vibe-coded. I've no intention of claiming that "I made" Ta Da or could quickly or easily re-create it myself. It almost definitely has many AI-isms in its visual design and codebase.
 
 <picture>
