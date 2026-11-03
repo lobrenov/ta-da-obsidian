@@ -39,10 +39,8 @@ function setup() {
 	const files = new Map([...index.items.keys()].map((path) => [path, { path, basename: path }]));
 	const trashed: string[] = [];
 	const app = {
-		vault: {
-			getFileByPath: (path: string) => files.get(path) ?? null,
-			trash: async (file: { path: string }) => void trashed.push(file.path),
-		},
+		vault: { getFileByPath: (path: string) => files.get(path) ?? null },
+		fileManager: { trashFile: async (file: { path: string }) => void trashed.push(file.path) },
 	};
 	return { app, files, trashed };
 }

@@ -146,7 +146,7 @@ function namedPhrase(phrase: string): Named | null {
 	}
 	const started = phrases.find((entry) => entry.phrase.startsWith(phrase))?.named;
 	if (started) return started;
-	if (rest !== null && rest !== "") return phrases.find((entry) => entry.phrase.startsWith(rest as string))?.named ?? null;
+	if (rest !== null && rest !== "") return phrases.find((entry) => entry.phrase.startsWith(rest))?.named ?? null;
 	return null;
 }
 

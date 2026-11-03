@@ -76,7 +76,7 @@ export class Logbook {
 				if (await this.exists(move.from)) firstError ??= error;
 			}
 		}
-		if (firstError !== undefined && moved.size === 0 && !rolled) throw firstError;
+		if (firstError !== undefined && moved.size === 0 && !rolled) throw firstError instanceof Error ? firstError : new Error(String(firstError));
 		const relinks: ProjectRelink[] = [...plan.relinks, ...again.flatMap((replanned) => replanned.relinks)];
 		const relinked = await this.relink(relinks, moved);
 		await this.reread([...moved.values(), ...relinked]);

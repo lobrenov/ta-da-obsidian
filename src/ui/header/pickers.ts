@@ -3,7 +3,6 @@ import type { VaultIndex } from "../../core/index/vaultIndex";
 import type { Kind } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import { isClosed, type Status, statusChoices } from "../../core/model/status";
-import { readTag } from "../../core/model/tag";
 import type { Parent } from "../../core/writing/parent";
 import { parentChoices, pickerTags, type TagChoice, tagChoices } from "./choices";
 import { element, icon, statusBox } from "./dom";

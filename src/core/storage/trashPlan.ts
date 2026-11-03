@@ -1,7 +1,7 @@
 import type { VaultIndex } from "../index/vaultIndex";
 import type { Item } from "../model/item";
 
-/** The paths deleting a file moves to `.trash/`, the file first and each once: a project takes its live tasks, an area its projects, their tasks and its own tasks. */
+/** The paths deleting a file trashes, the file first and each once: a project takes its live tasks, an area its projects, their tasks and its own tasks. */
 export function filesToTrash(index: VaultIndex, path: string): string[] {
 	const item = index.get(path);
 	const paths = [path];

@@ -907,7 +907,7 @@
 }
 
 /* On a phone, the New task and date windows sit at the top, above the keyboard. */
-.is-phone .modal-container:has(> .ta-da-new-modal, > .ta-da-date-modal) {
+.is-phone .modal-container.ta-da-top-modal {
 	align-items: flex-start;
 }
 
@@ -1201,7 +1201,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	column-gap: var(--size-4-2);
+	gap: 0 var(--size-4-2);
 	color: var(--text-muted);
 	font-size: 11.5px;
 }

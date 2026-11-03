@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocalDate } from "../src/core/model/localDate";
 
 vi.mock("obsidian", () => ({ TFile: class {}, TFolder: class {}, Notice: class {} }));
+vi.stubGlobal("window", globalThis);
 
 const { TFile } = await import("obsidian");
 const { TaDaIndex } = await import("../src/TaDaIndex");

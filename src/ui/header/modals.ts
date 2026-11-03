@@ -118,6 +118,7 @@ export class DateModal extends Modal {
 	override onOpen(): void {
 		const doc = this.contentEl.ownerDocument;
 		this.modalEl.classList.add("ta-da-date-modal");
+		this.containerEl.classList.add("ta-da-top-modal");
 		const root = this.contentEl;
 		this.scope.register([], "Escape", () => {
 			if (this.input.value !== "") {
@@ -275,7 +276,7 @@ export class DateModal extends Modal {
 			? [
 					["Never", null],
 					["In 4 weeks", this.today.addingDays(28)],
-					["End of year", LocalDate.of(this.today.year, 12, 31) as LocalDate],
+					["End of year", LocalDate.of(this.today.year, 12, 31)],
 				]
 			: [
 					["Today", this.today],

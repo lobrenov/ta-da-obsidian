@@ -81,11 +81,10 @@ describe("trashPaths", () => {
 		const notices: string[] = [];
 		const files = new Map(["a", "b", "c", "d"].map((path) => [path, { path, basename: path }]));
 		const app = {
-			vault: {
-				getFileByPath: (path: string) => files.get(path) ?? null,
-				trash: async (file: { path: string }, system: boolean) => {
+			vault: { getFileByPath: (path: string) => files.get(path) ?? null },
+			fileManager: {
+				trashFile: async (file: { path: string }) => {
 					if (failing.includes(file.path)) throw new Error("locked");
-					expect(system).toBe(false);
 					trashed.push(file.path);
 				},
 			},

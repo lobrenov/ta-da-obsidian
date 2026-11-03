@@ -13,7 +13,7 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 /** The text's characters, as Swift's `String` iterates them. */
 export function characters(text: string): string[] {
 	// ASCII has no multi-unit clusters but CR LF.
-	if (/^[\x00-\x7f]*$/.test(text) && !text.includes("\r\n")) return Array.from(text);
+	if (!/[^\p{ASCII}]/u.test(text) && !text.includes("\r\n")) return Array.from(text);
 	return Array.from(segmenter.segment(text), (part) => part.segment);
 }
 

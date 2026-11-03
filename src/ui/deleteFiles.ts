@@ -4,7 +4,7 @@ import { areaTrashMessage, areaTrashTitle, filesToTrash } from "../core/storage/
 import { DeleteAreaModal } from "./DeleteAreaModal";
 
 /**
- * Moves each path's file to `.trash/` (Obsidian numbers a taken name), the first path first. A file already gone is
+ * Trashes each path's file as the user's Files and links setting says, the first path first. A file already gone is
  * skipped. The first failure stops the rest, so a project or area that can't move keeps its contents; one notice says
  * which file failed and how many didn't move.
  */
@@ -13,7 +13,7 @@ export async function trashPaths(app: App, paths: string[]): Promise<void> {
 		const file = app.vault.getFileByPath(path);
 		if (!file) continue;
 		try {
-			await app.vault.trash(file, false);
+			await app.fileManager.trashFile(file);
 		} catch (error) {
 			const left = paths.length - at;
 			new Notice(`Couldn't delete “${file.basename}”: ${error instanceof Error ? error.message : String(error)}. ${left === 1 ? "1 file" : `${left} files`} didn't move.`);

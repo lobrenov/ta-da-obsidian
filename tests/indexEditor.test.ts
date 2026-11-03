@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", () => ({ TFile: class {}, TFolder: class {} }));
+vi.stubGlobal("window", globalThis);
 
 const { TFile } = await import("obsidian");
 const { TaDaIndex } = await import("../src/TaDaIndex");

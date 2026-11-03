@@ -9,7 +9,7 @@ function svg(parent: Element, tag: string, attributes: Record<string, string>): 
 	const element = parent.ownerDocument.createElementNS(svgNamespace, tag);
 	for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
 	parent.appendChild(element);
-	return element as SVGElement;
+	return element;
 }
 
 /** A 16-unit icon of one stroked path. */

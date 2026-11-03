@@ -12,7 +12,7 @@ import type { Tag } from "../../core/model/tag";
 import { tagLeaf } from "../../core/model/tag";
 import { type TrashedItem, contentsOf } from "../../core/storage/trash";
 import { linkTitle } from "../../core/model/wikiLink";
-import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel, weekOf } from "./agenda";
+import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel } from "./agenda";
 import { shortWeekday } from "./dates";
 import { occurrenceHelp, occurrenceLabel } from "../repeatWording";
 import { type Domain, domainKey, type GroupedList, groupingOf, type Groupings } from "./domain";

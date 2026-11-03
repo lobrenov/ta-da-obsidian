@@ -27,6 +27,7 @@ vi.mock("obsidian", () => ({
 	Modal: class {
 		contentEl = Object.assign(document.createElement("div"), { win: window, empty() {} });
 		modalEl = document.createElement("div");
+		containerEl = document.createElement("div");
 		titleEl = Object.assign(document.createElement("div"), {
 			setText(this: HTMLElement, text: string) {
 				this.textContent = text;

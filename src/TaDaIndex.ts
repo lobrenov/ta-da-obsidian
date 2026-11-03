@@ -26,9 +26,9 @@ export class TaDaIndex {
 	/** The latest change seen for each path with a read pending, so a slow read never overwrites a newer change. */
 	private readonly generations = new Map<string, number>();
 	private readonly listeners = new Set<() => void>();
-	private changeTimer: ReturnType<typeof setTimeout> | undefined;
+	private changeTimer: number | undefined;
 	/** Per path, the timer that will take an editor's latest text. */
-	private readonly editTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private readonly editTimers = new Map<string, number>();
 	/** Per path, the editor text last seen and when. */
 	private readonly recentEdits = new Map<string, { text: string; at: number }>();
 
@@ -41,8 +41,8 @@ export class TaDaIndex {
 	start(): void {
 		this.plugin.register(() => {
 			this.unloaded = true;
-			clearTimeout(this.changeTimer);
-			for (const timer of this.editTimers.values()) clearTimeout(timer);
+			window.clearTimeout(this.changeTimer);
+			for (const timer of this.editTimers.values()) window.clearTimeout(timer);
 			this.editTimers.clear();
 			this.listeners.clear();
 			this.resolveReady();
@@ -64,8 +64,8 @@ export class TaDaIndex {
 	}
 
 	private changed(): void {
-		clearTimeout(this.changeTimer);
-		this.changeTimer = setTimeout(() => {
+		window.clearTimeout(this.changeTimer);
+		this.changeTimer = window.setTimeout(() => {
 			for (const listener of [...this.listeners]) listener();
 		}, changeDelay);
 	}
@@ -96,11 +96,11 @@ export class TaDaIndex {
 	private edited(file: TFile, text: string): void {
 		if (!isMarkdown(file)) return;
 		const path = file.path;
-		clearTimeout(this.editTimers.get(path));
+		window.clearTimeout(this.editTimers.get(path));
 		this.recentEdits.set(path, { text, at: Date.now() });
 		this.editTimers.set(
 			path,
-			setTimeout(() => {
+			window.setTimeout(() => {
 				this.editTimers.delete(path);
 				this.apply(file, text);
 			}, editDelay),
@@ -163,7 +163,7 @@ export class TaDaIndex {
 	/** Drops a path from the index and cancels any read pending for it. */
 	private remove(path: string): void {
 		this.generations.delete(path);
-		clearTimeout(this.editTimers.get(path));
+		window.clearTimeout(this.editTimers.get(path));
 		this.editTimers.delete(path);
 		this.recentEdits.delete(path);
 		this.index.remove(path);

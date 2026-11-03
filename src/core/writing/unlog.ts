@@ -89,7 +89,7 @@ export function planRelinks(index: MoveIndex, items: Item[]): ProjectRelink[] {
 
 /** The relinks to apply: those of projects that moved and whose title changed, at their tasks' paths after `moved`. */
 export function resolveRelinks(relinks: ProjectRelink[], moved: ReadonlyMap<string, string> | Record<string, string>): Relink[] {
-	const at = (path: string): string | undefined => (moved instanceof Map ? moved.get(path) : Object.hasOwn(moved, path) ? (moved as Record<string, string>)[path] : undefined);
+	const at = (path: string): string | undefined => (moved instanceof Map ? (moved as ReadonlyMap<string, string>).get(path) : Object.hasOwn(moved, path) ? (moved as Record<string, string>)[path] : undefined);
 	return relinks.flatMap(({ task, project, from }) => {
 		const destination = at(project);
 		const to = destination === undefined ? null : titleOfPath(destination);

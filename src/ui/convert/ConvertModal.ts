@@ -32,6 +32,7 @@ export class ConvertModal extends Modal {
 	override onOpen(): void {
 		const doc = this.contentEl.ownerDocument;
 		this.modalEl.classList.add("ta-da-new-modal");
+		this.containerEl.classList.add("ta-da-top-modal");
 		this.titleEl.setText(`Convert “${this.file.basename}” to a project`);
 		this.chipsEl = element(doc, "div", "ta-da-header ta-da-new-header");
 		this.contentEl.appendChild(this.chipsEl);
@@ -70,10 +71,11 @@ export class ConvertModal extends Modal {
 	/** The status and area chips of the project it will be, and where its file moves. */
 	private draw(): void {
 		const doc = this.contentEl.ownerDocument;
-		const { today, index } = this.host;
+		const { index } = this.host;
+		const today = this.host.today();
 		const { status, area } = this.choice;
-		const item = parseItem(convertedText(this.text, "project", status, area, today()), this.file.path);
-		const chips = (item ? buildHeaderModel(item, index, today())?.chips ?? [] : []).filter((chip) => chip.kind === "status" || chip.kind === "parent");
+		const item = parseItem(convertedText(this.text, "project", status, area, today), this.file.path);
+		const chips = (item ? buildHeaderModel(item, index, today)?.chips ?? [] : []).filter((chip) => chip.kind === "status" || chip.kind === "parent");
 		const actions = {
 			openStatus: (anchor: HTMLElement) => openStatusMenu(anchor, "project", status, (picked) => this.change((choice) => (choice.status = picked))),
 			openParent: (anchor: HTMLElement) => openParentPicker(this.host, "project", area, anchor, (parent) => this.change((choice) => (choice.area = parent))),

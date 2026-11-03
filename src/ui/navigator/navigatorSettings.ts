@@ -1,7 +1,7 @@
-import { Setting } from "obsidian";
+import type { SettingDefinition, SettingDefinitionItem } from "obsidian";
 import { dateAtPath, weekAtPath, type DailyNoteNames } from "../../core/index/dailyNotes";
 import type { VaultIndex } from "../../core/index/vaultIndex";
-import { viewKinds, viewSpecs } from "./views";
+import { viewKinds, viewSpecs, type ViewKind } from "./views";
 import { cleanedFolder, type DailyNotesData, type NavigatorData, type SettingsStore } from "../../settingsData";
 
 /** The navigator's part of the shared settings, with a call-back for the view when it changes. */
@@ -59,82 +59,125 @@ export class NavigatorSettings {
 	}
 }
 
-/** The views' settings, drawn into the plugin's settings tab. */
-export function displayNavigatorSettings(containerEl: HTMLElement, settings: NavigatorSettings): void {
-	for (const kind of viewKinds) {
-		const name = viewSpecs[kind].title.replace("Ta Da: ", "");
-		new Setting(containerEl)
-			.setName(`Open ${name} on startup`)
-			.setDesc(`Shows the ${viewSpecs[kind].title} view in the left sidebar, beside the file explorer.`)
-			.addToggle((toggle) => toggle.setValue(settings.data.openOnStartup[kind]).onChange((value) => void settings.update({ openOnStartup: { ...settings.data.openOnStartup, [kind]: value } })));
-	}
-	new Setting(containerEl)
-		.setName("Collapse the list pane")
-		.setDesc("Shows one pane at a time in Tasks and Tags: picking a list shows it, with a back button. The button in the view's header toggles it too.")
-		.addToggle((toggle) => toggle.setValue(settings.data.collapseListPane).onChange((value) => void settings.update({ collapseListPane: value })));
-}
+const openOnStartupPrefix = "openOnStartup.";
 
-/** Settings ▸ Daily notes, drawn into the plugin's settings tab. */
-export function displayDailyNotesSettings(containerEl: HTMLElement, settings: NavigatorSettings): void {
-	const data = settings.dailyNotes;
-	new Setting(containerEl).setName("Daily notes").setDesc("Shared with Ta Da through Ta Da/settings.json in the vault.").setHeading();
-	folderSetting(containerEl, "Daily note folder", data.dailyFolder, (value) => void settings.updateDailyNotes({ dailyFolder: value }));
-	templateSetting(containerEl, "Daily note template", data.dailyTemplate, settings, (value) => void settings.updateDailyNotes({ dailyTemplate: value }), false);
-	new Setting(containerEl)
-		.setName("Show a note for each week")
-		.setDesc("Adds a week note row to the Agenda's week, and marks the weeks that have one.")
-		.addToggle((toggle) =>
-			toggle.setValue(data.weekNotes).onChange(async (value) => {
-				await settings.updateDailyNotes({ weekNotes: value });
-				weekSettings.forEach((setting) => setting.setDisabled(!value));
-			}),
-		);
-	const weekSettings = [
-		folderSetting(containerEl, "Week note folder", data.weekFolder, (value) => void settings.updateDailyNotes({ weekFolder: value }), !data.weekNotes),
-		templateSetting(containerEl, "Week note template", data.weekTemplate, settings, (value) => void settings.updateDailyNotes({ weekTemplate: value }), !data.weekNotes),
+/** The views' settings, as definitions for the plugin's settings tab. */
+export function navigatorDefinitions(settings: NavigatorSettings): SettingDefinitionItem[] {
+	return [
+		...viewKinds.map((kind): SettingDefinition => {
+			const title = viewSpecs[kind].title;
+			return {
+				name: `Open ${title.replace("Ta Da: ", "")} on startup`,
+				desc: `Shows the ${title} view in the left sidebar, beside the file explorer.`,
+				control: { type: "toggle", key: openOnStartupPrefix + kind },
+			};
+		}),
+		{
+			name: "Collapse the list pane",
+			desc: "Shows one pane at a time in Tasks and Tags: picking a list shows it, with a back button. The button in the view's header toggles it too.",
+			control: { type: "toggle", key: "collapseListPane" },
+		},
 	];
 }
 
+/** Settings ▸ Daily notes, as definitions for the plugin's settings tab. */
+export function dailyNotesDefinitions(settings: NavigatorSettings): SettingDefinitionItem[] {
+	const weekOff = (): boolean => !settings.dailyNotes.weekNotes;
+	return [
+		{
+			name: "Daily notes",
+			desc: "Shared with Ta Da through Ta Da/settings.json in the vault.",
+			render: (setting) => {
+				setting.setHeading();
+			},
+		},
+		folderDefinition("Daily note folder", settings, "dailyFolder", () => false),
+		templateDefinition("Daily note template", settings, "dailyTemplate", () => false),
+		{
+			name: "Show a note for each week",
+			desc: "Adds a week note row to the Agenda's week, and marks the weeks that have one.",
+			control: { type: "toggle", key: "weekNotes" },
+		},
+		folderDefinition("Week note folder", settings, "weekFolder", weekOff),
+		templateDefinition("Week note template", settings, "weekTemplate", weekOff),
+	];
+}
+
+/** The setting's value for a control key from `navigatorDefinitions` or `dailyNotesDefinitions`; undefined for other keys. */
+export function navigatorControlValue(settings: NavigatorSettings, key: string): unknown {
+	if (key.startsWith(openOnStartupPrefix)) return settings.data.openOnStartup[key.slice(openOnStartupPrefix.length) as ViewKind];
+	switch (key) {
+		case "collapseListPane":
+			return settings.data.collapseListPane;
+		case "weekNotes":
+			return settings.dailyNotes.weekNotes;
+		case "dailyTemplate":
+		case "weekTemplate":
+			return settings.dailyNotes[key] ?? "";
+		default:
+			return undefined;
+	}
+}
+
+/** Saves a control's value for a key from `navigatorDefinitions` or `dailyNotesDefinitions`. Returns whether the key was one of them. */
+export function setNavigatorControlValue(settings: NavigatorSettings, key: string, value: unknown): boolean {
+	if (key.startsWith(openOnStartupPrefix)) {
+		const kind = key.slice(openOnStartupPrefix.length) as ViewKind;
+		void settings.update({ openOnStartup: { ...settings.data.openOnStartup, [kind]: value === true } });
+		return true;
+	}
+	switch (key) {
+		case "collapseListPane":
+			void settings.update({ collapseListPane: value === true });
+			return true;
+		case "weekNotes":
+			void settings.updateDailyNotes({ weekNotes: value === true });
+			return true;
+		case "dailyTemplate":
+		case "weekTemplate":
+			void settings.updateDailyNotes({ [key]: value === "" || typeof value !== "string" ? null : value });
+			return true;
+		default:
+			return false;
+	}
+}
+
 /** A folder path typed into a field, tidied and saved on Enter or when the field loses focus. */
-function folderSetting(containerEl: HTMLElement, name: string, value: string, save: (folder: string) => void, disabled = false): Setting {
-	const setting = new Setting(containerEl).setName(name).setDesc("A vault folder; empty is the vault's top level.").setDisabled(disabled);
-	setting.addText((text) => {
-		text.setPlaceholder("Vault folder").setValue(value);
-		let saved = value;
-		const commit = (): void => {
-			const cleaned = cleanedFolder(text.getValue());
-			text.setValue(cleaned);
-			if (cleaned !== saved) {
-				saved = cleaned;
-				save(cleaned);
-			}
-		};
-		text.inputEl.addEventListener("blur", commit);
-		text.inputEl.addEventListener("keydown", (event) => {
-			if (event.key === "Enter") commit();
-		});
-	});
-	return setting;
+function folderDefinition(name: string, settings: NavigatorSettings, key: "dailyFolder" | "weekFolder", disabled: () => boolean): SettingDefinition {
+	return {
+		name,
+		desc: "A vault folder; empty is the vault's top level.",
+		render: (setting) => {
+			setting.setDisabled(disabled());
+			setting.addText((text) => {
+				const value = settings.dailyNotes[key];
+				text.setPlaceholder("Vault folder").setValue(value);
+				let saved = value;
+				const commit = (): void => {
+					const cleaned = cleanedFolder(text.getValue());
+					text.setValue(cleaned);
+					if (cleaned !== saved) {
+						saved = cleaned;
+						void settings.updateDailyNotes({ [key]: cleaned });
+					}
+				};
+				text.inputEl.addEventListener("blur", commit);
+				text.inputEl.addEventListener("keydown", (event) => {
+					if (event.key === "Enter") commit();
+				});
+			});
+		},
+	};
 }
 
 /** The note new daily or week notes start from: None, or one of the vault's notes. A saved note that's gone shows as missing. */
-function templateSetting(
-	containerEl: HTMLElement,
-	name: string,
-	value: string | null,
-	settings: NavigatorSettings,
-	save: (template: string | null) => void,
-	disabled: boolean,
-): Setting {
+function templateDefinition(name: string, settings: NavigatorSettings, key: "dailyTemplate" | "weekTemplate", disabled: () => boolean): SettingDefinition {
+	const value = settings.dailyNotes[key];
 	const choices = settings.templateChoices();
-	const setting = new Setting(containerEl).setName(name).setDesc("New notes start from this note's text.").setDisabled(disabled);
-	setting.addDropdown((dropdown) => {
-		dropdown.addOption("", "None");
-		if (value !== null && !choices.includes(value)) dropdown.addOption(value, `${missingTitle(value)} (missing)`);
-		for (const path of choices) dropdown.addOption(path, path.replace(/\.md$/, ""));
-		dropdown.setValue(value ?? "").onChange((chosen) => save(chosen === "" ? null : chosen));
-	});
-	return setting;
+	const options: Record<string, string> = { "": "None" };
+	if (value !== null && !choices.includes(value)) options[value] = `${missingTitle(value)} (missing)`;
+	for (const path of choices) options[path] = path.replace(/\.md$/, "");
+	return { name, desc: "New notes start from this note's text.", control: { type: "dropdown", key, options, disabled } };
 }
 
 function missingTitle(path: string): string {

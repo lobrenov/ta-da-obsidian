@@ -41,6 +41,7 @@ export class NewTaskModal extends Modal {
 	override onOpen(): void {
 		const doc = this.contentEl.ownerDocument;
 		this.modalEl.classList.add("ta-da-new-modal");
+		this.containerEl.classList.add("ta-da-top-modal");
 		this.switchEl = element(doc, "div", "ta-da-new-switch", undefined, { role: "group", "aria-label": "Type" });
 		this.titleInput = element(doc, "input", "ta-da-new-title", undefined, { type: "text", "aria-label": "Title" });
 		this.titleInput.value = this.draft.title;

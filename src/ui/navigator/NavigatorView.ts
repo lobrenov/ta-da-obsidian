@@ -562,7 +562,7 @@ export class NavigatorView extends ItemView {
 		el.setAttribute("draggable", "true");
 		el.addEventListener("dragstart", (event) => {
 			const picked = this.pickedRows.paths;
-			const several = picked.length > 1 && picked.includes(path) && manager.dragFiles;
+			const several = picked.length > 1 && picked.includes(path) && manager.dragFiles !== undefined;
 			const file = this.app.vault.getFileByPath(path);
 			const data = several
 				? manager.dragFiles?.(event, picked.flatMap((pick) => this.app.vault.getFileByPath(pick) ?? []))

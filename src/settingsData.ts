@@ -144,7 +144,7 @@ export class SettingsStore {
 		const earlier = normalizedDailyNotes(validDailyNotes(this.savedDailyNotes));
 		const obsidianText = await this.files.read(`${this.files.configDir}/daily-notes.json`);
 		const obsidian = normalizedDailyNotes(obsidianText === null ? {} : readObsidianDailyNotes(obsidianText));
-		const first = <K extends keyof DailyNotesData>(key: K, ...sources: Partial<DailyNotesData>[]): DailyNotesData[K] => (sources.find((source) => source[key] !== undefined)?.[key] ?? defaultDailyNotes[key]) as DailyNotesData[K];
+		const first = <K extends keyof DailyNotesData>(key: K, ...sources: Partial<DailyNotesData>[]): DailyNotesData[K] => sources.find((source) => source[key] !== undefined)?.[key] ?? defaultDailyNotes[key];
 		return {
 			dailyFolder: first("dailyFolder", file, earlier, obsidian),
 			dailyTemplate: first("dailyTemplate", file, earlier, obsidian),

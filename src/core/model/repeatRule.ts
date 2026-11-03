@@ -104,7 +104,7 @@ export class RepeatRule {
 				frequency = "year";
 			} else if (days.every((day) => day !== null)) {
 				frequency = "week";
-				weekdays = days as number[];
+				weekdays = days.filter((day) => day !== null);
 			} else if ((monthDay = readMonthDay(["the", ...clause])) !== null) {
 				frequency = "month";
 			} else if ((yearDate = readYearDate(clause)) !== null) {
