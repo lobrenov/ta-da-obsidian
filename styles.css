@@ -1007,7 +1007,7 @@
 	color: var(--text-muted);
 }
 
-/* Chips, the filter pill and picked tags */
+/* Chips and picked tags */
 
 .ta-da-navigator .ta-da-chips,
 .ta-da-navigator .ta-da-filter {
@@ -1554,32 +1554,16 @@
 	color: var(--text-normal);
 }
 
-.ta-da-navigator .ta-da-period-title {
+.ta-da-navigator .ta-da-scheduled {
 	display: flex;
-	align-items: baseline;
+	align-items: flex-start;
 	gap: var(--size-4-2);
-	padding: var(--size-4-3) var(--size-4-3) var(--size-4-1);
+	padding-inline-end: var(--size-4-3);
 }
 
-.ta-da-navigator .ta-da-period-name {
-	color: var(--text-normal);
-	font-size: 18px;
-	font-weight: var(--font-bold);
-}
-
-.ta-da-navigator .ta-da-period-note {
-	color: var(--text-muted);
-	white-space: nowrap;
-}
-
-.ta-da-navigator .ta-da-period-note.is-accent {
+.ta-da-navigator .ta-da-scheduled .ta-da-list-actions {
 	margin-inline-start: auto;
-	color: var(--ta-da-accent);
-	font-weight: var(--font-semibold);
-}
-
-.ta-da-navigator .ta-da-group-header.is-scheduled .ta-da-list-actions {
-	margin-inline-start: auto;
+	padding-top: var(--size-4-1);
 }
 
 .ta-da-navigator .ta-da-section .ta-da-filter {
@@ -1710,7 +1694,7 @@
 	margin-top: var(--size-4-3);
 }
 
-/* Group pill and the filter pill */
+/* The Group and Filter pill */
 .ta-da-navigator .ta-da-group-pill {
 	margin-inline-start: auto;
 }
@@ -1724,9 +1708,19 @@
 	font-weight: var(--font-semibold);
 }
 
-.ta-da-navigator .ta-da-pill.is-dashed {
-	border-style: dashed;
-	color: var(--text-muted);
+.ta-da-navigator .ta-da-pill.is-filtering {
+	border-color: transparent;
+	background: var(--ta-da-selected);
+}
+
+.ta-da-navigator .ta-da-pill-badge {
+	padding: 0 5px;
+	border-radius: 7px;
+	background: var(--ta-da-accent);
+	color: var(--text-on-accent);
+	font-size: 10px;
+	font-weight: var(--font-bold);
+	line-height: 14px;
 }
 
 /* Convert to project modal */

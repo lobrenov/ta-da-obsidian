@@ -636,19 +636,39 @@ export class NavigatorView extends ItemView {
 		pill.addEventListener("click", () => this.deps.logNow?.());
 	}
 
-	/** The Group pill, on lists that have a Group choice: `Group Status ▾`, opening the menu. */
+	/**
+	 * The Group and Filter pill, on lists with a Group choice or tags to filter by: `Group Status ▾`, or `Filter ▾` on a
+	 * list with no Group choice, with the picked tags' count. It opens one menu: Group by, then Tags in this view.
+	 */
 	private groupButton(parent: HTMLElement, list: ListModel): void {
-		const groupList = list.groupList;
-		if (!groupList) return;
-		const pill = parent.createEl("button", { cls: "ta-da-pill ta-da-group-pill", attr: { "aria-label": `Group: ${list.grouping ?? ""}` } });
-		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "list");
-		pill.createSpan({ cls: "ta-da-pill-label", text: "Group" });
-		pill.createSpan({ cls: "ta-da-pill-value", text: list.grouping ?? "" });
+		const { groupList, filter } = list;
+		if (!groupList && !filter) return;
+		const picked = filter?.tags.filter((tag) => tag.picked).length ?? 0;
+		const label = (groupList ? `Group: ${list.grouping ?? ""}` : "Filter by tag") + (picked > 0 ? `, ${picked} tags picked` : "");
+		const pill = parent.createEl("button", { cls: `ta-da-pill ta-da-group-pill${picked > 0 ? " is-filtering" : ""}`, attr: { "aria-label": label } });
+		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), groupList ? "list" : "list-filter");
+		if (groupList) {
+			pill.createSpan({ cls: "ta-da-pill-label", text: "Group" });
+			pill.createSpan({ cls: "ta-da-pill-value", text: list.grouping ?? "" });
+		} else {
+			pill.createSpan({ cls: "ta-da-pill-label", text: "Filter" });
+		}
+		if (picked > 0) pill.createSpan({ cls: "ta-da-pill-badge", text: String(picked) });
 		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "chevron-down");
 		pill.addEventListener("click", (event) => {
 			const menu = new Menu();
-			for (const choice of groupChoices[groupList]) {
-				menu.addItem((entry) => entry.setTitle(choice).setChecked(choice === list.grouping).onClick(() => this.setGrouping(choice)));
+			if (groupList) {
+				menu.addItem((entry) => entry.setTitle("Group by").setIsLabel(true));
+				for (const choice of groupChoices[groupList]) {
+					menu.addItem((entry) => entry.setTitle(choice).setChecked(choice === list.grouping).onClick(() => this.setGrouping(choice)));
+				}
+			}
+			if (filter) {
+				if (groupList) menu.addSeparator();
+				menu.addItem((entry) => entry.setTitle("Tags in this view").setIsLabel(true));
+				for (const tag of filter.tags) {
+					menu.addItem((entry) => entry.setTitle(`${tag.name} (${tag.count})`).setChecked(tag.picked).onClick(() => this.pick(tag.path, !tag.picked)));
+				}
 			}
 			menu.showAtMouseEvent(event);
 		});
@@ -701,38 +721,24 @@ export class NavigatorView extends ItemView {
 		button.addEventListener("click", onClick);
 	}
 
-	/** The filter pill, the picked tags as chips, and how many rows they leave. */
+	/** While tags are picked: each as a chip, how many rows they leave, and Clear. */
 	private renderFilter(parent: HTMLElement, list: ListModel): void {
+		const picked = list.filter?.tags.filter((tag) => tag.picked) ?? [];
+		if (!list.filter || picked.length === 0) return;
 		const filter = list.filter;
-		if (!filter) return;
 		const row = parent.createDiv({ cls: "ta-da-filter" });
-		const pill = row.createEl("button", { cls: "ta-da-pill" });
-		setIcon(pill.createSpan({ cls: "ta-da-pill-icon" }), "list-filter");
-		pill.createSpan({ text: "Filter" });
-		if (!filter.tags.some((tag) => tag.picked)) pill.addClass("is-dashed");
-		pill.addEventListener("click", (event) => {
-			const menu = new Menu();
-			menu.addItem((entry) => entry.setTitle("Tags in this view").setIsLabel(true));
-			for (const tag of filter.tags) {
-				menu.addItem((entry) => entry.setTitle(`${tag.name} (${tag.count})`).setChecked(tag.picked).onClick(() => this.pick(tag.path, !tag.picked)));
-			}
-			menu.showAtMouseEvent(event);
-		});
-		const picked = filter.tags.filter((tag) => tag.picked);
 		for (const tag of picked) {
 			const chip = row.createEl("button", { cls: "ta-da-pill is-picked", attr: { "aria-label": `Remove ${tag.name}` } });
 			chip.createSpan({ text: `#${tag.name}` });
 			setIcon(chip.createSpan({ cls: "ta-da-pill-icon" }), "x");
 			chip.addEventListener("click", () => this.pick(tag.path, false));
 		}
-		if (picked.length > 0) {
-			row.createSpan({ cls: "ta-da-filter-count", text: `${filter.shown} of ${filter.total}` });
-			const clear = row.createEl("button", { cls: "ta-da-link-button", text: "Clear" });
-			clear.addEventListener("click", () => {
-				this.picked.set(domainKey(list.domain), new Set());
-				this.refresh();
-			});
-		}
+		row.createSpan({ cls: "ta-da-filter-count", text: `${filter.shown} of ${filter.total}` });
+		const clear = row.createEl("button", { cls: "ta-da-link-button", text: "Clear" });
+		clear.addEventListener("click", () => {
+			this.picked.set(domainKey(list.domain), new Set());
+			this.refresh();
+		});
 	}
 
 	private renderSection(parent: HTMLElement, section: SectionModel, list: ListModel): void {
@@ -776,26 +782,11 @@ export class NavigatorView extends ItemView {
 				el.createSpan({ cls: "ta-da-group-title", text: "Loose" });
 				break;
 			}
-			case "dayTitle": {
-				const el = parent.createDiv({ cls: "ta-da-period-title" });
-				el.createSpan({ cls: "ta-da-period-name", text: header.title });
-				if (header.relative) el.createSpan({ cls: "ta-da-period-note is-accent", text: header.relative });
-				break;
-			}
-			case "weekTitle": {
-				const el = parent.createDiv({ cls: "ta-da-period-title" });
-				el.createSpan({ cls: "ta-da-period-name", text: header.title });
-				el.createSpan({ cls: "ta-da-period-note", text: header.range });
-				if (header.thisWeek) el.createSpan({ cls: "ta-da-period-note is-accent", text: "This week" });
-				break;
-			}
 			case "scheduled": {
-				const el = parent.createDiv({ cls: "ta-da-group-header is-archive is-scheduled" });
-				drawIcon(el.createSpan({ cls: "ta-da-group-icon" }), { type: "icon", name: "calendar", tint: "due" });
-				el.createSpan({ cls: "ta-da-group-title", text: "Scheduled" });
+				const el = parent.createDiv({ cls: "ta-da-scheduled" });
+				this.renderFilter(el, list);
 				const actions = el.createDiv({ cls: "ta-da-list-actions" });
 				this.groupButton(actions, list);
-				this.renderFilter(parent, list);
 				break;
 			}
 			case "repeats": {

@@ -13,7 +13,7 @@ import { tagLeaf } from "../../core/model/tag";
 import { type TrashedItem, contentsOf } from "../../core/storage/trash";
 import { linkTitle } from "../../core/model/wikiLink";
 import { type AgendaSelection, type AgendaState, buildStrip, type NoteSettings, type StripModel, weekOf } from "./agenda";
-import { dayMonth, fullDate, shortWeekday } from "./dates";
+import { shortWeekday } from "./dates";
 import { occurrenceHelp, occurrenceLabel } from "../repeatWording";
 import { type Domain, domainKey, type GroupedList, groupingOf, type Groupings } from "./domain";
 import { logbookGroups, logbookItems, logbookRow } from "./logbook";
@@ -59,11 +59,8 @@ export type SectionHeader =
 	| { style: "project"; title: string; path: string; icon: IconSpec; count: number; area: string | null; sub: boolean }
 	| { style: "loose" }
 	| { style: "archive"; title: string; note: string | null }
-	/** A day's full date and relative name. */
-	| { style: "dayTitle"; title: string; relative: string | null }
-	/** "Scheduled", with the Group menu and the tag filter. */
+	/** Over a day's tasks: the tag filter and the Group menu. */
 	| { style: "scheduled" }
-	| { style: "weekTitle"; title: string; range: string; thisWeek: boolean }
 	/** "Repeats": the coming occurrences of repeating tasks. */
 	| { style: "repeats" };
 
@@ -170,19 +167,17 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("agenda", options.groupings);
-	const relative = ["Today", "Tomorrow", "Yesterday"][[0, 1, -1].indexOf(today.daysTo(selection.date))] ?? null;
-	const title = plain("agenda:day", [periodNoteRow(ctx, selection)], { style: "dayTitle", title: fullDate(selection.date, today), relative });
+	const title = plain("agenda:day", [periodNoteRow(ctx, selection)]);
 	const sections = [title];
 	const repeats = allOccurrences(index, selection.date, selection.date, today).filter((occurrence) => filter.matches(occurrence.item));
-	if (all.length === 0) {
-		if (repeats.length === 0) title.message = "Nothing scheduled";
-	} else {
+	if (all.length === 0 && repeats.length === 0) title.message = "Nothing scheduled";
+	if (all.length > 0 || filter.isActive) {
 		const scheduled = plain("agenda:scheduled", [], { style: "scheduled" });
-		if (tasks.length === 0) scheduled.message = "Nothing here carries the picked tags.";
+		if (all.length > 0 && tasks.length === 0) scheduled.message = "Nothing here carries the picked tags.";
 		sections.push(scheduled, ...taskSections(ctx, tasks, grouping, { dates: "agenda", place: grouping !== "Project" }, "agenda", options));
 	}
 	if (repeats.length > 0) sections.push(plain("agenda:repeats", occurrenceRows(ctx, repeats), { style: "repeats" }));
-	return { ...base, groupList: "agenda", grouping, filter: filterModel(all, options.picked, tasks.length), sections };
+	return { ...base, groupList: all.length > 0 ? "agenda" : null, grouping, filter: filterModel(all, options.picked, tasks.length), sections };
 }
 
 /** The repeating tasks with an occurrence on `day`, once each, in `occurrences`' order. */
@@ -261,7 +256,7 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	});
 	const selection: AgendaSelection = { kind: "week", week };
 	const sections = [
-		plain("agenda:week", ctx.notes.weekNotes ? [periodNoteRow(ctx, selection)] : [], { style: "weekTitle", title: `Week ${week.week}`, range: `${dayMonth(week.firstDay, today)} – ${dayMonth(week.days[6] ?? week.firstDay, today)}`, thisWeek: week.equals(today.isoWeek) }),
+		plain("agenda:week", ctx.notes.weekNotes ? [periodNoteRow(ctx, selection)] : []),
 		plain("agenda:days", days),
 	];
 	if (entries.length > 0) {

@@ -31,12 +31,8 @@ function headerText(header: SectionHeader | null): string {
 			return `${header.sub ? "sub" : "project"} ${header.title} ${header.count}${header.area ? ` (${header.area})` : ""}`;
 		case "loose":
 			return "Loose";
-		case "dayTitle":
-			return `day ${header.title}${header.relative ? ` (${header.relative})` : ""}`;
 		case "scheduled":
 			return "scheduled";
-		case "weekTitle":
-			return `week ${header.title} ${header.range}${header.thisWeek ? " (this week)" : ""}`;
 		case "repeats":
 			return "Repeats";
 		case "archive":

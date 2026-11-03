@@ -22,7 +22,7 @@ describe("Agenda day", () => {
 		expect(model.grouping).toBe("Project");
 		expect(model.groupList).toBe("agenda");
 		expect(describeList(model)).toEqual([
-			"# day Friday 2 October (Today)",
+			"# -",
 			"    periodNote | Daily note | 2026-10-02.md | Standup ran long; the release moves to Tuesday. | 1/3",
 			"# scheduled",
 			"# -",
@@ -66,23 +66,29 @@ describe("Agenda day", () => {
 		expect(opened.sections.slice(2).map((section) => section.folded)).toEqual([false, false]);
 	});
 
-	it("lists another day's tasks due or at their deadline that day, and names it relative to today", () => {
+	it("lists another day's tasks due or at their deadline that day", () => {
 		const onDay = (date: string): string[] => {
 			const selection = { kind: "day", date: LocalDate.parse(date) as LocalDate } as const;
 			return describeList(list(day, context(loadFixtureIndex("DesignVault"), today, { agenda: { selection, monthOpen: false } })));
 		};
-		expect(onDay("2026-10-06")).toEqual(["# day Tuesday 6 October", "    periodNote | Daily note | create | 2026-10-06.md", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left"]);
-		expect(onDay("2026-10-03")[0]).toBe("# day Saturday 3 October (Tomorrow)");
+		expect(onDay("2026-10-06")).toEqual(["# -", "    periodNote | Daily note | create | 2026-10-06.md", "# scheduled", "# -", "    Update my claude.md files | [Doing] | 2/5 | deadline 4 days left"]);
 		expect(onDay("2026-10-01")).toEqual([
-			"# day Thursday 1 October (Yesterday) {Nothing scheduled}",
+			"# - {Nothing scheduled}",
 			"    periodNote | Daily note | 2026-10-01.md | Two tab bar options sketched; Other stays as the fifth tab. | 1 open | 1/2",
 		]);
 	});
 
 	it("says nothing is scheduled on an empty day", () => {
 		const model = list(day, context(new VaultIndex(), today));
-		expect(describeList(model)).toEqual(["# day Friday 2 October (Today) {Nothing scheduled}", "    periodNote | Daily note | create | 2026-10-02.md"]);
+		expect(describeList(model)).toEqual(["# - {Nothing scheduled}", "    periodNote | Daily note | create | 2026-10-02.md"]);
 		expect(model.filter).toBeNull();
+	});
+
+	it("keeps the picked tags on an empty day, with no Group choice, so they can be cleared", () => {
+		const model = list(day, context(new VaultIndex(), today), { picked: new Set(["work"]) });
+		expect(model.sections.map((section) => section.id)).toContain("agenda:scheduled");
+		expect(model.groupList).toBeNull();
+		expect(model.filter?.tags.map((tag) => tag.picked)).toEqual([true]);
 	});
 
 	it("falls back to the default when a list's saved grouping isn't one of its choices", () => {
@@ -99,7 +105,7 @@ describe("Agenda week", () => {
 		expect(model.groupList).toBeNull();
 		expect(model.filter).toBeNull();
 		expect(describeList(model)).toEqual([
-			"# week Week 40 28 Sep – 4 Oct (this week)",
+			"# -",
 			"    periodNote | Week note | 2026-W40.md | 1/3",
 			"# -",
 			"    day | Mon 28",
@@ -194,7 +200,7 @@ describe("areas and projects", () => {
 
 	it("groups the Agenda by area, each area's projects under it, and a project's missing area beside its name", () => {
 		expect(describeList(list({ kind: "agenda" }, ctx))).toEqual([
-			"# day Friday 2 October (Today)",
+			"# -",
 			"    periodNote | Daily note | create | 2026-10-02.md",
 			"# scheduled",
 			"# -",

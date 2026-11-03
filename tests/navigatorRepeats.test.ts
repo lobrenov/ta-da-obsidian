@@ -24,7 +24,7 @@ const week = (): ListRow[] => list({ kind: "agenda" }, agenda({ kind: "week", we
 
 describe("the Agenda day's Repeats group", () => {
 	it("lists a daily rule's coming days under the day's tasks", () => {
-		expect(day("2026-10-06")).toEqual([expect.stringMatching(/^# day /), expect.stringMatching(/^ {4}periodNote/), "# Repeats", "    occurrence | Daily | Home"]);
+		expect(day("2026-10-06")).toEqual(["# -", expect.stringMatching(/^ {4}periodNote/), "# Repeats", "    occurrence | Daily | Home"]);
 	});
 
 	it("marks a when done rule's date as an estimate, and lists it with the others", () => {
