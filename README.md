@@ -2,6 +2,9 @@
 
 Ta Da's tasks, projects and areas inside Obsidian, over the same vault as the Ta Da Mac and iPhone apps. Works on desktop and mobile. Proof of concept.
 
+> [!NOTE]
+> **AI Disclaimer:** Ta Da and its Obsidian plugin version are 100% vibe-coded. I've no intention of claiming that "I made" Ta Da or could quickly or easily re-create it myself. It almost definitely has many AI-isms in its visual design and codebase.
+
 ## What it does
 - **Header**: task, project and area files show a row of chips for status, project or area, dates and tags, in Live Preview and Reading view. Each chip opens its menu and changes one line of the file. Obsidian's Properties are hidden on these files; the header's Properties button shows them.
 - **Agenda, Tasks and Tags**: three Ta Da views, each its own tab in the left sidebar beside the file explorer (and its own entry in a phone's drawer). Agenda shows the strip and a day's or week's list. Tasks has search, Loose tasks, Logbook, Trash, and areas with their projects; Tags has search and the tag tree. The list beside them shows the chosen page, with grouping and a tag filter. Each view has New task in its header, follows the open file, and has a ribbon icon. Arrow keys move through the list and Return opens a file. On a phone, Tasks and Tags show one pane at a time, with a back button.
