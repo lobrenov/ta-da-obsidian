@@ -43,7 +43,9 @@ Ta Da's tasks, projects and areas in Obsidian. Each is one markdown file with YA
 </p>
 
 ## Install
-Copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins/ta-da/`, then turn on Ta Da in Settings ▸ Community plugins.
+Until Ta Da is in Community plugins:
+- With [BRAT](https://github.com/TfTHacker/obsidian42-brat): add `lobrenov/ta-da-obsidian`.
+- By hand: download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/lobrenov/ta-da-obsidian/releases/latest) into `<vault>/.obsidian/plugins/ta-da/`, then turn on Ta Da in Settings ▸ Community plugins.
 
 ## Files
 The plugin creates files where the apps do, in `Ta Da/` at the vault's top level, and edits them by changing only the lines it needs. Calendar events and reminders stay with the apps. The format is in Ta Da's [`docs/file-format.md`](https://github.com/lobrenov/ta-da-swift/blob/main/docs/file-format.md).
