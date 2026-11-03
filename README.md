@@ -14,7 +14,7 @@ Ta Da is a "one task, one file" based to-do list concept, with tasks, projects, 
 ## How it works
 - **Tasks, Projects, Areas**: one file per task, project or area. Properties, e.g. status, due dates, deadlines, repeats, are defined in YAML frontmatter. Ta Da uses `type: task, project, area` to identify Ta Da files. 
 - **Custom properties header**: Ta Da files have a custom-rendered properties row for status, project, area, dates and tags.
-- **Dates and repetitions**: due dates, deadlines and repetition log are parsed using natural language.
+- **Dates and repetitions**: due dates, deadlines and repetition rules are parsed using natural language.
 - **Agenda view**: a week or month strip and a day's or a week's tasks, with the daily or weekly note.
 - **Tasks and Tags views**: areas with their projects, Loose tasks, the Logbook and Trash, and the tag tree, each in a sidebar tab with grouping and a tag filter.
 - **New task menu**: a new task command for a task, project or area. I recommend binding to e.g. `CTRL / ⌘ + Shift + N`.
