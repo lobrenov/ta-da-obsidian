@@ -893,7 +893,6 @@ export class NavigatorView extends ItemView {
 			const label = day ? "Start this day’s note" : "Start the week note";
 			const el = parent.createDiv({ cls: "ta-da-row is-note-start", attr: { role: "button", tabindex: "-1", "aria-label": label } });
 			setIcon(el.createSpan({ cls: "ta-da-row-icon" }), "plus");
-			el.createSpan({ cls: "ta-da-note-start-label", text: label });
 			el.createSpan({ cls: "ta-da-note-file", text: row.file });
 			el.addEventListener("click", () => void this.createNote(row));
 			return el;

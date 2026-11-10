@@ -82,6 +82,10 @@
 	color: var(--text-muted);
 }
 
+.ta-da-header .ta-da-chip.is-missing:hover {
+	background: var(--background-modifier-hover);
+}
+
 .ta-da-header .ta-da-chip.is-open {
 	border-color: var(--interactive-accent);
 	background: var(--background-modifier-active-hover);
@@ -178,7 +182,8 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: var(--tag-padding-y) var(--tag-padding-x);
+	height: 26px;
+	padding: 0 var(--tag-padding-x);
 	border: var(--tag-border-width) solid var(--tag-border-color);
 	border-radius: var(--tag-radius);
 	corner-shape: var(--tag-corner-shape);
@@ -240,7 +245,8 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	padding: var(--tag-padding-y) var(--tag-padding-x);
+	height: 26px;
+	padding: 0 var(--tag-padding-x);
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: var(--tag-radius);
 	corner-shape: var(--tag-corner-shape);
@@ -1032,6 +1038,10 @@
 	font-size: var(--font-ui-smaller);
 }
 
+.ta-da-navigator .ta-da-pill:hover {
+	background: var(--background-modifier-hover);
+}
+
 .ta-da-navigator .ta-da-chip-count {
 	color: var(--text-muted);
 }
@@ -1383,6 +1393,10 @@
 	font-size: var(--font-ui-smaller);
 }
 
+.ta-da-navigator .ta-da-stepper button:hover {
+	background: var(--background-modifier-hover);
+}
+
 .ta-da-navigator .ta-da-stepper button + button {
 	border-left: 1px solid var(--background-modifier-border);
 }
@@ -1549,9 +1563,8 @@
 	color: var(--text-muted);
 }
 
-.ta-da-navigator .ta-da-note-start-label {
-	flex: 1 1 auto;
-	color: var(--text-normal);
+.ta-da-navigator .ta-da-row.is-note-start .ta-da-note-file {
+	margin-inline-start: auto;
 }
 
 .ta-da-navigator .ta-da-scheduled {
