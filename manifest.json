@@ -1,7 +1,7 @@
 {
   "id": "ta-da",
   "name": "Ta Da",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "minAppVersion": "1.14.0",
   "description": "Manage tasks, projects and areas as markdown files, with an Agenda, task and tag navigator. Compatible with Ta Da for macOS and iOS (beta).",
   "author": "Leon Obrenov",
