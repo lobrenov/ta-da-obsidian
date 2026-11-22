@@ -4,6 +4,7 @@ import { ISOWeek, LocalDate } from "../src/core/model/localDate";
 import { readStatus, statuses } from "../src/core/model/status";
 import { readTag } from "../src/core/model/tag";
 import { attachmentName, linkTitle, readWikiLink, readWikiLinkInner } from "../src/core/model/wikiLink";
+import { isAttachment, isImage } from "../src/core/storage/vault";
 import { checkboxState } from "../src/core/model/checkbox";
 import { scanBody } from "../src/core/parsing/bodyScanner";
 import { parseItem } from "../src/core/parsing/parseItem";
@@ -151,12 +152,25 @@ describe("WikiLink", () => {
 		}
 	});
 
-	it("needs an image extension for an attachment name", () => {
+	it("needs an extension other than markdown for an attachment name", () => {
 		const name = (text: string): string | null => attachmentName(readWikiLink(text) as never);
 		expect(name("[[Pasted image 20260930101522.png]]")).toBe("Pasted image 20260930101522.png");
-		expect(name("[[report.pdf]]")).toBeNull();
+		expect(name("[[kia-contract.pdf]]")).toBe("kia-contract.pdf");
+		expect(name("[[docs/Report.XLSX]]")).toBe("Report.XLSX");
+		expect(name("[[clip.mp3]]")).toBe("clip.mp3");
+		expect(name("[[Note]]")).toBeNull();
 		expect(name("[[Version 1.2]]")).toBeNull();
-		expect(name("[[.png]]")).toBe(".png");
+		expect(name("[[Meeting 2026.11.22]]")).toBeNull();
+		expect(name("[[Note.md]]")).toBeNull();
+	});
+
+	it("an attachment has an extension other than markdown and an image has an image one", () => {
+		for (const name of ["a.pdf", "b.XLSX", "c.png", "dir/d.zip", "clip.mp3", "x.7z"]) expect(isAttachment(name)).toBe(true);
+		for (const name of ["Note", "note.md", "Note.MD", "Ta Da/settings.json", "name.", ".hidden", "Version 1.2", "Meeting 2026.11.22", "a.b c"]) {
+			expect(isAttachment(name)).toBe(false);
+		}
+		expect(isImage("c.PNG")).toBe(true);
+		expect(isImage("a.pdf")).toBe(false);
 	});
 
 	it("reads blocks as headings and same-file links as none", () => {

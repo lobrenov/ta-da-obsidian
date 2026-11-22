@@ -1,4 +1,4 @@
-import { imageExtensions } from "../storage/vault";
+import { isAttachment } from "../storage/vault";
 import { trimBlanks } from "../text";
 import { titleOfPath } from "./item";
 
@@ -82,11 +82,9 @@ export function linkTitle(link: WikiLink): string {
 	return titleOfPath(link.target);
 }
 
-/** The image filename the target names, for example `front.jpg` for `attachments/front.jpg`; null when it isn't an image. */
+/** The attachment filename the target names, for example `front.jpg` for `attachments/front.jpg` or `kia.pdf`; null when the filename has no extension other than `md`. */
 export function attachmentName(link: WikiLink): string | null {
 	const parts = link.target.split("/").filter((part) => part !== "");
 	const name = parts[parts.length - 1] ?? "";
-	const dot = name.lastIndexOf(".");
-	if (dot < 0 || !imageExtensions.has(name.slice(dot + 1).toLowerCase())) return null;
-	return name;
+	return isAttachment(name) ? name : null;
 }
