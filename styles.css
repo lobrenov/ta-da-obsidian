@@ -1821,3 +1821,21 @@
 .ta-da-navigator .ta-da-log-now:disabled {
 	opacity: 0.5;
 }
+
+/* Tag rename */
+
+.ta-da-tag-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.ta-da-tag-field-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.ta-da-tag-input {
+	width: 100%;
+}

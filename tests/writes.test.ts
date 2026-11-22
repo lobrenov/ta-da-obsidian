@@ -73,6 +73,14 @@ function run(testCase: WriteCase, today: LocalDate): unknown {
 			return tagEditor.addTag(readTag(args.tag as string) as Tag, input);
 		case "TagEditor.removeTag":
 			return tagEditor.removeTag(readTag(args.tag as string) as Tag, input);
+		case "TagEditor.renameTag":
+			return tagEditor.renameTag(readTag(args.tag as string) as Tag, readTag(args.to as string) as Tag, input);
+		case "TagEditor.deleteTag":
+			return tagEditor.deleteTag(readTag(args.tag as string) as Tag, input);
+		case "TagEditor.rename":
+			return tagEditor.renameTagInFile(readTag(args.tag as string) as Tag, readTag(args.to as string) as Tag, input);
+		case "TagEditor.delete":
+			return tagEditor.deleteTagInFile(readTag(args.tag as string) as Tag, input);
 		case "Parent.set":
 			return setParent(args.parent as Parent | null, input);
 		case "FrontmatterEditor.set":

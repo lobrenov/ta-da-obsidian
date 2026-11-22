@@ -1,3 +1,4 @@
+import { scanFacts } from "../syntax/facts";
 import { identityKey, trimBlanks } from "../text";
 
 /**
@@ -48,4 +49,11 @@ export function tagParent(tag: Tag): Tag | null {
 /** Whether `other` nests under `tag`, at any depth. A tag isn't its own ancestor. */
 export function isTagAncestor(tag: Tag, other: Tag): boolean {
 	return other.path.startsWith(`${tag.path}/`);
+}
+
+/** Whether `text` is a valid inline tag name: read after a `#`, the parser takes all of it as one tag. */
+export function isValidTagName(text: string): boolean {
+	const tags = scanFacts(`#${text}`).tags;
+	const only = tags[0];
+	return tags.length === 1 && only !== undefined && only.column === 0 && only.line === 0 && only.length === text.length + 1;
 }

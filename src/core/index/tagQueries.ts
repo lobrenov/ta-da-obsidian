@@ -115,6 +115,11 @@ export function tagSuggestions(index: VaultIndex, query: string, limit = 50): Ta
 		.map((match) => match.node);
 }
 
+/** The tag as the tree shows it at `path`: a parent carried by no file keeps its child's spelling. Null when no row has it. */
+export function tagAt(index: VaultIndex, path: string): Tag | null {
+	return nodeFor({ name: path, path }, tagTree(index))?.tag ?? null;
+}
+
 function nodeFor(tag: Tag, nodes: TagNode[]): TagNode | null {
 	for (const node of nodes) {
 		if (node.tag.path === tag.path) return node;

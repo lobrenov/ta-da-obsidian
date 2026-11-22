@@ -13,7 +13,7 @@ interface Expected {
 	tasks: { line: number; marker: string; text: string }[];
 	links: { line: number; target: string; heading?: string; block?: string; alias?: string }[];
 	embeds: { line: number; target: string; heading?: string; block?: string; segments?: string[] }[];
-	tags: { line: number; tag: string }[];
+	tags: { line: number; column: number; length: number; tag: string }[];
 	skip?: Record<string, string>;
 }
 
@@ -57,7 +57,7 @@ describe("spec grammar", () => {
 						segments: fact.segments.length === 0 ? null : fact.segments,
 					}),
 				),
-				tags: facts.tags.map((tag) => ({ line: tag.line, tag: tag.name })),
+				tags: facts.tags.map((tag) => ({ line: tag.line, column: tag.column, length: tag.length, tag: tag.name })),
 			}).toEqual({
 				summary: expected.summary,
 				tasks: expected.tasks,

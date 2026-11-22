@@ -1,5 +1,8 @@
 import { isScalar, parseDocument } from "yaml";
-import { readTag, type Tag } from "../model/tag";
+import { isTagAncestor, readTag, type Tag } from "../model/tag";
+import { parseItem } from "../parsing/parseItem";
+import { splitFrontmatter } from "../parsing/frontmatterSplitter";
+import { deleteInlineTags, renameInlineTags } from "../syntax/tagEdit";
 import { trimBlanks } from "../text";
 import {
 	characters,
@@ -20,7 +23,8 @@ import {
 import { Lines } from "./lines";
 
 /*
- * Adds and removes tags in `tags:` by splicing only that key's lines. The body's tags are never touched.
+ * Adds and removes tags in `tags:` by splicing only that key's lines. `addTag` and `removeTag` never touch the body's
+ * tags; `renameTag`, `deleteTag` and `renameTagInFile`, `deleteTagInFile` do.
  */
 
 /**
@@ -81,6 +85,89 @@ export function removeTag(tag: Tag, text: string): string {
 	return file.text;
 }
 
+/**
+ * Renames a tag and its children in `tags:`, ignoring case: the tag's path becomes `to`'s and a child keeps the rest
+ * of its path as written. An item that becomes equal (ignoring case) to one already in the list is dropped, so
+ * renaming into an existing tag merges them. List style and quoting are kept as `addTag` does. Returns `text`
+ * unchanged when `tags:` holds no match, and null when it carries the tag in a value that can't be spliced safely.
+ */
+export function renameTag(tag: Tag, to: Tag, text: string): string | null {
+	const from = tagSegments(tag).length;
+	return editTags(tag, text, (match) => readTag([...tagSegments(to), ...tagSegments(match).slice(from)].join("/")));
+}
+
+/**
+ * Removes a tag and its children from `tags:`, ignoring case, as `removeTag` does. Returns `text` unchanged when
+ * `tags:` holds no match, and null when it carries the tag in a value that can't be spliced safely.
+ */
+export function deleteTag(tag: Tag, text: string): string | null {
+	return editTags(tag, text, () => null);
+}
+
+/** What a rename or delete across a whole file gives: the text, and whether `tags:` held the tag where it can't be spliced (left as it was while the body is still edited). */
+export interface FileTagEdit {
+	text: string;
+	unspliceable: boolean;
+}
+
+/** Renames a tag and its children in `tags:` and in the body's inline tags. The frontmatter's bytes are never touched by the body edit. */
+export function renameTagInFile(tag: Tag, to: Tag, text: string): FileTagEdit {
+	return applyToBody(renameTag(tag, to, text), text, (body) => renameInlineTags(tag.name, to.name, body));
+}
+
+/** Deletes a tag and its children from `tags:` and from the body's inline tags, as `renameTagInFile`. */
+export function deleteTagInFile(tag: Tag, text: string): FileTagEdit {
+	return applyToBody(deleteTag(tag, text), text, (body) => deleteInlineTags(tag.name, body));
+}
+
+function applyToBody(frontmatter: string | null, text: string, edit: (body: string) => string): FileTagEdit {
+	const split = splitFrontmatter(frontmatter ?? text);
+	return { text: split.block + edit(split.body), unspliceable: frontmatter === null };
+}
+
+const tagSegments = (tag: Tag): string[] => tag.name.split("/").filter((segment) => segment !== "");
+
+/** Applies `transform` to each `tags:` item at `tag` or under it: its replacement, or null to remove it. */
+function editTags(tag: Tag, text: string, transform: (tag: Tag) => Tag | null): string | null {
+	const file = new Lines(text);
+	const closing = closingFence(file);
+	const range = closing === null ? null : tagsRange(file, closing);
+	if (closing === null || !range) return text;
+	const matches = (other: Tag): boolean => other.path === tag.path || isTagAncestor(tag, other);
+	const value = readTagsValue(file, range);
+	if (!value) return parseItem(text, "x.md")?.properties.tags.some(matches) ? null : text;
+	const isMatch = value.items.map((item) => {
+		const found = itemTag(item);
+		return found !== null && matches(found);
+	});
+	if (!isMatch.includes(true)) return text;
+	const indent = value.style.kind === "block" ? value.style.indent : null;
+	const seen = new Set(value.items.flatMap((item, i) => (isMatch[i] ? [] : (itemTag(item)?.path ?? []))));
+	const results: (string | null)[] = value.items.map((item, i) => {
+		const old = itemTag(item);
+		if (!isMatch[i] || old === null) return item.raw;
+		const replacement = transform(old);
+		if (replacement === null || seen.has(replacement.path)) return null;
+		seen.add(replacement.path);
+		return replacement.name === old.name ? item.raw : indent === null ? flowItem(replacement.name) : scalar(replacement.name);
+	});
+	if (results.every((result, i) => result === (value.items[i] as TagsItem).raw)) return text;
+	if (indent !== null && results.some((result) => result !== null)) {
+		for (let i = value.items.length - 1; i >= 0; i--) {
+			const item = value.items[i] as TagsItem;
+			const result = results[i] as string | null;
+			if (item.line === undefined || result === item.raw) continue;
+			if (result === null) file.lines.splice(item.line, 1);
+			else file.lines[item.line] = `${indent}- ${result}${item.tail ?? ""}${endingOf(file.lines[item.line] as string)}`;
+		}
+	} else if (results.every((result) => result === null)) {
+		replace(range, file, `tags:${value.suffix}`);
+	} else {
+		replace(range, file, flowLine(results.filter((result): result is string => result !== null), value.suffix));
+	}
+	return file.text;
+}
+
 /** The `tags:` key's lines, as `keyRange` finds them, also past blank lines followed by more of the value. */
 function tagsRange(file: Lines, closing: number): LineRange | null {
 	const range = keyRange("tags", file, closing);
@@ -115,6 +202,8 @@ interface TagsItem {
 	raw: string;
 	/** The file line of a block item. */
 	line?: number;
+	/** What follows a block item's scalar on its line: spaces and a comment. */
+	tail?: string;
 }
 
 interface TagsValue {
@@ -150,6 +239,7 @@ function readTagsValue(file: Lines, range: LineRange): TagsValue | null {
 		const parts = characters(joined);
 		const open = parts.indexOf("[");
 		const flow = flowItems(parts.slice(open < 0 ? parts.length : open).join(""));
+		if (flow === null) return null;
 		return { style: { kind: "flow" }, items: flow.items.map((raw) => ({ raw })), suffix: flow.suffix };
 	}
 	const suffix = comment === null ? "" : ` ${line.slice(comment)}`;
@@ -164,8 +254,12 @@ function readTagsValue(file: Lines, range: LineRange): TagsValue | null {
 			const rest = parts.slice(indentLength).join("");
 			if (!(rest === "-" || hasPrefixCharacters(rest, "- "))) return;
 			if (style.kind === "empty") style = { kind: "block", indent };
-			const raw = trimBlanks(rest.slice(1));
-			if (raw !== "") items.push({ raw, line: range.start + 1 + offset });
+			const body = rest.slice(1);
+			const comment = commentStart(body);
+			const scalarText = body.slice(0, comment ?? body.length);
+			const raw = trimBlanks(scalarText);
+			const tail = scalarText.slice(scalarText.indexOf(raw) + raw.length) + (comment === null ? "" : body.slice(comment));
+			if (raw !== "") items.push({ raw, line: range.start + 1 + offset, tail });
 		});
 		return { style, items, suffix };
 	}
@@ -205,8 +299,8 @@ function commentStart(line: string): number | null {
 	return null;
 }
 
-/** The items between `[` and its `]`, split at commas outside quotes and brackets, and the text after `]`. */
-function flowItems(text: string): { items: string[]; suffix: string } {
+/** The items between `[` and its `]`, split at commas outside quotes and brackets, and the text after `]`. Null when there's no `]`. */
+function flowItems(text: string): { items: string[]; suffix: string } | null {
 	const parts = characters(text);
 	const items: string[] = [];
 	let current = "";
@@ -244,6 +338,5 @@ function flowItems(text: string): { items: string[]; suffix: string } {
 			current += c;
 		}
 	}
-	const item = trimBlanks(current);
-	return { items: item === "" ? items : [...items, item], suffix: "" };
+	return null;
 }

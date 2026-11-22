@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type TagNode, itemsTagged, tagBrowser, tagSuggestions, tagTree, untagged } from "../src/core/index/tagQueries";
+import { type TagNode, itemsTagged, tagAt, tagBrowser, tagSuggestions, tagTree, untagged } from "../src/core/index/tagQueries";
 import { readTag, type Tag } from "../src/core/model/tag";
 import type { TaskGroup } from "../src/core/index/queries";
 import { VaultIndex } from "../src/core/index/vaultIndex";
@@ -127,5 +127,14 @@ describe("tag spelling and logged files", () => {
 		index.update(live);
 		expect(describeNodes(tagTree(index))).toEqual(["Home 2"]);
 		expect([...index.pathsCarrying("home")].sort()).toEqual([live.path, "tasks/Other.md"]);
+	});
+});
+
+describe("tagAt", () => {
+	it("gives the tag as the tree spells it, a parent no file carries taking its child's spelling", () => {
+		const spelled = new VaultIndex([makeItem("tasks/A.md", "type: task\ntags: [Home/Garden]")]);
+		expect(tagAt(spelled, "home")?.name).toBe("Home");
+		expect(tagAt(spelled, "home/garden")?.name).toBe("Home/Garden");
+		expect(tagAt(spelled, "work")).toBeNull();
 	});
 });

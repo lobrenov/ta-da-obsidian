@@ -1,7 +1,9 @@
-import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
+import { debounce, ItemView, Keymap, Menu, Notice, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
 import { type Grouping, TagFilter } from "../../core/index/grouping";
+import { tagAt } from "../../core/index/tagQueries";
 import { isLoggedPath } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
+import type { Tag } from "../../core/model/tag";
 import type { TrashedItem } from "../../core/storage/trash";
 import type { TaDaIndex } from "../../TaDaIndex";
 import { readTrash } from "../../TaDaTrash";
@@ -30,7 +32,10 @@ import { filesNotUnder, moveFilesTo } from "../fileEdits";
 import { moveSelection, type Picks, pickClick } from "./selection";
 import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
-import { defaultDomain, offersDomain, type ViewKind, viewSpecs } from "./views";
+import { defaultDomain, offersDomain, type ViewKind, viewKinds, viewSpecs } from "./views";
+import { followsEdit, followTag } from "./tagState";
+import { DeleteTagModal, RenameTagModal } from "../TagModals";
+import { carrierCount, deleteTagEverywhere, failureMessage, renameTagEverywhere, type TagEditResult } from "../tagEdits";
 
 /** The width below which one pane shows at a time; the same as the container query in `styles.css`. */
 const narrowBelow = 520;
@@ -441,6 +446,58 @@ export class NavigatorView extends ItemView {
 		menu.showAtMouseEvent(event);
 	}
 
+	/** A tag row's right-click menu: Rename tag… and Delete tag…, each asking first. */
+	private tagMenu(path: string, event: MouseEvent): void {
+		const index = this.deps.taDaIndex.index;
+		const tag = tagAt(index, path);
+		if (!tag) return;
+		event.preventDefault();
+		const menu = new Menu();
+		menu.addItem((entry) =>
+			entry.setTitle("Rename tag…").setIcon("pencil").onClick(() => new RenameTagModal(this.app, tag, carrierCount(index, tag), (to) => void this.editTag(tag, to)).open()),
+		);
+		menu.addSeparator();
+		menu.addItem((entry) =>
+			entry
+				.setTitle("Delete tag…")
+				.setIcon("trash")
+				.setWarning(true)
+				.onClick(() => new DeleteTagModal(this.app, tag, carrierCount(index, tag), () => void this.editTag(tag, null)).open()),
+		);
+		menu.showAtMouseEvent(event);
+	}
+
+	/** Renames a tag (or deletes it, with no `to`) in every file, then has every Ta Da view follow it. */
+	private async editTag(tag: Tag, to: Tag | null): Promise<void> {
+		const { taDaIndex, writer } = this.deps;
+		const result: TagEditResult = to
+			? await renameTagEverywhere(this.app, taDaIndex.index, writer, tag, to)
+			: await deleteTagEverywhere(this.app, taDaIndex.index, writer, tag);
+		const message = failureMessage(tag, result.failed);
+		if (message) new Notice(message);
+		if (!followsEdit(tag, to, result.failed)) return;
+		for (const kind of viewKinds) {
+			for (const leaf of this.app.workspace.getLeavesOfType(viewSpecs[kind].type)) {
+				if (leaf.view instanceof NavigatorView) leaf.view.followTag(tag, to);
+			}
+		}
+	}
+
+	/** Moves the state kept by tag path (picked filters, folds, open rows, the tag page shown) with a rename; a delete drops it. */
+	followTag(from: Tag, to: Tag | null): void {
+		const followed = followTag({ domain: this.domain, picked: this.picked, folds: this.folds, expanded: this.expanded }, from, to);
+		this.picked.clear();
+		for (const [key, paths] of followed.state.picked) this.picked.set(key, new Set(paths));
+		this.folds.clear();
+		for (const id of followed.state.folds) this.folds.add(id);
+		this.expanded.clear();
+		for (const id of followed.state.expanded) this.expanded.add(id);
+		this.domain = followed.domain ?? defaultDomain(this.kind);
+		this.lastKey = "";
+		this.refresh();
+		this.save();
+	}
+
 	// Keys
 
 	private onListKey(event: KeyboardEvent): void {
@@ -521,6 +578,10 @@ export class NavigatorView extends ItemView {
 			const { path } = item.domain;
 			this.dropTarget(self, { kind: item.domain.kind, path });
 			self.addEventListener("contextmenu", (event) => this.fileMenu(path, event));
+		}
+		if (item.domain.kind === "tag" && item.domain.path !== null) {
+			const { path } = item.domain;
+			self.addEventListener("contextmenu", (event) => this.tagMenu(path, event));
 		}
 		return outer;
 	}

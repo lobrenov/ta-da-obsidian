@@ -42,10 +42,33 @@ export interface EmbedFact {
 	range: Range;
 }
 
+interface EnclosingSpan {
+	range: Range;
+	open: number;
+	close: number;
+}
+
 export interface TagFact {
 	line: number;
 	/** Without `#`. */
 	name: string;
+	/** Where the tag starts in its line: the `#`, in UTF-16 units from the line's start. */
+	column: number;
+	/** The tag's length in UTF-16 units: `#` through the last character of its name (trailing `/`s excluded). */
+	length: number;
+	/** The emphasis and strong spans the tag sits in, innermost first. */
+	wrappers: TagWrapper[];
+}
+
+/** An emphasis or strong span around a tag, as UTF-16 distances from the tag's own bounds. */
+export interface TagWrapper {
+	/** From the span's start to the tag's `#`. */
+	before: number;
+	/** From the tag's end (trailing `/`s excluded) to the span's end. */
+	after: number;
+	/** The lengths of the opening and closing markers. */
+	open: number;
+	close: number;
 }
 
 /** What a markdown body holds that Ta Da reads: summary, tasks, links, embeds and tags. */
@@ -232,7 +255,17 @@ class FactScanner {
 					const r = mapped(embed.range);
 					this.facts.embeds.push({ ...embed, range: r, line: this.line(r.location) });
 				}
-				for (const tag of cell.tags) this.facts.tags.push({ ...tag, line: rowLine });
+				for (const tag of cell.tags) {
+					const start = (cellScanner.lineStarts[tag.line - rowLine] as number) + tag.column;
+					const r = mapped(range(start, tag.length));
+					this.facts.tags.push({
+						...tag,
+						line: rowLine,
+						column: r.location - (this.lineStarts[rowLine - this.firstLineIndex] as number),
+						length: r.length,
+						wrappers: r.length === tag.length ? tag.wrappers : [],
+					});
+				}
 			}
 		}
 	}
@@ -309,7 +342,7 @@ class FactScanner {
 	// MARK: Inlines
 
 	/** `region` is the text `nodes` were parsed from: where a reference link is looked for, outside `excluding`. */
-	private collect(nodes: InlineNode[], region: Range | null, excluding: Range[]): void {
+	private collect(nodes: InlineNode[], region: Range | null, excluding: Range[], enclosing: EnclosingSpan[] = []): void {
 		if (region) this.addReferenceUses(nodes, region, excluding);
 		for (const node of nodes) {
 			switch (node.type) {
@@ -337,16 +370,29 @@ class FactScanner {
 				}
 				case "tag": {
 					const nameStart = maxRange(node.marker);
+					const line = this.line(node.range.location);
 					this.facts.tags.push({
-						line: this.line(node.range.location),
+						line,
 						name: this.string(range(nameStart, maxRange(node.range) - nameStart)),
+						column: node.range.location - (this.lineStarts[line - this.firstLineIndex] as number),
+						length: node.range.length,
+						wrappers: [...enclosing].reverse().map((span) => ({
+							before: node.range.location - span.range.location,
+							after: maxRange(span.range) - maxRange(node.range),
+							open: span.open,
+							close: span.close,
+						})),
 					});
 					break;
 				}
 				case "link":
 					this.collect(node.children, null, []);
 					break;
-				case "emphasis":
+				case "emphasis": {
+					const [open, close] = node.markers as [Range, Range];
+					this.collect(node.children, null, [], [...enclosing, { range: node.range, open: open.length, close: close.length }]);
+					break;
+				}
 				case "ext":
 					this.collect(node.children, null, []);
 					break;

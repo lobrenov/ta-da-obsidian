@@ -1,6 +1,6 @@
 import { type Item, isLogged, isLoggedPath, titleOfPath, type Warning } from "../model/item";
 import { attachmentName, linkTitle } from "../model/wikiLink";
-import type { Tag } from "../model/tag";
+import { isTagAncestor, type Tag } from "../model/tag";
 import type { LocalDate } from "../model/localDate";
 import { folderOf } from "../storage/vault";
 import { compareCodeUnits, identityKey } from "../text";
@@ -131,6 +131,15 @@ export class VaultIndex {
 	/** The paths of the items that carry this tag path itself, not its children. */
 	pathsCarrying(tagPath: string): ReadonlySet<string> {
 		return this.pathsByTag.get(tagPath) ?? new Set();
+	}
+
+	/** The paths of the items that carry this tag or any child of it, logged ones included, sorted. */
+	pathsCarryingOrUnder(tag: Tag): string[] {
+		const paths = new Set<string>();
+		for (const [path, carriers] of this.pathsByTag) {
+			if (path === tag.path || isTagAncestor(tag, { name: path, path })) for (const carrier of carriers) paths.add(carrier);
+		}
+		return [...paths].sort(compareCodeUnits);
 	}
 
 	/** Items with this title, ignoring case: live tasks, projects and areas, then notes, then logged files, each by path. */
