@@ -132,7 +132,7 @@ describe("Writer", () => {
 			changes: [{ from: { line: 1, ch: 10 }, to: { line: 1, ch: 13 }, text: "ne" }],
 		}, "set");
 		expect(fake.process).not.toHaveBeenCalled();
-		expect(fake.edited).toHaveBeenCalledWith(file, "---\nstatus: Done\n---\n");
+		expect(fake.edited).toHaveBeenCalledWith(file, "---\nstatus: Doing\n---\n");
 	});
 
 	it("finds an open view among the leaves when the active one shows another file", async () => {

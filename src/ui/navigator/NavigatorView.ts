@@ -867,7 +867,8 @@ export class NavigatorView extends ItemView {
 		this.track(path, el);
 		const pickable = row.type === "task" || row.type === "project";
 		if (pickable) {
-			this.pickable.push(path);
+			// Once each: Group by Tag shows a task under each of its tags.
+			if (!this.pickable.includes(path)) this.pickable.push(path);
 			this.dragRow(el, path);
 		}
 		el.addEventListener("click", (event) => {

@@ -92,7 +92,7 @@ export class Writer {
 		if (after === null || !change) return false;
 		// As a `set` event, which Obsidian's Properties filter lets through while the cursor is in the frontmatter.
 		editor.transaction({ changes: [change] }, "set");
-		this.onEdited(file, after);
+		this.onEdited(file, editor.getValue());
 		return true;
 	}
 }
