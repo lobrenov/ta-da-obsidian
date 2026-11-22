@@ -48,9 +48,9 @@ export function groupedListOf(domain: Domain): GroupedList | null {
 
 /** The Group menu's choices, in order. */
 export const groupChoices: Record<GroupedList, readonly Grouping[]> = {
-	agenda: ["Project", "Status", "Open"],
-	loose: ["Status", "Date", "Open"],
-	project: ["Status", "Date", "Open"],
+	agenda: ["Project", "Status", "Open", "Tag"],
+	loose: ["Status", "Date", "Open", "Tag"],
+	project: ["Status", "Date", "Open", "Tag"],
 };
 
 export const defaultGrouping: Record<GroupedList, Grouping> = {

@@ -43,6 +43,16 @@ describe("ListSection", () => {
 		]);
 	});
 
+	it("puts a task under each of its tags in tag sections, then No tag, then Completed", () => {
+		expect(described(listSections(tasks, "Tag", today))).toEqual([
+			"#bug: Overdue, Undated",
+			"#dev: Undated",
+			"#Home/Garden: Next week",
+			"No tag: Deadline today",
+			"Completed: Shipped, Dropped",
+		]);
+	});
+
 	it("leaves empty groups out", () => {
 		expect(described(listSections(tasks.slice(2, 4), "Date", today))).toEqual(["Upcoming: Next week", "Someday: Undated"]);
 		expect(listSections([], "Status", today)).toEqual([]);

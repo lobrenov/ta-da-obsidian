@@ -544,14 +544,14 @@ function foldName(section: ListSection, grouping: Grouping): string {
 	return grouping === "Open" ? section.title : `${grouping}: ${section.title}`;
 }
 
-/** Done, Cancelled and Date's Completed start folded. */
+/** Done, Cancelled, and Date's and Tag's Completed start folded. */
 function startsFolded(section: ListSection, grouping: Grouping): boolean {
 	const kind = section.kind;
 	switch (kind.case) {
 		case "status":
 			return isClosed(kind.value);
 		case "completed":
-			return grouping === "Date";
+			return grouping === "Date" || grouping === "Tag";
 		default:
 			return false;
 	}

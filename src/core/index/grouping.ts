@@ -5,7 +5,7 @@ import { type Tag, tagParent } from "../model/tag";
 import { compareTitles } from "./vaultIndex";
 
 /** How a browser list groups its tasks. */
-export const groupings = ["Project", "Status", "Date", "Open"] as const;
+export const groupings = ["Project", "Status", "Date", "Open", "Tag"] as const;
 export type Grouping = (typeof groupings)[number];
 
 /** Open tasks by their nearer date: Today (due or at its deadline today or earlier), Upcoming (a date after today, none by today), Someday (neither). */
@@ -15,9 +15,11 @@ export type SectionKind =
 	| { case: "status"; value: Status }
 	| { case: "date"; value: DateGroup }
 	| { case: "open" }
-	| { case: "completed" };
+	| { case: "completed" }
+	| { case: "tag"; value: string }
+	| { case: "untagged" };
 
-/** A group of a Status, Date or Open list. */
+/** A group of a Status, Date, Open or Tag list. A tag section's `value` is the tag as written. */
 export interface ListSection {
 	kind: SectionKind;
 	tasks: Item[];
@@ -30,13 +32,15 @@ export const statusOrder: readonly Status[] = ["Doing", "Ongoing", "Blocked", "N
 const dateGroups: readonly DateGroup[] = ["Today", "Upcoming", "Someday"];
 
 function section(kind: SectionKind, tasks: Item[]): ListSection {
-	const title = kind.case === "status" || kind.case === "date" ? kind.value : kind.case === "open" ? "Open" : "Completed";
+	const titles = { open: "Open", completed: "Completed", untagged: "No tag" };
+	const title = kind.case === "status" || kind.case === "date" ? kind.value : kind.case === "tag" ? `#${kind.value}` : titles[kind.case];
 	return { kind, tasks, title };
 }
 
 /**
  * `tasks` split by `grouping`, keeping their order within each section and leaving empty sections out.
- * `Project` groups by area then project (`grouped`); here it gives Open and Completed.
+ * `Project` groups by area then project (`grouped`); here it gives Open and Completed. `Tag` puts an open task under each
+ * tag it carries, by full path, then No tag, then Completed.
  */
 export function listSections(tasks: Item[], grouping: Grouping, today: LocalDate): ListSection[] {
 	const open = tasks.filter((task) => !isClosed(task.properties.status));
@@ -52,6 +56,18 @@ export function listSections(tasks: Item[], grouping: Grouping, today: LocalDate
 				section({ case: "completed" }, closed),
 			];
 			break;
+		case "Tag": {
+			const tags = new Map<string, Tag>();
+			for (const use of open.flatMap((task) => task.tags)) if (!tags.has(use.tag.path)) tags.set(use.tag.path, use.tag);
+			sections = [
+				...[...tags.values()]
+					.sort((a, b) => compareTitles(a.path, b.path))
+					.map((tag) => section({ case: "tag", value: tag.name }, open.filter((task) => task.tags.some((use) => use.tag.path === tag.path)))),
+				section({ case: "untagged" }, open.filter((task) => task.tags.length === 0)),
+				section({ case: "completed" }, closed),
+			];
+			break;
+		}
 		case "Open":
 		case "Project":
 			sections = [section({ case: "open" }, open), section({ case: "completed" }, closed)];
