@@ -84,11 +84,14 @@ export function dateGroupOf(item: Item, today: LocalDate): DateGroup {
 }
 
 /**
- * The tags picked to narrow a list. A file passes when it carries a picked tag or a child of one; with none picked,
- * every file passes.
+ * The tags picked to narrow a list. A file passes when it carries a picked tag or a child of one, or carries no tag
+ * while `untagged` is picked; with none picked, every file passes.
  */
 export class TagFilter {
-	/** `picked` is the picked tags' paths. */
+	/** No tag's pick: an empty path, which no tag has. */
+	static readonly untagged = "";
+
+	/** `picked` is the picked tags' paths, and `untagged` for No tag. */
 	constructor(readonly picked: ReadonlySet<string> = new Set()) {}
 
 	get isActive(): boolean {
@@ -97,6 +100,7 @@ export class TagFilter {
 
 	matches(item: Item): boolean {
 		if (!this.isActive) return true;
+		if (item.tags.length === 0) return this.picked.has(TagFilter.untagged);
 		return item.tags.some((use) => this.picked.has(use.tag.path) || [...this.picked].some((path) => use.tag.path.startsWith(`${path}/`)));
 	}
 

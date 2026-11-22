@@ -78,6 +78,8 @@ describe("TagFilter", () => {
 		expect(titles(new TagFilter(new Set(["dev", "home"])).apply(tasks))).toEqual(["Next week", "Undated", "Shipped"]);
 		expect(titles(new TagFilter(new Set(["home/garden"])).apply(tasks))).toEqual(["Next week"]);
 		expect(new TagFilter(new Set(["hom"])).apply(tasks)).toEqual([]);
+		expect(titles(new TagFilter(new Set([TagFilter.untagged])).apply(tasks))).toEqual(["Deadline today", "Dropped"]);
+		expect(titles(new TagFilter(new Set([TagFilter.untagged, "bug"])).apply(tasks))).toEqual(["Overdue", "Deadline today", "Undated", "Dropped"]);
 	});
 
 	it("lists the tags of the files with counts", () => {

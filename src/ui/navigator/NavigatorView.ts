@@ -1,5 +1,5 @@
 import { debounce, ItemView, Keymap, Menu, Platform, setIcon, type ViewStateResult, type WorkspaceLeaf } from "obsidian";
-import type { Grouping } from "../../core/index/grouping";
+import { type Grouping, TagFilter } from "../../core/index/grouping";
 import { isLoggedPath } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
 import type { TrashedItem } from "../../core/storage/trash";
@@ -729,7 +729,7 @@ export class NavigatorView extends ItemView {
 		const row = parent.createDiv({ cls: "ta-da-filter" });
 		for (const tag of picked) {
 			const chip = row.createEl("button", { cls: "ta-da-pill is-picked", attr: { "aria-label": `Remove ${tag.name}` } });
-			chip.createSpan({ text: `#${tag.name}` });
+			chip.createSpan({ text: tag.path === TagFilter.untagged ? tag.name : `#${tag.name}` });
 			setIcon(chip.createSpan({ cls: "ta-da-pill-icon" }), "x");
 			chip.addEventListener("click", () => this.pick(tag.path, false));
 		}

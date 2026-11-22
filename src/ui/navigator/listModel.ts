@@ -90,7 +90,7 @@ export interface ListHeader {
 }
 
 export interface FilterModel {
-	/** The tags in the list's files, with how many files carry each (or a child of it). */
+	/** No tag (path `TagFilter.untagged`) while a file has none or it's picked, then the tags in the list's files, with how many files carry each (or a child of it). */
 	tags: { path: string; name: string; count: number; picked: boolean }[];
 	shown: number;
 	total: number;
@@ -563,12 +563,15 @@ function isClosedSection(section: ListSection): boolean {
 	return kind.case === "completed" || (kind.case === "status" && isClosed(kind.value));
 }
 
-/** The filter's tags, picked ones kept when no file carries them any more. Null where no file carries a tag and none is picked. */
+/** The filter's tags, picked ones kept when no file carries them any more, No tag first while a file has none or it's picked. Null where no file carries a tag and none is picked. */
 export function filterModel(items: Item[], picked: ReadonlySet<string>, shown: number): FilterModel | null {
 	const tags = TagFilter.tags(items).map(({ tag, count }) => ({ path: tag.path, name: tag.name, count, picked: picked.has(tag.path) }));
 	for (const path of picked) {
-		if (!tags.some((tag) => tag.path === path)) tags.push({ path, name: path, count: 0, picked: true });
+		if (path !== TagFilter.untagged && !tags.some((tag) => tag.path === path)) tags.push({ path, name: path, count: 0, picked: true });
 	}
-	if (tags.length === 0) return null;
+	if (tags.length === 0 && picked.size === 0) return null;
+	const untagged = items.filter((item) => item.tags.length === 0).length;
+	const noTag = picked.has(TagFilter.untagged);
+	if (untagged > 0 || noTag) tags.unshift({ path: TagFilter.untagged, name: "No tag", count: untagged, picked: noTag });
 	return { tags, shown, total: items.length };
 }

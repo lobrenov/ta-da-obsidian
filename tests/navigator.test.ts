@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultDailyNoteNames } from "../src/core/index/dailyNotes";
+import { TagFilter } from "../src/core/index/grouping";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { LocalDate } from "../src/core/model/localDate";
 import { trashedItems } from "../src/core/storage/trash";
@@ -303,14 +304,22 @@ describe("tag filter", () => {
 		makeItem("Ta Da/tasks/Bare.md", "type: task\nstatus: Not Started"),
 	]);
 
-	it("offers the tags in the list, with parents, and narrows to a picked tag or its children", () => {
+	it("offers No tag, then the tags in the list, with parents, and narrows to a picked tag or its children", () => {
 		const all = list({ kind: "loose" }, context(index, today));
-		expect(all.filter?.tags.map((tag) => `${tag.name} ${tag.count}`)).toEqual(["Home 1", "Home/Garden 1", "work 1"]);
+		expect(all.filter?.tags.map((tag) => `${tag.name} ${tag.count}`)).toEqual(["No tag 1", "Home 1", "Home/Garden 1", "work 1"]);
 		expect(all.filter).toMatchObject({ shown: 3, total: 3 });
 		const picked = list({ kind: "loose" }, context(index, today), { picked: new Set(["home"]) });
 		expect(describeList(picked)).toEqual(["# Not Started 1", "    Wet | [Not Started] | 1 tag"]);
 		expect(picked.filter).toMatchObject({ shown: 1, total: 3 });
 		expect(picked.filter?.tags.find((tag) => tag.path === "home")?.picked).toBe(true);
+	});
+
+	it("narrows to files with no tag while No tag is picked, alongside picked tags", () => {
+		const noTag = list({ kind: "loose" }, context(index, today), { picked: new Set([TagFilter.untagged]) });
+		expect(noTag.filter).toMatchObject({ shown: 1, total: 3 });
+		expect(noTag.filter?.tags[0]).toEqual({ path: "", name: "No tag", count: 1, picked: true });
+		const both = list({ kind: "loose" }, context(index, today), { picked: new Set([TagFilter.untagged, "work"]) });
+		expect(both.filter).toMatchObject({ shown: 2, total: 3 });
 	});
 
 	it("keeps a picked tag in the menu after no file carries it, and says nothing matches", () => {
