@@ -31,7 +31,7 @@ export default class TaDaPlugin extends Plugin {
 		await this.store.load();
 		this.taDaIndex = new TaDaIndex(this);
 		this.taDaIndex.start();
-		this.writer = new Writer(this.app);
+		this.writer = new Writer(this.app, (file, text) => this.taDaIndex.edited(file, text));
 		const logbook = new Logbook(this.app, this.taDaIndex.index, this.writer, localToday);
 		this.logbook = logbook;
 		this.statusActions = new StatusActions(this.app, this.taDaIndex.index, this.writer, localToday, logbook);

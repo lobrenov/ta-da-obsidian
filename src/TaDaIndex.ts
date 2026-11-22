@@ -90,10 +90,11 @@ export class TaDaIndex {
 	}
 
 	/**
-	 * An open editor's text, which Obsidian sends on every edit, undo included. It goes into the index after the
-	 * edits pause, so the index follows the editor ahead of the file being saved.
+	 * An open editor's text, which Obsidian sends on every edit, undo included, and `Writer` after each of its writes to
+	 * an editor. It goes into the index after the edits pause, so the index follows the editor ahead of the file being
+	 * saved.
 	 */
-	private edited(file: TFile, text: string): void {
+	edited(file: TFile, text: string): void {
 		if (!isMarkdown(file)) return;
 		const path = file.path;
 		window.clearTimeout(this.editTimers.get(path));

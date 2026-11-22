@@ -34,6 +34,7 @@ interface Fake {
 	writer: InstanceType<typeof Writer>;
 	process: ReturnType<typeof vi.fn>;
 	renameFile: ReturnType<typeof vi.fn>;
+	edited: ReturnType<typeof vi.fn>;
 }
 
 /** An `App` with a vault that holds `texts`, and no open views unless `views` gives them. */
@@ -48,8 +49,9 @@ function makeApp(options: { read?: (file: FakeFile) => Promise<string>; current?
 			getLeavesOfType: () => options.leaves ?? [],
 		},
 	};
+	const edited = vi.fn();
 	// The fake has only what Writer uses.
-	return { writer: new Writer(app as never), process, renameFile };
+	return { writer: new Writer(app as never, edited), process, renameFile, edited };
 }
 
 describe("Writer", () => {
@@ -130,6 +132,7 @@ describe("Writer", () => {
 			changes: [{ from: { line: 1, ch: 10 }, to: { line: 1, ch: 13 }, text: "ne" }],
 		}, "set");
 		expect(fake.process).not.toHaveBeenCalled();
+		expect(fake.edited).toHaveBeenCalledWith(file, "---\nstatus: Done\n---\n");
 	});
 
 	it("finds an open view among the leaves when the active one shows another file", async () => {

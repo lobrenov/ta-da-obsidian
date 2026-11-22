@@ -13,16 +13,20 @@ export type Edit = (text: string) => string | null;
  * Every write to a file's text, one queue per file. A file open in a `MarkdownView` is changed through its `Editor`,
  * as one transaction on the lines that differ, so undo and the cursor hold. Any other file goes through
  * `Vault.process`, guarded on the text the edit was computed against. `processFrontMatter` is never used.
+ * `onEdited` gets an editor's text after each write to it, which Obsidian doesn't report as an edit.
  */
 export class Writer {
 	private readonly queues = new Map<TFile, Promise<void>>();
-	constructor(private readonly app: App) {}
+	constructor(
+		private readonly app: App,
+		private readonly onEdited: (file: TFile, text: string) => void = () => undefined,
+	) {}
 
 	/** Resolves to whether the file's text changed. */
 	apply(file: TFile, edit: Edit): Promise<boolean> {
 		return this.enqueue(file, async () => {
 			const view = this.openView(file);
-			return view ? this.applyToEditor(view.editor, edit) : this.applyToFile(file, edit);
+			return view ? this.applyToEditor(file, view.editor, edit) : this.applyToFile(file, edit);
 		});
 	}
 
@@ -81,13 +85,14 @@ export class Writer {
 		return wrote;
 	}
 
-	private applyToEditor(editor: Editor, edit: Edit): boolean {
+	private applyToEditor(file: TFile, editor: Editor, edit: Edit): boolean {
 		const before = editor.getValue();
 		const after = edit(before);
 		const change = after === null ? null : lineChange(before, after);
-		if (!change) return false;
+		if (after === null || !change) return false;
 		// As a `set` event, which Obsidian's Properties filter lets through while the cursor is in the frontmatter.
 		editor.transaction({ changes: [change] }, "set");
+		this.onEdited(file, after);
 		return true;
 	}
 }

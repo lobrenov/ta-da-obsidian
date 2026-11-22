@@ -28,6 +28,7 @@ import { createPeriodNote } from "./periodNotes";
 import { dropParent } from "../fileActions";
 import { filesNotUnder, moveFilesTo } from "../fileEdits";
 import { moveSelection, type Picks, pickClick } from "./selection";
+import { type Point, swipesBack } from "./swipe";
 import type { NewTaskContext } from "../newTask/prefill";
 import type { NavigatorSettings } from "./navigatorSettings";
 import { defaultDomain, offersDomain, type ViewKind, viewSpecs } from "./views";
@@ -72,6 +73,8 @@ export class NavigatorView extends ItemView {
 	private lastKey = "";
 	private opened = false;
 	private closed = false;
+	/** Where a touch on the list pane began, while it can swipe back. */
+	private swipeStart: Point | null = null;
 	/** `.trash/` changed since it was last read. */
 	private trashStale = true;
 	private readonly scheduleTrash = debounce(() => void this.refreshTrash(), 1000, true);
@@ -203,6 +206,7 @@ export class NavigatorView extends ItemView {
 
 		this.listPaneEl = root.createDiv({ cls: "ta-da-list-pane", attr: { tabindex: "0" } });
 		this.listPaneEl.addEventListener("keydown", (event) => this.onListKey(event));
+		this.registerSwipeBack(this.listPaneEl);
 		this.listHeadEl = this.listPaneEl.createDiv({ cls: "ta-da-list-head" });
 		this.listBodyEl = this.listPaneEl.createDiv({ cls: "ta-da-list-body" });
 
@@ -216,6 +220,29 @@ export class NavigatorView extends ItemView {
 	/** On a phone, shows the search field above search results. */
 	private updatePhone(): void {
 		if (Platform.isPhone) this.contentEl.toggleClass("is-searching", this.query.trim() !== "");
+	}
+
+	/** Whether the list shows its Back button: a list over the navigation pane, on a phone or in a narrow pane. */
+	private canGoBack(): boolean {
+		return this.kind !== "agenda" && this.showingList && (Platform.isPhone || this.contentEl.clientWidth < narrowBelow);
+	}
+
+	/** A rightward swipe on the list goes back while it shows Back; the swipe isn't passed on to Obsidian's drawers. */
+	private registerSwipeBack(el: HTMLElement): void {
+		const point = (touch: Touch | undefined): Point | null => (touch ? { x: touch.clientX, y: touch.clientY } : null);
+		this.registerDomEvent(el, "touchstart", (event) => {
+			this.swipeStart = this.canGoBack() && event.touches.length === 1 ? point(event.touches[0]) : null;
+			if (this.swipeStart) event.stopPropagation();
+		}, { passive: true });
+		this.registerDomEvent(el, "touchmove", (event) => {
+			if (this.swipeStart) event.stopPropagation();
+		}, { passive: true });
+		this.registerDomEvent(el, "touchend", (event) => {
+			const start = this.swipeStart;
+			this.swipeStart = null;
+			const end = point(event.changedTouches[0]);
+			if (start && end && swipesBack(start, end)) this.back();
+		});
 	}
 
 	/** Back to the navigation pane, clearing a search. */
