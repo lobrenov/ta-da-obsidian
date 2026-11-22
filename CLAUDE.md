@@ -3,14 +3,14 @@
 Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the same vault as the Ta Da Mac and iPhone apps. Desktop and mobile.
 
 - Repo: https://github.com/lobrenov/ta-da-obsidian (public; `origin`)
-- Ta Da repo, cloned beside this one at `../Ta Da`: the build plan (`docs/archive/build plans/Obsidian POC.md`), the file format (`docs/file-format.md`, the source of truth) and the architecture (`docs/architecture.md`, Obsidian section).
+- Ta Da repo, cloned beside this one at `../ta-da-swift`: the build plan (`docs/archive/build plans/Obsidian POC.md`), the file format (`docs/file-format.md`, the source of truth) and the architecture (`docs/architecture.md`, Obsidian section).
 - Design: the canvas's Obsidian POC page, https://claude.ai/artifact/A7c33hg9HUKz41u3wbki3V.
 
 ## Commands
-- Test: `npm test` (Vitest). `TADA_REPO=<path>` points the tests at a Ta Da checkout other than `../Ta Da`.
+- Test: `npm test` (Vitest). `TADA_REPO=<path>` points the tests at a Ta Da checkout other than `../ta-da-swift`.
 - Build: `npm run build` (typechecks `src/` and `tests/`, then bundles `main.js`).
 - Dev: `OBSIDIAN_VAULT=<vault> npm run dev` (watch build, copied into `<vault>/.obsidian/plugins/ta-da/`).
-- Install into SampleVault: `npm run build`, then copy `main.js`, `manifest.json` and `styles.css` into `../Ta Da/SampleVault/.obsidian/plugins/ta-da/`, or run `OBSIDIAN_VAULT="../Ta Da/SampleVault" npm run dev`. Reload the plugin in Obsidian.
+- Install into SampleVault: `npm run build`, then copy `main.js`, `manifest.json` and `styles.css` into `../ta-da-swift/SampleVault/.obsidian/plugins/ta-da/`, or run `OBSIDIAN_VAULT="../ta-da-swift/SampleVault" npm run dev`. Reload the plugin in Obsidian.
 
 ## Layout
 - `src/core/`: the TypeScript port of TaDaCore (`model/`, `parsing/`, `syntax/` from the editor fork's `MarkdownEngineSyntax`, `index/`, `writing/`, `storage/`, including `storage/settingsFile.ts`, the read and write of `Ta Da/settings.json`). No Obsidian imports.
@@ -30,7 +30,7 @@ Obsidian plugin (id `ta-da`) for Ta Da's tasks, projects and areas, over the sam
 - `tests/`: Vitest tests, including conformance with TaDaCore.
 
 ## Conformance
-The tests read TaDaCore's fixtures from the Ta Da repo: `../Ta Da/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/` (`read.json`, `queries.json`, `writes.json`, `settings.json`, `recurrence.json` and `RecurrenceVault/`, `logging.json` and `LoggingVault/`, `HomeVault/`) and `../DesignVault/` beside it. `tests/spec.test.ts` reads the grammar spec from `../swift-markdown-engine-extended/spec/grammar`. Regenerate the JSON from the Ta Da repo with `swift test --package-path Packages/TaDaCore --filter writeConformance` (`ConformanceExportTests.swift`); a port change that changes behaviour starts there.
+The tests read TaDaCore's fixtures from the Ta Da repo: `../ta-da-swift/Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/Conformance/` (`read.json`, `queries.json`, `writes.json`, `settings.json`, `recurrence.json` and `RecurrenceVault/`, `logging.json` and `LoggingVault/`, `HomeVault/`) and `../DesignVault/` beside it. `tests/spec.test.ts` reads the grammar spec from `../swift-markdown-engine-extended/spec/grammar`. Regenerate the JSON from the Ta Da repo with `swift test --package-path Packages/TaDaCore --filter writeConformance` (`ConformanceExportTests.swift`); a port change that changes behaviour starts there.
 
 ## Rules
 - The plugin never changes how Obsidian renders Markdown. Where Ta Da's editor renders Markdown differently, Obsidian's rendering stands.

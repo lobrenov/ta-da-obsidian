@@ -59,7 +59,7 @@ The plugin creates files where the apps do, in `Ta Da/` at the vault's top level
 - Daily notes: the folder and template for daily notes, and for week notes, which can be turned off. These are shared with Ta Da through `Ta Da/settings.json` in the vault.
 
 ## Development
-The Ta Da repo must be cloned beside this one (`../Ta Da`), with `swift-markdown-engine-extended` beside both; the tests read their fixtures. `CLAUDE.md` has the layout and rules.
+The Ta Da repo must be cloned beside this one (`../ta-da-swift`), with `swift-markdown-engine-extended` beside both; the tests read their fixtures. `CLAUDE.md` has the layout and rules.
 
 - `npm test`: Vitest, including conformance with TaDaCore.
 - `npm run build`: typecheck and bundle `main.js`.
