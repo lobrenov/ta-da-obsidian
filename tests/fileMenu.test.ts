@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { makeItem } from "./support";
 
@@ -109,6 +109,9 @@ describe("the file menu's Status…", () => {
 	});
 
 	it("words a repeating task's items: Skip this time, and where Done and Skip move it", () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date(2026, 9, 7));
+		onTestFinished(() => void vi.useRealTimers());
 		const { open } = setup();
 		const titles = (path: string) => open(path)[0]?.sub.map((entry) => entry.title);
 		expect(titles("Ta Da/tasks/Water.md")).toEqual([

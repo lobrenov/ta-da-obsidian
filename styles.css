@@ -1171,8 +1171,10 @@
 	cursor: default;
 }
 
-.ta-da-navigator .ta-da-row:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+	.ta-da-navigator .ta-da-row:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 .ta-da-navigator .ta-da-row.is-selected {
