@@ -15,7 +15,9 @@ import * as frontmatter from "../src/core/writing/frontmatterEditor";
 import * as newFile from "../src/core/writing/newFile";
 import * as noteConversion from "../src/core/writing/noteConversion";
 import { type Parent, setParent } from "../src/core/writing/parent";
+import { parseInlineAttributes, strippedOf } from "../src/core/parsing/inlineAttributes";
 import * as subtaskExtraction from "../src/core/writing/subtaskExtraction";
+import * as subtaskLine from "../src/core/writing/subtaskLine";
 import * as tagEditor from "../src/core/writing/tagEditor";
 import { taDaRepo } from "./taDaRepo";
 
@@ -53,7 +55,11 @@ function propertyValue({ kind, value }: JsonValue): frontmatter.PropertyValue {
 }
 
 const tagList = (names: unknown): Tag[] => (names as string[]).flatMap((name) => readTag(name) ?? []);
+const nullableDate = (value: unknown): LocalDate | null => (typeof value === "string" ? LocalDate.parse(value) : null);
 const nullable = (value: unknown): string | null => (value === null ? null : (value as string));
+
+const extractJson = <T extends { due: LocalDate | null } | null>(found: T): unknown =>
+	found && { ...found, due: found.due === null ? null : found.due.toString() };
 
 function run(testCase: WriteCase, today: LocalDate): unknown {
 	const { op, args } = testCase;
@@ -92,7 +98,7 @@ function run(testCase: WriteCase, today: LocalDate): unknown {
 			return frontmatter.insertAtTop(keys, input);
 		}
 		case "NewFile.task":
-			return newFile.newTask({ project: nullable(args.project), area: nullable(args.area), tags: tagList(args.tags), today });
+			return newFile.newTask({ project: nullable(args.project), area: nullable(args.area), tags: tagList(args.tags), dueDate: nullableDate(args.dueDate), today });
 		case "NewFile.project":
 			return newFile.newProject({ area: nullable(args.area), tags: tagList(args.tags), today });
 		case "NewFile.area":
@@ -110,17 +116,33 @@ function run(testCase: WriteCase, today: LocalDate): unknown {
 		case "SubtaskExtraction.extract": {
 			let location = 0;
 			for (let line = 0; line < (args.lineIndex as number); line++) location = maxRange(lineRange(input, location));
-			return subtaskExtraction.extract(location, input);
+			return extractJson(subtaskExtraction.extract(location, input));
 		}
-		case "SubtaskExtraction.extractAll":
-			return subtaskExtraction.extractAll(input);
+		case "SubtaskExtraction.extractAll": {
+			const result = subtaskExtraction.extractAll(input);
+			return { text: result.text, extracts: result.extracts.map(extractJson) };
+		}
 		case "SubtaskExtraction.taskText":
 			return subtaskExtraction.taskText(
-				{ title: args.title as string, status: args.status as Status, body: args.body as string, range: [0, 0] },
+				{ title: args.title as string, status: args.status as Status, body: args.body as string, range: [0, 0], due: nullableDate(args.due), parent: null },
 				nullable(args.project),
 				nullable(args.area),
 				today,
 			);
+		case "InlineAttributes.parse": {
+			const found = parseInlineAttributes(args.text as string);
+			return {
+				due: found.due?.date.toString() ?? null,
+				dueRange: found.due?.range ?? null,
+				parent: found.parent?.title ?? null,
+				parentRange: found.parent?.range ?? null,
+				stripped: strippedOf(found, args.text as string),
+			};
+		}
+		case "SubtaskLine.setDue":
+			return subtaskLine.setDue(nullableDate(args.date), input, args.line as number);
+		case "SubtaskLine.setParent":
+			return subtaskLine.setParent(nullable(args.title), input, args.line as number);
 		case "NoteConversion.text":
 			return noteConversion.text(input, args.kind as Kind, args.status as Status, args.parent as Parent | null, today);
 		default:

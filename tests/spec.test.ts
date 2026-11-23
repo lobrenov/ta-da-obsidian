@@ -10,7 +10,7 @@ const grammarFolder = resolve(repoRoot, "../swift-markdown-engine-extended/spec/
 
 interface Expected {
 	summary: string | null;
-	tasks: { line: number; marker: string; text: string }[];
+	tasks: { line: number; marker: string; text: string; attributes?: unknown }[];
 	links: { line: number; target: string; heading?: string; block?: string; alias?: string }[];
 	embeds: { line: number; target: string; heading?: string; block?: string; segments?: string[] }[];
 	tags: { line: number; column: number; length: number; tag: string }[];
@@ -60,7 +60,8 @@ describe("spec grammar", () => {
 				tags: facts.tags.map((tag) => ({ line: tag.line, column: tag.column, length: tag.length, tag: tag.name })),
 			}).toEqual({
 				summary: expected.summary,
-				tasks: expected.tasks,
+				// The plugin reads a line's attributes with `parseInlineAttributes` (conformance), not as facts.
+				tasks: expected.tasks.map(({ attributes: _attributes, ...task }) => task),
 				links: expected.links,
 				embeds: expected.embeds,
 				tags: expected.tags,

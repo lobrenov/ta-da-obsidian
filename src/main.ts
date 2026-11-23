@@ -11,6 +11,7 @@ import { localToday } from "./ui/dates";
 import { openConvertModal } from "./ui/convert/ConvertModal";
 import { registerFileMenu } from "./ui/fileMenu";
 import { registerHeader } from "./ui/header/registerHeader";
+import { registerTaskAttributes } from "./ui/registerTaskAttributes";
 import { registerLinkBoxes } from "./ui/registerLinkBoxes";
 import { registerNavigator } from "./ui/navigator/register";
 import { StatusActions } from "./ui/statusActions";
@@ -24,7 +25,7 @@ export default class TaDaPlugin extends Plugin {
 	logbook!: Logbook;
 	dailyLog!: DailyLog;
 	store = new SettingsStore(this, vaultSettingsFiles(this.app));
-	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes` and `taskLinkBoxes`. */
+	/** The settings the header and navigator read; `data.json` holds all but `dailyNotes`, `taskLinkBoxes` and `noteSubtasks`. */
 	override settings: TaDaData = this.store.data;
 
 	override async onload(): Promise<void> {
@@ -43,6 +44,7 @@ export default class TaDaPlugin extends Plugin {
 		const { newTask } = registerCommands(this);
 		const header = registerHeader(this, this.taDaIndex, this.writer, this.statusActions, this.settings);
 		const refreshLinkBoxes = registerLinkBoxes(this, this.taDaIndex, () => this.settings.taskLinkBoxes);
+		registerTaskAttributes(this, this.taDaIndex);
 		const navigator = registerNavigator(this, this.store, newTask);
 		const tab = new TaDaSettingTab(
 			this.app,
@@ -56,6 +58,10 @@ export default class TaDaPlugin extends Plugin {
 			(value) => {
 				void this.store.updateTaskLinkBoxes(value);
 				refreshLinkBoxes();
+			},
+			(value) => {
+				void this.store.updateNoteSubtasks(value);
+				navigator.notify();
 			},
 		);
 		this.addSettingTab(tab);

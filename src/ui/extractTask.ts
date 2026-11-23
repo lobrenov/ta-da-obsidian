@@ -1,4 +1,5 @@
 import { type App, Notice, type TFile } from "obsidian";
+import { parentItem } from "../core/index/subtaskQueries";
 import type { VaultIndex } from "../core/index/vaultIndex";
 import type { LocalDate } from "../core/model/localDate";
 import { type Extract, extract, taskText } from "../core/writing/subtaskExtraction";
@@ -15,7 +16,8 @@ export interface ExtractHost {
 
 /**
  * Extract to task: the subtask on the line holding `location` in `file`'s `text` becomes a task file, filed under the
- * file when it's a project or area, else under its project or area. Only once that file exists do the subtask's lines
+ * line's `@[[…]]` when it resolves to a project or area, else under the file when it's a project or area, else under its
+ * project or area. A `>` date becomes its `dueDate`. Only once that file exists do the subtask's lines
  * leave `file`, as one edit through the `Writer`; a failure to make it leaves `file` alone.
  */
 export async function extractSubtask(host: ExtractHost, file: TFile, text: string, location: number): Promise<void> {
@@ -23,7 +25,8 @@ export async function extractSubtask(host: ExtractHost, file: TFile, text: strin
 	if (!found) return;
 	const { vault, workspace } = host.app;
 	const item = host.index.get(file.path);
-	const parent = item && (item.properties.kind === "project" || item.properties.kind === "area") ? item : item ? host.index.parentOf(item) : null;
+	const hosting = item && (item.properties.kind === "project" || item.properties.kind === "area") ? item : item ? host.index.parentOf(item) : null;
+	const parent = (found.parent === null ? null : parentItem(host.index, found.parent)) ?? hosting;
 	const inProject = parent?.properties.kind === "project";
 	const content = taskText(found, inProject ? parent.title : null, parent && !inProject ? parent.title : null, host.today());
 

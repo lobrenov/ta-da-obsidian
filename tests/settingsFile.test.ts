@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeTaskLinkBoxes } from "../src/core/storage/settingsFile";
+import { readDailyNotes, readNoteSubtasks, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeNoteSubtasks, writeTaskLinkBoxes } from "../src/core/storage/settingsFile";
 import { defaultDailyNotes } from "../src/settingsData";
 
 describe("readDailyNotes", () => {
@@ -66,5 +66,28 @@ describe("writeTaskLinkBoxes", () => {
 	it("creates the file's text, or starts again from text that can't be read", () => {
 		expect(writeTaskLinkBoxes(null, false)).toBe(`${JSON.stringify({ editor: { taskLinkBoxes: false } }, null, 2)}\n`);
 		expect(JSON.parse(writeTaskLinkBoxes("{ nope", true))).toEqual({ editor: { taskLinkBoxes: true } });
+	});
+});
+
+describe("readNoteSubtasks", () => {
+	it("is off when missing, unreadable or not a boolean", () => {
+		for (const text of [null, "{ nope", "[1]", "{}", '{ "editor": 3 }', '{ "editor": { "taskLinkBoxes": true } }', '{ "editor": { "noteSubtasks": "yes" } }']) expect(readNoteSubtasks(text)).toBe(false);
+	});
+
+	it("reads the key", () => {
+		expect(readNoteSubtasks('{ "editor": { "noteSubtasks": true } }')).toBe(true);
+		expect(readNoteSubtasks('{ "editor": { "noteSubtasks": false } }')).toBe(false);
+	});
+});
+
+describe("writeNoteSubtasks", () => {
+	it("sets the key and keeps the other groups and keys, editor's included", () => {
+		const existing = JSON.stringify({ theme: { themeSet: "Ayu" }, editor: { taskLinkBoxes: false, font: "Mono", autocomplete: { tags: true } } });
+		expect(JSON.parse(writeNoteSubtasks(existing, true))).toEqual({ theme: { themeSet: "Ayu" }, editor: { taskLinkBoxes: false, font: "Mono", autocomplete: { tags: true }, noteSubtasks: true } });
+	});
+
+	it("creates the file's text, or starts again from text that can't be read", () => {
+		expect(writeNoteSubtasks(null, true)).toBe(`${JSON.stringify({ editor: { noteSubtasks: true } }, null, 2)}\n`);
+		expect(JSON.parse(writeNoteSubtasks("{ nope", false))).toEqual({ editor: { noteSubtasks: false } });
 	});
 });

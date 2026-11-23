@@ -17,6 +17,7 @@ import { taDaRepo } from "./taDaRepo";
 const today = LocalDate.parse("2026-10-02") as LocalDate;
 const designVault = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTests/Fixtures/DesignVault");
 
+const plain = { text: "", title: "", due: null, parent: null, isNested: false, isQuoted: false } as const;
 describe("Lines", () => {
 	it.each(["", "a", "a\n", "a\nb", "a\r\nb\r\n", "\n\n", "Ünï\r\ncödé 🙂\n"])("round-trips %j", (text) => {
 		expect(new Lines(text).text).toBe(text);
@@ -72,7 +73,7 @@ describe("CheckboxSyntax", () => {
 
 describe("ChecklistEditor", () => {
 	const text = "---\ntype: task\n---\nÜber 🙂\n\n- [ ] Open\n  - [x] Done\n> - [-] Cancelled\n1. [?] Icon\n";
-	const boxes = (input: string) => (parseItem(input, "t.md") as Item).checkboxes;
+const boxes = (input: string) => (parseItem(input, "t.md") as Item).checkboxes;
 
 	it("click completes and reopens", () => {
 		const b = boxes(text);
@@ -96,7 +97,7 @@ describe("ChecklistEditor", () => {
 		const first = boxes(text)[0]!;
 		expect(click(first, text.replace("- [ ] Open", "- [x] Open"))).toBeNull();
 		expect(click(first, "---\ntype: task\n---\n")).toBeNull();
-		expect(click({ marker: " ", lineIndex: 5, column: 0, state: "open" }, text)).toBeNull();
+		expect(click({ marker: " ", lineIndex: 5, column: 0, state: "open", ...plain }, text)).toBeNull();
 	});
 
 	it("click keeps CRLF", () => {
@@ -194,6 +195,6 @@ describe("ChecklistEditor and a byte order mark", () => {
 	it("keeps the BOM", () => {
 		const text = "﻿- [ ] a\n";
 		// The BOM is three UTF-8 bytes, so the marker is at column 6 of the first line.
-		expect(click({ marker: " ", lineIndex: 0, column: 6, state: "open" }, text)).toBe("﻿- [x] a\n");
+		expect(click({ marker: " ", lineIndex: 0, column: 6, state: "open", ...plain }, text)).toBe("﻿- [x] a\n");
 	});
 });

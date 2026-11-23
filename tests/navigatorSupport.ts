@@ -59,6 +59,13 @@ function rowText(row: ListRow): string {
 			return ["periodNote", row.name, row.path === null ? "create" : null, row.file, row.summary, row.open > 0 ? `${row.open} open` : null, row.subtasks ? `${row.subtasks.done}/${row.subtasks.total}` : null].filter((part) => part !== null).join(" | ");
 		case "day":
 			return ["day", row.label, row.summary || null, row.hasOpenTasks ? "dot" : null, row.hasOpenBoxes ? "ring" : null, row.today ? "today" : null].filter((part) => part !== null).join(" | ");
+		case "subtaskCard":
+			return [
+				"subtasks",
+				row.title,
+				row.folder,
+				...row.lines.map((line) => [line.title, line.date ? `${line.date.text}${line.date.overdue ? " (overdue)" : ""}` : null, line.parent ? `@${line.parent.title} (${line.parent.kind})` : null].filter((part) => part !== null).join(" ")),
+			].join(" | ");
 		case "occurrence":
 			return ["occurrence", row.title, row.estimated ? "≈" : null, row.deadline ? "Deadline" : null, row.place].filter((part) => part !== null).join(" | ");
 		case "logged":

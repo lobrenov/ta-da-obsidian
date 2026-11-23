@@ -27,7 +27,7 @@ describe("SettingsStore", () => {
 		const { plugin } = makePlugin({ hideProperties: false, navigator: { openOnStartup: { tasks: true } } });
 		const store = new SettingsStore(plugin, memoryFiles());
 		await store.load();
-		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true });
+		expect(store.data).toEqual({ hideProperties: false, navigator: { openOnStartup: { agenda: false, tasks: true, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true, noteSubtasks: false });
 	});
 
 	it("keeps the one data object, so what holds it sees a loaded or changed value", async () => {
@@ -87,6 +87,22 @@ describe("SettingsStore", () => {
 		files.files.set("Ta Da/settings.json", JSON.stringify({ editor: { taskLinkBoxes: true } }));
 		expect(await store.reloadSettingsFile()).toBe(true);
 		expect(store.data.taskLinkBoxes).toBe(true);
+	});
+
+	it("reads, writes and reloads the note subtasks through the vault file, off by default, keeping its other keys", async () => {
+		const { plugin, writes } = makePlugin();
+		const files = memoryFiles({ "Ta Da/settings.json": JSON.stringify({ editor: { taskLinkBoxes: false } }) });
+		const store = new SettingsStore(plugin, files);
+		await store.load();
+		expect(store.data.noteSubtasks).toBe(false);
+		await store.updateNoteSubtasks(true);
+		expect(store.data.noteSubtasks).toBe(true);
+		expect(writes).toEqual([]);
+		expect(JSON.parse(files.files.get("Ta Da/settings.json") ?? "")).toEqual({ editor: { taskLinkBoxes: false, noteSubtasks: true } });
+		expect(await store.reloadSettingsFile()).toBe(false);
+		files.files.set("Ta Da/settings.json", JSON.stringify({ editor: { noteSubtasks: false } }));
+		expect(await store.reloadSettingsFile()).toBe(true);
+		expect(store.data.noteSubtasks).toBe(false);
 	});
 
 	it("creates the settings file when a setting changes, and never when loading", async () => {
@@ -182,7 +198,7 @@ describe("SettingsStore", () => {
 
 describe("resolveData", () => {
 	it("gives defaults for nothing saved and for a wrong type", () => {
-		const defaults = { hideProperties: true, navigator: { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true };
+		const defaults = { hideProperties: true, navigator: { openOnStartup: { agenda: false, tasks: false, tags: false }, collapseListPane: false }, dailyNotes: defaultDailyNotes, taskLinkBoxes: true, noteSubtasks: false };
 		expect(resolveData(null)).toEqual(defaults);
 		expect(resolveData({ navigator: "x" })).toEqual(defaults);
 		expect(resolveData({ navigator: { openOnStartup: "yes" } })).toEqual(defaults);

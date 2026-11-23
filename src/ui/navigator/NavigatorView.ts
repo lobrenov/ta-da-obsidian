@@ -25,7 +25,8 @@ import {
 } from "./domain";
 import { buildList, type ListContext, type ListHeader, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
-import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, TaskRowModel } from "./rows";
+import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, SubtaskCardModel, TaskRowModel } from "./rows";
+import { tickSubtask } from "./subtaskActions";
 import { createPeriodNote } from "./periodNotes";
 import { dropParent } from "../fileActions";
 import { filesNotUnder, moveFilesTo } from "../fileEdits";
@@ -258,7 +259,7 @@ export class NavigatorView extends ItemView {
 
 	private context(): ListContext {
 		const { dailyNotes } = this.deps.settings;
-		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, agenda: this.agenda, notes: { names: this.deps.settings.names, weekNotes: dailyNotes.weekNotes } };
+		return { index: this.deps.taDaIndex.index, today: this.today, trash: this.trash, agenda: this.agenda, notes: { names: this.deps.settings.names, weekNotes: dailyNotes.weekNotes, noteSubtasks: this.deps.settings.noteSubtasks } };
 	}
 
 	/** Whether the Trash count or list is on screen: in Tasks, the navigation pane shows when wide, or when the list isn't showing. */
@@ -333,7 +334,7 @@ export class NavigatorView extends ItemView {
 	 * Opens a file as the file explorer does. A click or a new tab or split makes the opened leaf active. A key press
 	 * leaves focus in the list and announces the file with `file-open`, so Outline, Backlinks and Properties follow.
 	 */
-	private openPath(path: string, event?: MouseEvent | KeyboardEvent): void {
+	private openPath(path: string, event?: MouseEvent | KeyboardEvent, line?: number): void {
 		const file = this.app.vault.getFileByPath(path);
 		if (!file) return;
 		this.select(path, false);
@@ -341,7 +342,7 @@ export class NavigatorView extends ItemView {
 		const fromKey = event instanceof KeyboardEvent && !newLeaf;
 		void this.app.workspace
 			.getLeaf(newLeaf)
-			.openFile(file, { active: !fromKey })
+			.openFile(file, { active: !fromKey, ...(line === undefined ? {} : { eState: { line } }) })
 			.then(() => {
 				if (fromKey) this.app.workspace.trigger("file-open", file);
 			});
@@ -873,6 +874,9 @@ export class NavigatorView extends ItemView {
 			case "task":
 				el = this.taskRow(parent, row);
 				break;
+			case "subtaskCard":
+				this.subtaskCard(parent, row);
+				return;
 			case "project":
 			case "area":
 				el = this.parentRow(parent, row);
@@ -992,6 +996,43 @@ export class NavigatorView extends ItemView {
 		const dots = parent.createSpan({ cls: "ta-da-strip-dots" });
 		if (marks.hasOpenBoxes) dots.createSpan({ cls: "ta-da-dot is-ring" });
 		if (marks.hasOpenTasks) dots.createSpan({ cls: "ta-da-dot" });
+	}
+
+	/**
+	 * A source file's listed subtask lines (From notes): the file's name and folder over each line's box, date pill, text and
+	 * parent chip. A box ticks the line, which stays struck until the list reloads; the text opens the file at the line.
+	 */
+	private subtaskCard(parent: HTMLElement, card: SubtaskCardModel): void {
+		const el = parent.createDiv({ cls: "ta-da-subtask-card" });
+		const head = el.createDiv({ cls: "ta-da-subtask-head", attr: { role: "button", tabindex: "-1" } });
+		setIcon(head.createSpan({ cls: "ta-da-row-icon is-note-icon" }), "file-text");
+		head.createSpan({ cls: "ta-da-row-title is-strong", text: card.title });
+		if (card.folder !== "") {
+			const folder = head.createSpan({ cls: "ta-da-meta-item ta-da-subtask-folder" });
+			metaIcon(folder, "folder", "link");
+			folder.appendText(card.folder);
+		}
+		head.addEventListener("click", (event) => this.openPath(card.source, event));
+		for (const line of card.lines) {
+			const row = el.createDiv({ cls: "ta-da-subtask-line" });
+			const box = drawCheckbox(row, line.marker === "/" ? "Doing" : "Not Started", `Complete: ${line.title}`, (event) => {
+				event.stopPropagation();
+				const file = this.app.vault.getFileByPath(card.source);
+				if (!file) return;
+				row.addClass("is-done");
+				box.replaceWith(drawCheckbox(row, "Done", `Done: ${line.title}`, null));
+				void tickSubtask(this.deps.writer, file, line.lineIndex, line.marker);
+			});
+			if (line.date) row.createSpan({ cls: `ta-da-date-pill${line.date.overdue ? " is-overdue" : ""}`, text: line.date.text, attr: { "aria-label": line.date.tooltip } });
+			const text = row.createSpan({ cls: "ta-da-subtask-text", text: line.title, attr: { title: line.title, role: "button" } });
+			text.addEventListener("click", (event) => this.openPath(card.source, event, line.lineIndex));
+			if (line.parent) {
+				const chip = row.createSpan({ cls: `ta-da-parent-chip${line.parent.kind === "unresolved" ? " is-unresolved" : ""}`, attr: { "aria-label": `In ${line.parent.title}` } });
+				if (line.parent.kind === "area") drawIcon(chip, { type: "area" });
+				else if (line.parent.kind === "project") drawIcon(chip, { type: "ring", fraction: 0, ongoing: false });
+				chip.createSpan({ cls: "ta-da-parent-chip-title", text: line.parent.title });
+			}
+		}
 	}
 
 	/** A task on one line: its box, a date pill, the title, quiet glyphs, and the place at the right. */

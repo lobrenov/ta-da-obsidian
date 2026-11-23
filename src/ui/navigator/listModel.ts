@@ -3,6 +3,7 @@ import type { Occurrence, TaskGroup } from "../../core/index/queries";
 import { dailyNote, openCheckboxCount, pathForDate, pathForWeek, weekNote } from "../../core/index/dailyNotes";
 import { agendaDay, agendaWeek, allOccurrences, dayMarks, grouped, looseTasks, progress } from "../../core/index/queries";
 import { search as searchIndex } from "../../core/index/queries";
+import { looseNoteSubtasks, noteSubtasksFrom, noteSubtasksIn, noteSubtasksOn, type SubtaskCard } from "../../core/index/subtaskQueries";
 import { tagBrowser } from "../../core/index/tagQueries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { type Item, subtasks as subtasksOf } from "../../core/model/item";
@@ -21,6 +22,7 @@ import {
 	type ArchiveRowModel,
 	cardRow,
 	dateOf,
+	type DateRule,
 	type IconSpec,
 	lineRow,
 	type ListRow,
@@ -29,6 +31,7 @@ import {
 	type PeriodNoteRowModel,
 	noteRow,
 	projectIcon,
+	subtaskCards,
 	type TaskRowOptions,
 	taskRow,
 } from "./rows";
@@ -160,7 +163,7 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const strip = buildStrip(ctx.index, ctx.agenda, ctx.today, ctx.notes);
 	const base = { domain: { kind: "agenda" } as Domain, header: { ...noHeader, title: "Agenda", icon: { type: "icon", name: "calendar", tint: "due" } as IconSpec }, strip, empty: null };
 	if (selection.kind === "week") {
-		return { ...base, groupList: null, grouping: null, filter: null, sections: weekSections(ctx, selection.week) };
+		return { ...base, groupList: null, grouping: null, filter: null, sections: weekSections(ctx, selection.week, options) };
 	}
 	const { index, today } = ctx;
 	const all = agendaDay(index, selection.date, today);
@@ -170,13 +173,15 @@ function agendaList(ctx: ListContext, options: ListOptions): ListModel {
 	const title = plain("agenda:day", [periodNoteRow(ctx, selection)]);
 	const sections = [title];
 	const repeats = allOccurrences(index, selection.date, selection.date, today).filter((occurrence) => filter.matches(occurrence.item));
-	if (all.length === 0 && repeats.length === 0) title.message = "Nothing scheduled";
+	const notes = fromNotes(ctx, "agenda", ctx.notes.noteSubtasks ? noteSubtasksOn(index, selection.date, today) : [], { dates: "agenda" }, options);
+	if (all.length === 0 && repeats.length === 0 && !notes) title.message = "Nothing scheduled";
 	if (all.length > 0 || filter.isActive) {
 		const scheduled = plain("agenda:scheduled", [], { style: "scheduled" });
 		if (all.length > 0 && tasks.length === 0) scheduled.message = "Nothing here carries the picked tags.";
 		sections.push(scheduled, ...taskSections(ctx, tasks, grouping, { dates: "agenda", place: grouping !== "Project" }, "agenda", options));
 	}
 	if (repeats.length > 0) sections.push(plain("agenda:repeats", occurrenceRows(ctx, repeats), { style: "repeats" }));
+	if (notes) sections.push(notes);
 	return { ...base, groupList: all.length > 0 ? "agenda" : null, grouping, filter: filterModel(all, options.picked, tasks.length), sections };
 }
 
@@ -230,10 +235,10 @@ function periodNoteRow(ctx: ListContext, selection: AgendaSelection): PeriodNote
 }
 
 /** A week: a row for each day, then the entries due or at their deadline in it. */
-function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
+function weekSections(ctx: ListContext, week: ISOWeek, options: ListOptions): SectionModel[] {
 	const { index, today } = ctx;
 	const entries = agendaWeek(index, week);
-	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, today, ctx.notes.names);
+	const marks = dayMarks(index, week.firstDay, week.days[6] ?? week.firstDay, today, ctx.notes.names, ctx.notes.noteSubtasks === true);
 	const coming = allOccurrences(index, week.firstDay, week.days[6] ?? week.firstDay, today);
 	const days = week.days.map((date): ListRow => {
 		const due = new Set(entries.filter((entry) => entry.date.equals(date) && !isClosed(entry.item.properties.status)).map((entry) => entry.item.path)).size;
@@ -262,6 +267,8 @@ function weekSections(ctx: ListContext, week: ISOWeek): SectionModel[] {
 	if (entries.length > 0) {
 		sections.push(plain("agenda:due", entries.map((entry) => taskRow(index, entry.item, today, { dates: "agenda", place: true, entry })), { style: "archive", title: "Due this week", note: null }));
 	}
+	const notes = fromNotes(ctx, "agenda:week", ctx.notes.noteSubtasks ? noteSubtasksFrom(index, week.firstDay, week.days[6] ?? week.firstDay) : [], { dates: "elsewhere" }, options);
+	if (notes) sections.push(notes);
 	return sections;
 }
 
@@ -270,14 +277,15 @@ function looseList(ctx: ListContext, options: ListOptions): ListModel {
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("loose", options.groupings);
+	const notes = fromNotes(ctx, "loose", ctx.notes.noteSubtasks ? looseNoteSubtasks(ctx.index) : [], { dates: "elsewhere" }, options);
 	return {
 		domain: { kind: "loose" },
 		header: { ...noHeader, title: "Loose tasks", icon: { type: "icon", name: "inbox", tint: "accent" } },
 		groupList: "loose",
 		grouping,
 		filter: filterModel(all, options.picked, tasks.length),
-		sections: taskSections(ctx, tasks, grouping, { dates: "elsewhere", place: false }, "loose", options),
-		empty: emptyOf(all.length, tasks.length, "No loose tasks"),
+		sections: [...taskSections(ctx, tasks, grouping, { dates: "elsewhere", place: false }, "loose", options), ...(notes ? [notes] : [])],
+		empty: notes ? null : emptyOf(all.length, tasks.length, "No loose tasks"),
 	};
 }
 
@@ -287,6 +295,7 @@ function projectList(project: Item, ctx: ListContext, options: ListOptions): Lis
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("project", options.groupings);
+	const notes = fromNotes(ctx, project.path, ctx.notes.noteSubtasks ? noteSubtasksIn(index, project) : [], { dates: "elsewhere", hideParent: project.path }, options);
 	const p = project.properties;
 	const { done, total } = progress(index, project);
 	const own = subtasksOf(project);
@@ -303,8 +312,8 @@ function projectList(project: Item, ctx: ListContext, options: ListOptions): Lis
 		groupList: "project",
 		grouping,
 		filter: filterModel(all, options.picked, tasks.length),
-		sections: taskSections(ctx, tasks, grouping, { dates: "elsewhere", place: false }, project.path, options),
-		empty: emptyOf(all.length, tasks.length, "No tasks"),
+		sections: [...taskSections(ctx, tasks, grouping, { dates: "elsewhere", place: false }, project.path, options), ...(notes ? [notes] : [])],
+		empty: notes ? null : emptyOf(all.length, tasks.length, "No tasks"),
 	};
 }
 
@@ -325,6 +334,8 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 	if (closed.length > 0) {
 		sections.push(foldable(`${key}|Completed`, { style: "count", title: "Completed", count: closed.length, quiet: true }, closed.map((task) => taskRow(index, task, today, rowOptions)), true, options));
 	}
+	const notes = fromNotes(ctx, key, ctx.notes.noteSubtasks ? noteSubtasksIn(index, area) : [], { dates: "elsewhere", hideParent: area.path }, options);
+	if (notes) sections.push(notes);
 	const files = [...allProjects, ...allTasks];
 	const openCount = allTasks.filter((task) => !isClosed(task.properties.status)).length;
 	return {
@@ -340,7 +351,7 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 		grouping: null,
 		filter: filterModel(files, options.picked, projects.length + tasks.length),
 		sections,
-		empty: files.length === 0 ? "No tasks" : sections.length === 0 ? noMatches : null,
+		empty: files.length === 0 && !notes ? "No tasks" : sections.length === 0 ? noMatches : null,
 	};
 }
 
@@ -380,6 +391,13 @@ function groupSections(ctx: ListContext, groups: TaskGroup[], rowOptions: TaskRo
 			sub: area !== null,
 		});
 	});
+}
+
+/** `From notes`: a card for each source file's listed subtask lines, after the page's own tasks. Null when there are none. */
+function fromNotes(ctx: ListContext, foldKey: string, cards: SubtaskCard[], rowOptions: { dates: DateRule; hideParent?: string }, options: ListOptions): SectionModel | null {
+	if (cards.length === 0) return null;
+	const lines = cards.reduce((sum, card) => sum + card.lines.length, 0);
+	return foldable(`${foldKey}|From notes`, countHeader("From notes", lines), subtaskCards(ctx.index, cards, ctx.today, rowOptions), false, options);
 }
 
 // Tag pages

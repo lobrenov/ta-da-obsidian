@@ -2,6 +2,7 @@ import { type Checkbox, checkboxState } from "../model/checkbox";
 import { readTag, type Tag, uniqueTags } from "../model/tag";
 import { makeWikiLink, type WikiLink } from "../model/wikiLink";
 import { scanFacts } from "../syntax/facts";
+import { parseInlineAttributes, strippedOf } from "./inlineAttributes";
 
 /** What a file's body contributes to its item. */
 export interface BodyScan {
@@ -30,7 +31,8 @@ export function scanBody(body: string, firstLineIndex = 0): BodyScan {
 	if (facts.tasks.length > 0) {
 		for (let i = 0; i < body.length; i++) if (body.charCodeAt(i) === 0x0a) newlines.push(i);
 	}
-	const checkboxes: Checkbox[] = facts.tasks.map((task) => {
+	const lineStart = (line: number): number => (line === 0 ? 0 : (newlines[line - 1] as number) + 1);
+	const lines = facts.tasks.map((task) => {
 		const marker = task.box.location + 1;
 		let low = 0;
 		let high = newlines.length;
@@ -39,11 +41,48 @@ export function scanBody(body: string, firstLineIndex = 0): BodyScan {
 			if ((newlines[mid] as number) < marker) low = mid + 1;
 			else high = mid;
 		}
-		const lineStart = low === 0 ? 0 : (newlines[low - 1] as number) + 1;
-		const column = encoder.encode(body.slice(lineStart, marker)).length;
+		return { index: low, marker };
+	});
+	const boxLines = new Set(lines.map((line) => line.index));
+	/** A line's indent in columns (a tab moving to the next multiple of 4) and its first other character; null when blank. */
+	const indent = (line: number): { columns: number; first: number } | null => {
+		let columns = 0;
+		for (let i = lineStart(line); i < body.length; i++) {
+			const c = body.charCodeAt(i);
+			if (c === 0x20) columns += 1;
+			else if (c === 0x09) columns = Math.floor(columns / 4) * 4 + 4;
+			else return c === 0x0a || c === 0x0d ? null : { columns, first: c };
+		}
+		return null;
+	};
+	const isNested = (line: number, columns: number): boolean => {
+		if (columns === 0) return false;
+		for (let earlier = line - 1; earlier >= 0; earlier--) {
+			const above = indent(earlier);
+			if (above === null || above.columns >= columns) continue;
+			return boxLines.has(earlier);
+		}
+		return false;
+	};
+	const checkboxes: Checkbox[] = facts.tasks.map((task, i) => {
+		const line = lines[i] as { index: number; marker: number };
+		const column = encoder.encode(body.slice(lineStart(line.index), line.marker)).length;
 		const state = checkboxState(task.marker);
 		if (state === null) throw new Error(`Not a task marker: ${task.marker}`);
-		return { marker: task.marker, lineIndex: firstLineIndex + low, column, state };
+		const attributes = parseInlineAttributes(task.text);
+		const indented = indent(line.index);
+		return {
+			marker: task.marker,
+			lineIndex: firstLineIndex + line.index,
+			column,
+			state,
+			text: task.text,
+			title: strippedOf(attributes, task.text),
+			due: attributes.due?.date ?? null,
+			parent: attributes.parent?.title ?? null,
+			isNested: isNested(line.index, indented?.columns ?? 0),
+			isQuoted: indented?.first === 0x3e,
+		};
 	});
 	const links = facts.links.flatMap((fact) => makeWikiLink(fact.parts.target, fact.parts.heading, fact.parts.block, fact.parts.alias) ?? []);
 	const embeds = facts.embeds.flatMap((fact) => {

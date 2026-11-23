@@ -6,6 +6,7 @@ import { linkTitle } from "../model/wikiLink";
 import { rolloverDay } from "./repeatMove";
 import { nextForCompleted } from "../writing/recurrence";
 import { dailyNote, type DailyNoteNames, defaultDailyNoteNames, openCheckboxCount } from "./dailyNotes";
+import { isListed } from "./subtaskQueries";
 import { byDate, byTitle, type VaultIndex } from "./vaultIndex";
 
 /** One dated entry in Upcoming. An item gets one entry on its `dueDate` and another on its `deadline`. */
@@ -85,7 +86,8 @@ export function agendaWeek(index: VaultIndex, week: ISOWeek): AgendaEntry[] {
 
 /**
  * For each date from `from` through `through` that has either mark. An occurrence marks its day like an open task, except
- * those of `every day` and `every weekday` rules. The daily note is looked up by `names`.
+ * those of `every day` and `every weekday` rules. A listed subtask line with a due date marks its day as an open task does,
+ * unless `includingSubtasks` is false. The daily note is looked up by `names`.
  */
 export function dayMarks(
 	index: VaultIndex,
@@ -93,6 +95,7 @@ export function dayMarks(
 	through: LocalDate,
 	today: LocalDate,
 	names: DailyNoteNames = defaultDailyNoteNames,
+	includingSubtasks = true,
 ): Map<string, DayMarks> {
 	const marks = new Map<string, DayMarks>();
 	if (from.compare(through) > 0) return marks;
@@ -108,6 +111,13 @@ export function dayMarks(
 		if (isClosed(task.properties.status)) continue;
 		for (const date of [task.properties.dueDate, task.properties.deadline]) {
 			if (date && date.compare(from) >= 0 && date.compare(through) <= 0) marksFor(date).hasOpenTasks = true;
+		}
+	}
+	if (includingSubtasks) {
+		for (const item of index.items.values()) {
+			for (const box of item.checkboxes) {
+				if (box.due && box.due.compare(from) >= 0 && box.due.compare(through) <= 0 && isListed(index, box, item)) marksFor(box.due).hasOpenTasks = true;
+			}
 		}
 	}
 	for (const task of index.tasks) {

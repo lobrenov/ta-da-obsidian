@@ -1,3 +1,5 @@
+import type { LocalDate } from "./localDate";
+
 export type CheckboxState = "open" | "done" | "cancelled" | "icon";
 
 /** Every marker character rendered as a checkbox: GFM's and the Alternative Checkboxes Reference Set. */
@@ -33,4 +35,16 @@ export interface Checkbox {
 	/** UTF-8 offset of `marker` within its line. */
 	readonly column: number;
 	readonly state: CheckboxState;
+	/** The rest of the box's first line, trimmed, as written: its attributes included. */
+	readonly text: string;
+	/** `text` without its due date and parent. */
+	readonly title: string;
+	/** The first `>YYYY-MM-DD` in `text` (see `parseInlineAttributes`). */
+	readonly due: LocalDate | null;
+	/** The target title of the first `@[[…]]` in `text`. */
+	readonly parent: string | null;
+	/** Indented under another checkbox, which lists it as a subtask line of its own. */
+	readonly isNested: boolean;
+	/** In a quote or callout. */
+	readonly isQuoted: boolean;
 }

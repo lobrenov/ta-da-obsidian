@@ -3,6 +3,7 @@ import type { LocalDate } from "../model/localDate";
 import type { Status } from "../model/status";
 import { lineRange, lineRanges, maxRange, substring } from "../syntax/ranges";
 import { trimBlanks } from "../text";
+import { parseInlineAttributes, strippedOf } from "../parsing/inlineAttributes";
 import { isBlank, isNewlineCharacter } from "./characters";
 import { box, markerEnd, markerStart } from "./checkboxSyntax";
 import { setStatus } from "./completion";
@@ -11,7 +12,7 @@ import { newTask } from "./newFile";
 /** Extract to Task: a subtask line, with the lines indented under it, becomes a task file of its own and leaves the text it was in. */
 
 export interface Extract {
-	/** The line's text after its box, trimmed. */
+	/** The line's text after its box, trimmed, without its due date and parent. */
 	title: string;
 	/** From the box: `/` Doing, `x` Done, `-` Cancelled, any other open box Not Started. */
 	status: Status;
@@ -19,6 +20,10 @@ export interface Extract {
 	body: string;
 	/** The UTF-16 range of the subtask line and the lines under it, line endings included, which the edit deletes: location, length. */
 	range: [number, number];
+	/** The line's `>YYYY-MM-DD`. */
+	due: LocalDate | null;
+	/** The target title of the line's `@[[…]]`: a project or area for the host to resolve. */
+	parent: string | null;
 }
 
 const isIndent = (code: number): boolean => code === 0x20 || code === 0x09;
@@ -83,7 +88,9 @@ export function extract(location: number, text: string): Extract | null {
 	const found = markerEndAt === null ? null : box(line, markerEndAt);
 	const state = found === null ? null : checkboxState(found.marker);
 	if (found === null || state === null || state === "icon") return null;
-	const title = trimBlanks(line.slice(found.offset + 2));
+	const source = trimBlanks(line.slice(found.offset + 2));
+	const attributes = parseInlineAttributes(source);
+	const title = strippedOf(attributes, source);
 	if (title === "") return null;
 
 	const children: string[] = [];
@@ -107,7 +114,7 @@ export function extract(location: number, text: string): Extract | null {
 	const body = children.map((child) => outdented(child, outdent)).join("\n");
 
 	const status: Status = state === "done" ? "Done" : state === "cancelled" ? "Cancelled" : found.marker === "/" ? "Doing" : "Not Started";
-	return { title, status, body, range: [lineBegin, end - lineBegin] };
+	return { title, status, body, range: [lineBegin, end - lineBegin], due: attributes.due?.date ?? null, parent: attributes.parent?.title ?? null };
 }
 
 /**
@@ -130,8 +137,8 @@ export function extractAll(source: string): { text: string; extracts: Extract[] 
 	return { text, extracts };
 }
 
-/** The new task's text: a task filed under `project` or else `area`, with the extract's status and its body. */
+/** The new task's text: a task filed under `project` or else `area`, with the extract's status, due date and body. */
 export function taskText(found: Extract, project: string | null, area: string | null, today: LocalDate): string {
-	const text = setStatus(found.status, newTask({ project, area, today }), today);
+	const text = setStatus(found.status, newTask({ project, area, dueDate: found.due, today }), today);
 	return found.body === "" ? text : `${text}${found.body}\n`;
 }

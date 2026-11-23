@@ -35,6 +35,19 @@ export function writeTaskLinkBoxes(text: string | null, value: boolean): string 
 	return `${JSON.stringify(root, null, 2)}\n`;
 }
 
+/** `editor.noteSubtasks`: whether open subtasks from notes are listed. Missing or not a boolean is off. */
+export function readNoteSubtasks(text: string | null): boolean {
+	const value = objectOf(parseObject(text)?.["editor"])?.["noteSubtasks"];
+	return typeof value === "boolean" ? value : false;
+}
+
+/** The settings file's text with `editor.noteSubtasks` set and everything else as it was. */
+export function writeNoteSubtasks(text: string | null, value: boolean): string {
+	const root = parseObject(text) ?? {};
+	root["editor"] = { ...(objectOf(root["editor"]) ?? {}), noteSubtasks: value };
+	return `${JSON.stringify(root, null, 2)}\n`;
+}
+
 /** The keys of a `dailyNotes` group that hold a value of the right type; each key stands alone. */
 export function validDailyNotes(group: unknown): Partial<DailyNotesValues> {
 	const stored = objectOf(group) ?? {};

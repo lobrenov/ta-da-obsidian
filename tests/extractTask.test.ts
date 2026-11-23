@@ -133,4 +133,36 @@ describe("extractSubtask", () => {
 		await extractSubtask(run.host, file, source, 0);
 		expect(run.log).toEqual([]);
 	});
+
+	describe("attributes", () => {
+		const attributed = "- [ ] Book flights >2026-11-05 @[[Work]] now\n";
+
+		it("strips them from the title, writes the date as dueDate and files under the resolved parent over the file's", async () => {
+			const run = setup({ current: attributed });
+			(run.host as { index: VaultIndex }).index.update(makeItem("Ta Da/areas/Work.md", "type: area"));
+			await extractSubtask(run.host, file, attributed, 0);
+			expect(run.created[0]?.path).toBe("Ta Da/tasks/Book flights now.md");
+			expect(run.created[0]?.text).toContain("area: \"[[Work]]\"");
+			expect(run.created[0]?.text).not.toContain("project:");
+			expect(run.created[0]?.text).toContain("dueDate: 2026-11-05");
+			expect(notices.map((notice) => notice.message)).toEqual(["Extracted to a task in Work"]);
+		});
+
+		it("resolves a project before an area of the same title, case-insensitively", async () => {
+			const run = setup();
+			const { index } = run.host as { index: VaultIndex };
+			index.update(makeItem("Ta Da/areas/Plan.md", "type: area"));
+			index.update(makeItem("Ta Da/projects/Plan.md", "type: project"));
+			await extractSubtask(run.host, file, "- [ ] Do it @[[plan]]\n", 0);
+			expect(run.created[0]?.text).toContain("project: \"[[Plan]]\"");
+		});
+
+		it("keeps the file's parent when the parent doesn't resolve", async () => {
+			const run = setup();
+			await extractSubtask(run.host, file, "- [ ] Do it @[[Nowhere]] >2026-11-05\n", 0);
+			expect(run.created[0]?.path).toBe("Ta Da/tasks/Do it.md");
+			expect(run.created[0]?.text).toContain("project: \"[[Holiday]]\"");
+			expect(run.created[0]?.text).toContain("dueDate: 2026-11-05");
+		});
+	});
 });

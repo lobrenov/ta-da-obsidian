@@ -11,6 +11,8 @@ export type AgendaSelection = { kind: "day"; date: LocalDate } | { kind: "week";
 export interface NoteSettings {
 	names: DailyNoteNames;
 	weekNotes: boolean;
+	/** Open subtasks from notes are listed, and dated ones mark their days; `editor.noteSubtasks`. Off when absent. */
+	noteSubtasks?: boolean;
 }
 
 /** The Agenda's selection, and whether its strip shows the month or just the selected week. */
@@ -116,7 +118,7 @@ export function buildStrip(index: VaultIndex, state: AgendaState, today: LocalDa
 	const weeks = monthOpen ? anchor.isoWeeksOfMonth : [weekOf(selection)];
 	const first = weeks[0]?.firstDay ?? anchor;
 	const last = weeks[weeks.length - 1]?.days[6] ?? anchor;
-	const marks = dayMarks(index, first, last, today, notes.names);
+	const marks = dayMarks(index, first, last, today, notes.names, notes.noteSubtasks === true);
 	const rows = weeks.map((week): StripRow => ({
 		week: {
 			week,

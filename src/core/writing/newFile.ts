@@ -7,13 +7,20 @@ import { flowItem, quoted } from "./frontmatterEditor";
  * The text of a file Ta Da creates. The title isn't written: it's the filename. Tags go in `tags:` as a flow list.
  */
 
-/** A task names one parent: its project, or else its area. */
-export function newTask(options: { project?: string | null; area?: string | null; tags?: Tag[]; today: LocalDate }): string {
-	const { project, area, tags = [], today } = options;
+/** A task names one parent: its project, or else its area. `dueDate` is written after `createdDate`. */
+export function newTask(options: {
+	project?: string | null;
+	area?: string | null;
+	tags?: Tag[];
+	dueDate?: LocalDate | null;
+	today: LocalDate;
+}): string {
+	const { project, area, tags = [], dueDate, today } = options;
 	const keys = ["type: task", "status: Not Started"];
 	if (project != null) keys.push(`project: ${quoted(`[[${project}]]`)}`);
 	else if (area != null) keys.push(`area: ${quoted(`[[${area}]]`)}`);
 	keys.push(`createdDate: ${today.toString()}`);
+	if (dueDate) keys.push(`dueDate: ${dueDate.toString()}`);
 	return block(keys, tags);
 }
 

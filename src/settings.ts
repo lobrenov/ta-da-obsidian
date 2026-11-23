@@ -10,6 +10,7 @@ export class TaDaSettingTab extends PluginSettingTab {
 		private readonly changed: () => void,
 		private readonly navigator: NavigatorSettings,
 		private readonly setTaskLinkBoxes: (value: boolean) => void,
+		private readonly setNoteSubtasks: (value: boolean) => void,
 	) {
 		super(app, plugin);
 	}
@@ -27,6 +28,11 @@ export class TaDaSettingTab extends PluginSettingTab {
 				control: { type: "toggle", key: "hideProperties" },
 			},
 			{ name: "Task checkboxes on links", control: { type: "toggle", key: "taskLinkBoxes" } },
+			{
+				name: "Subtasks from notes",
+				desc: "Lists open subtasks from notes in the Agenda, projects, areas and Loose tasks. Shared with Ta Da through Ta Da/settings.json in the vault.",
+				control: { type: "toggle", key: "noteSubtasks" },
+			},
 			...navigatorDefinitions(this.navigator),
 			...dailyNotesDefinitions(this.navigator),
 		];
@@ -35,6 +41,7 @@ export class TaDaSettingTab extends PluginSettingTab {
 	override getControlValue(key: string): unknown {
 		if (key === "hideProperties") return this.settings.hideProperties;
 		if (key === "taskLinkBoxes") return this.settings.taskLinkBoxes;
+		if (key === "noteSubtasks") return this.settings.noteSubtasks;
 		return navigatorControlValue(this.navigator, key);
 	}
 
@@ -44,6 +51,8 @@ export class TaDaSettingTab extends PluginSettingTab {
 			this.changed();
 		} else if (key === "taskLinkBoxes") {
 			this.setTaskLinkBoxes(value === true);
+		} else if (key === "noteSubtasks") {
+			this.setNoteSubtasks(value === true);
 		} else if (setNavigatorControlValue(this.navigator, key, value) && key === "weekNotes") {
 			this.update();
 		}

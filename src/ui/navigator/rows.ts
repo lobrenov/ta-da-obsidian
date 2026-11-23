@@ -3,6 +3,7 @@ import { rowHelp, rowNext } from "../repeatWording";
 import { folderOf } from "../../core/storage/vault";
 import type { AgendaEntry } from "../../core/index/queries";
 import { progress as progressOf } from "../../core/index/queries";
+import { parentItem, type SubtaskCard } from "../../core/index/subtaskQueries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import { type Item, subtasks as subtasksOf } from "../../core/model/item";
 import type { LocalDate } from "../../core/model/localDate";
@@ -152,7 +153,33 @@ export interface OccurrenceRowModel {
 	label: string;
 }
 
-export type ListRow = OccurrenceRowModel | TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel | PeriodNoteRowModel;
+/** A subtask line listed under From notes. */
+export interface SubtaskLineModel {
+	/** 0-based line in its file, and the box's marker there: how a tick and a click find the line. */
+	lineIndex: number;
+	marker: string;
+	/** The line's text without its attributes. */
+	title: string;
+	date: RowDate | null;
+	/** The parent chip: the project or area the line is filed under (`unresolved` is drawn struck). Null when there is none or this is its own page. */
+	parent: { title: string; kind: "project" | "area" | "unresolved" } | null;
+}
+
+/**
+ * One source file's listed subtask lines. `path` is null so the card stays out of the list's keys and selection; the
+ * lines open `source` at their line.
+ */
+export interface SubtaskCardModel {
+	type: "subtaskCard";
+	id: string;
+	path: null;
+	source: string;
+	title: string;
+	folder: string;
+	lines: SubtaskLineModel[];
+}
+
+export type ListRow = SubtaskCardModel | OccurrenceRowModel | TaskRowModel | ParentRowModel | NoteRowModel | ArchiveRowModel | AgendaDayRowModel | PeriodNoteRowModel;
 
 /** Which date a list shows. The Agenda shows a due date only when overdue; other lists show the date itself. */
 export type DateRule = "agenda" | "elsewhere";
@@ -199,6 +226,29 @@ export function rowDate(task: Item, today: LocalDate, options: Pick<TaskRowOptio
 	if (p.deadline) return pillOf("deadline", p.deadline, today, agenda);
 	if (p.dueDate && (!agenda || p.dueDate.compare(today) < 0)) return pillOf("due", p.dueDate, today, agenda);
 	return null;
+}
+
+/** The cards of listed subtask lines (`From notes`). The Agenda shows a due date only when overdue; `hideParent` leaves out the chip of a page's own parent. */
+export function subtaskCards(index: VaultIndex, cards: SubtaskCard[], today: LocalDate, options: { dates: DateRule; hideParent?: string }): SubtaskCardModel[] {
+	return cards.map((card) => ({
+		type: "subtaskCard",
+		id: `subtasks:${card.path}`,
+		path: null,
+		source: card.path,
+		title: card.title,
+		folder: card.folder,
+		lines: card.lines.map((line): SubtaskLineModel => {
+			const parent = line.parent === null ? null : parentItem(index, line.parent);
+			const hidden = parent !== null && parent.path === options.hideParent;
+			return {
+				lineIndex: line.lineIndex,
+				marker: line.marker,
+				title: line.title,
+				date: line.due && (options.dates !== "agenda" || line.due.compare(today) < 0) ? pillOf("due", line.due, today, options.dates === "agenda") : null,
+				parent: line.parent === null || hidden ? null : { title: parent?.title ?? line.parent, kind: parent === null ? "unresolved" : parent.properties.kind === "area" ? "area" : "project" },
+			};
+		}),
+	}));
 }
 
 /** The pill for a date: overdue when it's past, or a deadline is today. */

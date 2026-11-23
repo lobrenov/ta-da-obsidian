@@ -5,11 +5,12 @@ import { VaultIndex } from "../src/core/index/vaultIndex";
 import { TagFilter, groupings, listSections, type ListSection } from "../src/core/index/grouping";
 import { type FolderNode, folderTree, notesIn } from "../src/core/index/noteQueries";
 import * as queries from "../src/core/index/queries";
+import { type SubtaskCard, looseNoteSubtasks, noteSubtasksFrom, noteSubtasksIn, noteSubtasksOn } from "../src/core/index/subtaskQueries";
 import { type TagNode, itemsTagged, tagBrowser, tagSuggestions, tagTree, untagged } from "../src/core/index/tagQueries";
 import { type Item, isLogged, type Warning } from "../src/core/model/item";
 import { LocalDate } from "../src/core/model/localDate";
 import { parseItem } from "../src/core/parsing/parseItem";
-import { readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeTaskLinkBoxes, type DailyNotesValues } from "../src/core/storage/settingsFile";
+import { readDailyNotes, readNoteSubtasks, readObsidianDailyNotes, readTaskLinkBoxes, writeDailyNotes, writeNoteSubtasks, writeTaskLinkBoxes, type DailyNotesValues } from "../src/core/storage/settingsFile";
 import { contentsOf, tasksOf, trashedItems, type TrashedItem } from "../src/core/storage/trash";
 import { compareCodeUnits } from "../src/core/text";
 import { itemJson } from "./itemJson";
@@ -21,6 +22,7 @@ const conformanceFolder = resolve(taDaRepo, "Packages/TaDaCore/Tests/TaDaCoreTes
 const vaultFolders: Record<string, string> = {
 	DesignVault: resolve(conformanceFolder, "../DesignVault"),
 	HomeVault: resolve(conformanceFolder, "HomeVault"),
+	SubtaskVault: resolve(conformanceFolder, "SubtaskVault"),
 };
 
 interface ReadExport {
@@ -74,6 +76,12 @@ const sectionJson = (section: ListSection): unknown => ({
 });
 const trashedPaths = (list: TrashedItem[]): string[] => list.map((entry) => entry.item.path);
 const fromPaths = (entries: [string, unknown][]): Record<string, unknown> => Object.fromEntries(entries);
+
+const cardsJson = (cards: SubtaskCard[]): unknown =>
+	cards.map((card) => ({
+		path: card.path,
+		lines: card.lines.map((line) => ({ lineIndex: line.lineIndex, text: line.text, due: line.due === null ? null : line.due.toString(), parent: line.parent })),
+	}));
 
 const readExport = loadJson<ReadExport>("read.json");
 const queriesExport = loadJson<QueriesExport>("queries.json");
@@ -132,6 +140,34 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 			return [...marks.keys()].sort(compareCodeUnits).map((key) => ({ date: key, ...marks.get(key) }));
 		},
 		loose: () => inOrder(queries.looseTasks(index)),
+		subtasksOn: () =>
+			fromPaths(
+				["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-09"].map((day): [string, unknown] => [
+					day,
+					cardsJson(noteSubtasksOn(index, LocalDate.parse(day) as LocalDate, today)),
+				]),
+			),
+		subtasksFrom: () =>
+			[
+				[today.isoWeek.firstDay, today.isoWeek.days[6] as LocalDate],
+				[LocalDate.parse("2026-10-03") as LocalDate, LocalDate.parse("2026-10-09") as LocalDate],
+			].map(([from, through]) => ({
+				from: (from as LocalDate).toString(),
+				through: (through as LocalDate).toString(),
+				cards: cardsJson(noteSubtasksFrom(index, from as LocalDate, through as LocalDate)),
+			})),
+		subtasksIn: () =>
+			fromPaths(
+				[...index.projects, ...index.areas]
+					.sort((a, b) => compareCodeUnits(a.path, b.path))
+					.map((parent): [string, unknown] => [parent.path, cardsJson(noteSubtasksIn(index, parent))]),
+			),
+		subtasksLoose: () => cardsJson(looseNoteSubtasks(index)),
+		dayMarksWithoutSubtasks: () => {
+			const from = LocalDate.parse("2026-10-01") as LocalDate;
+			const through = LocalDate.parse("2026-10-31") as LocalDate;
+			return [...queries.dayMarks(index, from, through, today, undefined, false).keys()].sort(compareCodeUnits);
+		},
 		activeProjects: () => progress(queries.activeProjects(index)),
 		looseProjects: () => progress(queries.looseProjects(index)),
 		areaProjects: () => queries.areaProjects(index).map((entry) => ({ area: entry.area.path, projects: progress(entry.projects) })),
@@ -225,20 +261,22 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 });
 
 interface SettingsExport {
-	read: { name: string; input: string | null; expected: { dailyNotes: Partial<DailyNotesValues>; editor?: { taskLinkBoxes?: boolean } } }[];
+	read: { name: string; input: string | null; expected: { dailyNotes: Partial<DailyNotesValues>; editor?: { taskLinkBoxes?: boolean; noteSubtasks?: boolean } } }[];
 	obsidianDailyNotes: { name: string; input: string; expected: Record<string, unknown> }[];
 	write: { name: string; input: string | null; dailyNotes: DailyNotesValues; expected: unknown }[];
 	writeTaskLinkBoxes: { name: string; input: string | null; taskLinkBoxes: boolean; expected: unknown }[];
+	writeNoteSubtasks: { name: string; input: string | null; noteSubtasks: boolean; expected: unknown }[];
 }
 
 /** The settings fixture is skipped until the Swift side has written it. */
 const hasSettingsExport = existsSync(join(conformanceFolder, "settings.json"));
-const settingsExport = hasSettingsExport ? loadJson<SettingsExport>("settings.json") : { read: [], obsidianDailyNotes: [], write: [], writeTaskLinkBoxes: [] };
+const settingsExport = hasSettingsExport ? loadJson<SettingsExport>("settings.json") : { read: [], obsidianDailyNotes: [], write: [], writeTaskLinkBoxes: [], writeNoteSubtasks: [] };
 
 describe.skipIf(!hasSettingsExport)("settings", () => {
 	it.each(settingsExport.read)("read: $name", ({ input, expected }) => {
 		expect(readDailyNotes(input)).toEqual(expected.dailyNotes);
 		expect(readTaskLinkBoxes(input)).toBe(expected.editor?.taskLinkBoxes ?? true);
+		expect(readNoteSubtasks(input)).toBe(expected.editor?.noteSubtasks ?? false);
 	});
 	it.each(settingsExport.obsidianDailyNotes)("obsidianDailyNotes: $name", ({ input, expected }) => {
 		expect(readObsidianDailyNotes(input)).toEqual(expected);
@@ -250,6 +288,11 @@ describe.skipIf(!hasSettingsExport)("settings", () => {
 	});
 	it.each(settingsExport.writeTaskLinkBoxes)("writeTaskLinkBoxes: $name", ({ input, taskLinkBoxes, expected }) => {
 		const text = writeTaskLinkBoxes(input, taskLinkBoxes);
+		expect(text.endsWith("\n")).toBe(true);
+		expect(JSON.parse(text)).toEqual(expected);
+	});
+	it.each(settingsExport.writeNoteSubtasks)("writeNoteSubtasks: $name", ({ input, noteSubtasks, expected }) => {
+		const text = writeNoteSubtasks(input, noteSubtasks);
 		expect(text.endsWith("\n")).toBe(true);
 		expect(JSON.parse(text)).toEqual(expected);
 	});

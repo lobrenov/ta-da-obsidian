@@ -1,5 +1,5 @@
 import { LocalDate } from "./core/model/localDate";
-import { type DailyNotesValues, readDailyNotes, readObsidianDailyNotes, readTaskLinkBoxes, settingsFilePath, validDailyNotes, writeDailyNotes, writeTaskLinkBoxes } from "./core/storage/settingsFile";
+import { type DailyNotesValues, readDailyNotes, readObsidianDailyNotes, readNoteSubtasks, readTaskLinkBoxes, settingsFilePath, validDailyNotes, writeDailyNotes, writeNoteSubtasks, writeTaskLinkBoxes } from "./core/storage/settingsFile";
 import { type ViewKind, viewKinds } from "./ui/navigator/views";
 
 export interface TaDaSettings {
@@ -46,6 +46,8 @@ export interface TaDaData extends TaDaSettings {
 	dailyNotes: DailyNotesData;
 	/** Draw a task's status box before wikilinks to it; `editor.taskLinkBoxes` in the vault's settings file. */
 	taskLinkBoxes: boolean;
+	/** List open subtasks from notes in Ta Da's lists; `editor.noteSubtasks` in the vault's settings file. */
+	noteSubtasks: boolean;
 }
 
 /** Folders tidied and an empty template read as none. */
@@ -71,6 +73,7 @@ export function resolveData(saved: unknown): TaDaData {
 		},
 		dailyNotes: { ...defaultDailyNotes, ...normalizedDailyNotes(validDailyNotes(data.dailyNotes)) },
 		taskLinkBoxes: true,
+		noteSubtasks: false,
 	};
 }
 
@@ -91,10 +94,10 @@ export interface SettingsFiles {
 /**
  * The one in-memory copy of the settings, shared by the header and the navigator. `data` keeps its identity, so what
  * holds it sees every change. `data.json` takes the header's and the navigator's, saved whole, one at a time, in the
- * order asked; its old `dailyNotes` is kept as it was, for the fallback. The daily notes and `editor.taskLinkBoxes` are in `Ta Da/settings.json`.
+ * order asked; its old `dailyNotes` is kept as it was, for the fallback. The daily notes, `editor.taskLinkBoxes` and `editor.noteSubtasks` are in `Ta Da/settings.json`.
  */
 export class SettingsStore {
-	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes }, taskLinkBoxes: true };
+	readonly data: TaDaData = { ...defaultSettings, navigator: { ...defaultNavigator, openOnStartup: { ...defaultNavigator.openOnStartup } }, dailyNotes: { ...defaultDailyNotes }, taskLinkBoxes: true, noteSubtasks: false };
 	private queue: Promise<void> = Promise.resolve();
 	private pendingWrites = 0;
 	private savedDailyNotes: unknown;
@@ -117,10 +120,11 @@ export class SettingsStore {
 		const text = await this.files.read(settingsFilePath);
 		this.data.dailyNotes = await this.readDailyNotes(text);
 		this.data.taskLinkBoxes = readTaskLinkBoxes(text);
+		this.data.noteSubtasks = readNoteSubtasks(text);
 	}
 
 	/**
-	 * Reads the daily notes and the task link boxes again from the settings file, after any write already waiting.
+	 * Reads the daily notes, the task link boxes and the note subtasks again from the settings file, after any write already waiting.
 	 * Returns whether they changed. A read made while a newer change is still being written is dropped.
 	 */
 	reloadSettingsFile(): Promise<boolean> {
@@ -128,10 +132,12 @@ export class SettingsStore {
 			const text = await this.files.read(settingsFilePath);
 			const values = await this.readDailyNotes(text);
 			const taskLinkBoxes = readTaskLinkBoxes(text);
+			const noteSubtasks = readNoteSubtasks(text);
 			if (this.pendingWrites > 0) return false;
-			const changed = JSON.stringify(values) !== JSON.stringify(this.data.dailyNotes) || taskLinkBoxes !== this.data.taskLinkBoxes;
+			const changed = JSON.stringify(values) !== JSON.stringify(this.data.dailyNotes) || taskLinkBoxes !== this.data.taskLinkBoxes || noteSubtasks !== this.data.noteSubtasks;
 			this.data.dailyNotes = values;
 			this.data.taskLinkBoxes = taskLinkBoxes;
+			this.data.noteSubtasks = noteSubtasks;
 			return changed;
 		});
 		this.queue = reloaded.then(() => undefined, () => undefined);
@@ -192,6 +198,18 @@ export class SettingsStore {
 		this.data.taskLinkBoxes = value;
 		this.pendingWrites++;
 		const written = this.queue.then(() => this.files.update(settingsFilePath, (text) => writeTaskLinkBoxes(text, value)));
+		this.queue = written.then(
+			() => void this.pendingWrites--,
+			() => void this.pendingWrites--,
+		);
+		return written;
+	}
+
+	/** Sets the value, then writes `editor.noteSubtasks`, keeping the settings file's other keys. */
+	updateNoteSubtasks(value: boolean): Promise<void> {
+		this.data.noteSubtasks = value;
+		this.pendingWrites++;
+		const written = this.queue.then(() => this.files.update(settingsFilePath, (text) => writeNoteSubtasks(text, value)));
 		this.queue = written.then(
 			() => void this.pendingWrites--,
 			() => void this.pendingWrites--,
