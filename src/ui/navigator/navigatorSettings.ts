@@ -21,12 +21,12 @@ export class NavigatorSettings {
 		return this.store.data.dailyNotes;
 	}
 
-	/** Where daily and week notes live, as the index looks them up. */
 	/** Whether open subtasks from notes are listed. */
 	get noteSubtasks(): boolean {
 		return this.store.data.noteSubtasks;
 	}
 
+	/** Where daily and week notes live, as the index looks them up. */
 	get names(): DailyNoteNames {
 		return { dailyFolder: this.dailyNotes.dailyFolder, weekFolder: this.dailyNotes.weekFolder };
 	}

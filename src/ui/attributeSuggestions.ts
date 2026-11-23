@@ -35,13 +35,15 @@ const finishedDate = /^[0-9]{4}-[0-9]{2}-[0-9]{2} /;
 /**
  * The date menu's trigger with the caret at `ch` in `line`: a `>` after whitespace on a checkbox line, after its box.
  * The query is the text after it: letters, digits, `-` and `/` with up to two single spaces, up to 40 characters, not
- * starting with a space; anything else, or a date already written and followed by a space, closes the menu.
+ * starting with a space; anything else, or a date already written and followed by a space, closes the menu. The menu
+ * opens only for a `>` just typed (straight before the caret), or stays open for the `>` at `open`, the start it
+ * opened on; text typed after an older `>` never opens it.
  */
-export function dateTrigger(line: string, ch: number): AttributeTrigger | null {
+export function dateTrigger(line: string, ch: number, open: number | null = null): AttributeTrigger | null {
 	const first = textStart(line);
 	if (first === null || ch < first) return null;
 	for (let at = ch - 1; at >= first; at--) {
-		if (line[at] !== ">" || !isBlank(line[at - 1])) continue;
+		if (line[at] !== ">" || !isBlank(line[at - 1]) || (at !== ch - 1 && at !== open)) continue;
 		const query = line.slice(at + 1, ch);
 		if (query.length > 40 || query.startsWith(" ") || /  /.test(query) || (query.match(/ /g)?.length ?? 0) > 2 || !dateQuery.test(query) || finishedDate.test(query)) continue;
 		return { start: at, end: ch, query };
@@ -54,15 +56,17 @@ const parentForbidden = /[\n[\]|#^]/;
 /**
  * The parent menu's trigger: an `@` after whitespace on a checkbox line, after its box. The query is the text after it
  * (a `[[` typed after the `@` is left out), without a newline, bracket, `|`, `#` or `^`, up to 100 characters, not
- * starting with a space. A `]]` straight after the caret, closing a `[[` typed after the `@`, is replaced too.
+ * starting with a space. A `]]` straight after the caret, closing a `[[` typed after the `@`, is replaced too. It opens
+ * only for an `@` just typed, or stays open for the one at `open`, as `dateTrigger` does.
  */
-export function parentTrigger(line: string, ch: number): AttributeTrigger | null {
+export function parentTrigger(line: string, ch: number, open: number | null = null): AttributeTrigger | null {
 	const first = textStart(line);
 	if (first === null || ch < first) return null;
 	for (let at = ch - 1; at >= first; at--) {
-		if (line[at] !== "@" || !isBlank(line[at - 1])) continue;
+		if (line[at] !== "@" || !isBlank(line[at - 1]) || (at !== ch - 1 && at !== open)) continue;
 		const typed = line.slice(at + 1, ch);
-		const bracketed = typed.startsWith("[[");
+		// The first `[` of a `[[` on its way keeps the menu too.
+		const bracketed = typed.startsWith("[[") || typed === "[";
 		const query = bracketed ? typed.slice(2) : typed;
 		if (query.length > 100 || query.startsWith(" ") || parentForbidden.test(query)) continue;
 		return { start: at, end: bracketed && line.startsWith("]]", ch) ? ch + 2 : ch, query };

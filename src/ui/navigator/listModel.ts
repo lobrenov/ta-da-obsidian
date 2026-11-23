@@ -277,7 +277,7 @@ function looseList(ctx: ListContext, options: ListOptions): ListModel {
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("loose", options.groupings);
-	const notes = fromNotes(ctx, "loose", ctx.notes.noteSubtasks ? looseNoteSubtasks(ctx.index) : [], { dates: "elsewhere" }, options);
+	const notes = fromNotes(ctx, "loose", ctx.notes.noteSubtasks && !filter.isActive ? looseNoteSubtasks(ctx.index) : [], { dates: "elsewhere" }, options);
 	return {
 		domain: { kind: "loose" },
 		header: { ...noHeader, title: "Loose tasks", icon: { type: "icon", name: "inbox", tint: "accent" } },
@@ -295,7 +295,7 @@ function projectList(project: Item, ctx: ListContext, options: ListOptions): Lis
 	const filter = new TagFilter(options.picked);
 	const tasks = filter.apply(all);
 	const grouping = groupingOf("project", options.groupings);
-	const notes = fromNotes(ctx, project.path, ctx.notes.noteSubtasks ? noteSubtasksIn(index, project) : [], { dates: "elsewhere", hideParent: project.path }, options);
+	const notes = fromNotes(ctx, project.path, ctx.notes.noteSubtasks && !filter.isActive ? noteSubtasksIn(index, project) : [], { dates: "elsewhere", hideParent: project.path }, options);
 	const p = project.properties;
 	const { done, total } = progress(index, project);
 	const own = subtasksOf(project);
@@ -334,7 +334,7 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 	if (closed.length > 0) {
 		sections.push(foldable(`${key}|Completed`, { style: "count", title: "Completed", count: closed.length, quiet: true }, closed.map((task) => taskRow(index, task, today, rowOptions)), true, options));
 	}
-	const notes = fromNotes(ctx, key, ctx.notes.noteSubtasks ? noteSubtasksIn(index, area) : [], { dates: "elsewhere", hideParent: area.path }, options);
+	const notes = fromNotes(ctx, key, ctx.notes.noteSubtasks && !filter.isActive ? noteSubtasksIn(index, area) : [], { dates: "elsewhere", hideParent: area.path }, options);
 	if (notes) sections.push(notes);
 	const files = [...allProjects, ...allTasks];
 	const openCount = allTasks.filter((task) => !isClosed(task.properties.status)).length;
@@ -393,7 +393,7 @@ function groupSections(ctx: ListContext, groups: TaskGroup[], rowOptions: TaskRo
 	});
 }
 
-/** `From notes`: a card for each source file's listed subtask lines, after the page's own tasks. Null when there are none. */
+/** `From notes` (left out while a tag filter is active): a card for each source file's listed subtask lines, after the page's own tasks. Null when there are none. */
 function fromNotes(ctx: ListContext, foldKey: string, cards: SubtaskCard[], rowOptions: { dates: DateRule; hideParent?: string }, options: ListOptions): SectionModel | null {
 	if (cards.length === 0) return null;
 	const lines = cards.reduce((sum, card) => sum + card.lines.length, 0);

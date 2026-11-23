@@ -155,8 +155,25 @@ describe("clicking a pill or chip", () => {
 		expect(current).toBe("Plan");
 		choose("Work");
 		expect(view.state.doc.toString()).toBe("x\n- [ ] One >2026-10-09 @[[Work]] end");
+		view.dispatch({ selection: EditorSelection.cursor(0) });
+		drawn(view)[1]?.dom.click();
 		choose(null);
 		expect(view.state.doc.toString()).toBe("x\n- [ ] One >2026-10-09 end");
+	});
+
+	it("takes the position at click time: a pick after the line changed or the text shrank writes nothing", () => {
+		let choose: (date: LocalDate | null) => void = () => undefined;
+		const view = make({ pickDate: (_date, pick) => (choose = pick) });
+		drawn(view)[0]?.dom.click();
+		const before = view.state.doc.toString();
+		view.dispatch({ changes: { from: view.state.doc.length, insert: " more" } });
+		const shifted = view.state.doc.toString();
+		choose(LocalDate.parse("2026-11-05"));
+		expect(view.state.doc.toString()).toBe(shifted);
+		view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "" } });
+		choose(LocalDate.parse("2026-11-05"));
+		expect(view.state.doc.toString()).toBe("");
+		expect(before).toContain(">2026-10-09");
 	});
 
 	it("editAttribute leaves a line that isn't a subtask", () => {

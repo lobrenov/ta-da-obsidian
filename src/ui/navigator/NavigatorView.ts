@@ -25,8 +25,8 @@ import {
 } from "./domain";
 import { buildList, type ListContext, type ListHeader, type ListModel, type SectionHeader, type SectionModel, visiblePaths } from "./listModel";
 import { ancestorsOf, buildNav, type NavItem } from "./navModel";
-import type { AgendaDayRowModel, ArchiveRowModel, ListRow, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, SubtaskCardModel, TaskRowModel } from "./rows";
-import { tickSubtask } from "./subtaskActions";
+import type { AgendaDayRowModel, ArchiveRowModel, ListRow, SubtaskLineModel, NoteRowModel, OccurrenceRowModel, ParentRowModel, PeriodNoteRowModel, SubtaskCardModel, TaskRowModel } from "./rows";
+import { markSubtask, type SubtaskTarget } from "./subtaskActions";
 import { createPeriodNote } from "./periodNotes";
 import { dropParent } from "../fileActions";
 import { filesNotUnder, moveFilesTo } from "../fileEdits";
@@ -1017,22 +1017,39 @@ export class NavigatorView extends ItemView {
 			const row = el.createDiv({ cls: "ta-da-subtask-line" });
 			const box = drawCheckbox(row, line.marker === "/" ? "Doing" : "Not Started", `Complete: ${line.title}`, (event) => {
 				event.stopPropagation();
-				const file = this.app.vault.getFileByPath(card.source);
-				if (!file) return;
-				row.addClass("is-done");
-				box.replaceWith(drawCheckbox(row, "Done", `Done: ${line.title}`, null));
-				void tickSubtask(this.deps.writer, file, line.lineIndex, line.marker);
+				this.markLine(card.source, line, "done", () => {
+					row.addClass("is-done");
+					box.replaceWith(drawCheckbox(row, "Done", `Done: ${line.title}`, null));
+				});
 			});
 			if (line.date) row.createSpan({ cls: `ta-da-date-pill${line.date.overdue ? " is-overdue" : ""}`, text: line.date.text, attr: { "aria-label": line.date.tooltip } });
 			const text = row.createSpan({ cls: "ta-da-subtask-text", text: line.title, attr: { title: line.title, role: "button" } });
 			text.addEventListener("click", (event) => this.openPath(card.source, event, line.lineIndex));
+			if (line.hasChildren) metaIcon(row, "list-checks").setAttribute("aria-label", "Has subtasks");
 			if (line.parent) {
-				const chip = row.createSpan({ cls: `ta-da-parent-chip${line.parent.kind === "unresolved" ? " is-unresolved" : ""}`, attr: { "aria-label": `In ${line.parent.title}` } });
+				const chip = row.createSpan({ cls: "ta-da-parent-chip", attr: { "aria-label": `In ${line.parent.title}` } });
 				if (line.parent.kind === "area") drawIcon(chip, { type: "area" });
-				else if (line.parent.kind === "project") drawIcon(chip, { type: "ring", fraction: 0, ongoing: false });
+				else drawIcon(chip, { type: "ring", fraction: 0, ongoing: false });
 				chip.createSpan({ cls: "ta-da-parent-chip-title", text: line.parent.title });
 			}
+			row.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				const menu = new Menu();
+				menu.addItem((item) => item.setTitle("Open at line").setIcon("file-text").onClick(() => this.openPath(card.source, undefined, line.lineIndex)));
+				menu.addItem((item) => item.setTitle("Mark done").setIcon("check").onClick(() => this.markLine(card.source, line, "done", () => row.addClass("is-done"))));
+				menu.addItem((item) => item.setTitle("Mark cancelled").setIcon("x").onClick(() => this.markLine(card.source, line, "cancelled", () => row.addClass("is-done"))));
+				menu.showAtMouseEvent(event);
+			});
 		}
+	}
+
+	/** Sets a card line's box through the `Writer`, striking the line first; says so when nothing was written. */
+	private markLine(source: string, line: SubtaskLineModel & SubtaskTarget, to: "done" | "cancelled", strike: () => void): void {
+		const file = this.app.vault.getFileByPath(source);
+		if (!file) return;
+		strike();
+		const failed = (): void => void new Notice("Couldn't change the subtask: its line has changed.");
+		markSubtask(this.deps.writer, file, line, to).then((wrote) => void (wrote || failed()), (error: unknown) => void new Notice(`Couldn't change the subtask: ${error instanceof Error ? error.message : String(error)}`));
 	}
 
 	/** A task on one line: its box, a date pill, the title, quiet glyphs, and the place at the right. */

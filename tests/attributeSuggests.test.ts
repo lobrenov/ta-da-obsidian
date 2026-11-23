@@ -78,8 +78,10 @@ const index = new VaultIndex([
 ]);
 const host = { app: {}, index, today: () => today } as never;
 
+/** The trigger with the caret at `ch`, as typed: the line is read from its start, a character at a time, as the editor asks. */
 function open<T>(suggest: { onTrigger(cursor: { line: number; ch: number }, editor: never, file: null): { start: { line: number; ch: number }; end: { line: number; ch: number }; query: string } | null; context: unknown }, editor: ReturnType<typeof fakeEditor>, ch: number): ReturnType<typeof suggest.onTrigger> {
-	const trigger = suggest.onTrigger({ line: 0, ch }, editor as never, null);
+	let trigger: ReturnType<typeof suggest.onTrigger> = null;
+	for (let c = 1; c <= ch; c++) trigger = suggest.onTrigger({ line: 0, ch: c }, editor as never, null);
 	suggest.context = trigger && { ...trigger, editor, file: null };
 	return trigger;
 }
@@ -154,6 +156,29 @@ describe("DateSuggest", () => {
 	});
 });
 
+describe("an open menu", () => {
+	it("stays open while typing on, and esc holds: typing on afterwards doesn't reopen it", () => {
+		const suggest = new DateSuggest(host);
+		const editor = fakeEditor(["- [ ] a >fri"]);
+		expect(suggest.onTrigger({ line: 0, ch: 9 }, editor as never, null)).not.toBeNull();
+		expect(suggest.onTrigger({ line: 0, ch: 10 }, editor as never, null)?.query).toBe("f");
+		(suggest as unknown as { close(): void }).close();
+		expect(suggest.onTrigger({ line: 0, ch: 11 }, editor as never, null)).toBeNull();
+		expect(suggest.onTrigger({ line: 0, ch: 12 }, editor as never, null)).toBeNull();
+	});
+
+	it("doesn't open on text typed after an @ that was already there, or after a pick", () => {
+		const suggest = new ParentSuggest(host);
+		const editor = fakeEditor(["- [ ] call @bob about lunch"]);
+		expect(suggest.onTrigger({ line: 0, ch: 15 }, editor as never, null)).toBeNull();
+		expect(suggest.onTrigger({ line: 0, ch: 16 }, editor as never, null)).toBeNull();
+		const typed = fakeEditor(["- [ ] a @ta"]);
+		open(suggest as never, typed, 11);
+		suggest.selectSuggestion({ kind: "project", title: "Ta Da MVP", detail: null });
+		expect(suggest.onTrigger({ line: 0, ch: 24 }, typed as never, null)).toBeNull();
+	});
+});
+
 describe("ParentSuggest", () => {
 	it("triggers on a checkbox line's @, and lists projects and areas fuzzily", () => {
 		const suggest = new ParentSuggest(host);
@@ -218,7 +243,12 @@ describe("the code guard", () => {
 	const triggerAt = (text: string, line: number, trigger: string) => {
 		const editor = withTree(text);
 		const ch = (text.split("\n")[line] as string).length;
-		return { date: new DateSuggest(host).onTrigger({ line, ch }, editor as never, null), parent: new ParentSuggest(host).onTrigger({ line, ch }, editor as never, null), trigger };
+		const typed = (suggest: { onTrigger(cursor: { line: number; ch: number }, editor: never, file: null): unknown }) => {
+			let found: unknown = null;
+			for (let c = 1; c <= ch; c++) found = suggest.onTrigger({ line, ch: c }, editor as never, null);
+			return found;
+		};
+		return { date: typed(new DateSuggest(host)), parent: typed(new ParentSuggest(host)), trigger };
 	};
 
 	it("triggers on a checkbox line outside code", () => {

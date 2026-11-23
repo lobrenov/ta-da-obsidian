@@ -41,6 +41,27 @@ function triggerInfo(editor: Editor, cursor: EditorPosition, found: { start: num
 	return found && { start: { line: cursor.line, ch: found.start }, end: { line: cursor.line, ch: found.end }, query: found.query };
 }
 
+/**
+ * What the menus remember: the start of the token the menu is open on, so typing on keeps it open and typing after an
+ * older `>` or `@` doesn't open it. Closing it (esc, a pick, or the text no longer triggering) forgets the start.
+ */
+class Anchor {
+	private start: { line: number; ch: number } | null = null;
+
+	/** The open start's offset when the menu is open on `line`. */
+	openAt(line: number): number | null {
+		return this.start?.line === line ? this.start.ch : null;
+	}
+
+	track(cursor: EditorPosition, found: { start: number } | null): void {
+		this.start = found ? { line: cursor.line, ch: found.start } : null;
+	}
+
+	clear(): void {
+		this.start = null;
+	}
+}
+
 /** The token a suggestion replaces, as the line reads it now. */
 function tokenOf(context: EditorSuggestContext): { line: number; from: number; to: number; token: string } {
 	const { start, end, editor } = context;
@@ -49,13 +70,23 @@ function tokenOf(context: EditorSuggestContext): { line: number; from: number; t
 
 /** `>` on a checkbox line, after whitespace: the date menu. ↵ writes `>YYYY-MM-DD `. */
 export class DateSuggest extends EditorSuggest<DateRow> {
+	private readonly anchor = new Anchor();
+
 	constructor(private readonly host: AttributeSuggestHost) {
 		super(host.app);
 		this.setInstructions(footer);
 	}
 
 	override onTrigger(cursor: EditorPosition, editor: Editor, _file: TFile | null): EditorSuggestTriggerInfo | null {
-		return triggerInfo(editor, cursor, dateTrigger(editor.getLine(cursor.line), cursor.ch));
+		const found = dateTrigger(editor.getLine(cursor.line), cursor.ch, this.anchor.openAt(cursor.line));
+		const info = triggerInfo(editor, cursor, found);
+		this.anchor.track(cursor, info && found);
+		return info;
+	}
+
+	override close(): void {
+		this.anchor.clear();
+		super.close();
 	}
 
 	override getSuggestions(context: EditorSuggestContext): DateRow[] {
@@ -83,6 +114,7 @@ export class DateSuggest extends EditorSuggest<DateRow> {
 		if (!context) return;
 		const { editor } = context;
 		const { line, from, to, token } = tokenOf(context);
+		this.anchor.clear();
 		if (row.date) {
 			replaceToken(editor, line, from, to, token, dateText(row.date));
 			return;
@@ -97,13 +129,23 @@ export class DateSuggest extends EditorSuggest<DateRow> {
 
 /** `@` on a checkbox line, after whitespace: the projects and areas. ↵ writes `@[[Title]] `. */
 export class ParentSuggest extends EditorSuggest<ParentRow> {
+	private readonly anchor = new Anchor();
+
 	constructor(private readonly host: AttributeSuggestHost) {
 		super(host.app);
 		this.setInstructions(footer);
 	}
 
 	override onTrigger(cursor: EditorPosition, editor: Editor, _file: TFile | null): EditorSuggestTriggerInfo | null {
-		return triggerInfo(editor, cursor, parentTrigger(editor.getLine(cursor.line), cursor.ch));
+		const found = parentTrigger(editor.getLine(cursor.line), cursor.ch, this.anchor.openAt(cursor.line));
+		const info = triggerInfo(editor, cursor, found);
+		this.anchor.track(cursor, info && found);
+		return info;
+	}
+
+	override close(): void {
+		this.anchor.clear();
+		super.close();
 	}
 
 	override getSuggestions(context: EditorSuggestContext): ParentRow[] {
@@ -131,6 +173,7 @@ export class ParentSuggest extends EditorSuggest<ParentRow> {
 		if (!context) return;
 		const { editor } = context;
 		const { line, from, to, token } = tokenOf(context);
+		this.anchor.clear();
 		if (row.kind !== "new") {
 			replaceToken(editor, line, from, to, token, parentText(row.title));
 			return;

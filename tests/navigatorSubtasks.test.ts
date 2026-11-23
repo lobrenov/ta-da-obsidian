@@ -3,7 +3,7 @@ import { LocalDate } from "../src/core/model/localDate";
 import { buildStrip, agendaOn } from "../src/ui/navigator/agenda";
 import { ISOWeek } from "../src/core/model/localDate";
 import type { SubtaskCardModel } from "../src/ui/navigator/rows";
-import { tickSubtask } from "../src/ui/navigator/subtaskActions";
+import { markSubtask } from "../src/ui/navigator/subtaskActions";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { loadFixtureIndex } from "./fixtureVault";
 import { makeItem } from "./support";
@@ -44,7 +44,7 @@ describe("From notes", () => {
 		expect(lineTitles(standup)).toEqual(["Overdue", "Unresolved but dated", "Under a bullet"]);
 		expect(standup?.lines[0]?.date).toMatchObject({ text: "30 Sep", overdue: true });
 		expect(standup?.lines[1]?.date).toBeNull();
-		expect(standup?.lines[1]?.parent).toEqual({ title: "Nowhere", kind: "unresolved" });
+		expect(standup?.lines[1]?.parent).toBeNull();
 	});
 
 	it("leaves the pill off a line due on another day and puts the day's own lines on it", () => {
@@ -137,9 +137,10 @@ describe("the Agenda's dots", () => {
 	});
 });
 
-describe("ticking a card's line", () => {
-	const text = "---\ncreatedDate: 2026-09-20\n---\n- [ ] Loose\n- [/] Doing >2026-10-09\n";
+describe("marking a card's line", () => {
+	const text = "---\ncreatedDate: 2026-09-20\n---\n- [ ] Loose\n- [/] Doing >2026-10-09\n  - [ ] Child\n";
 	const file = { path: "Meetings/Standup.md" } as never;
+	const target = { lineIndex: 4, marker: "/", text: "Doing >2026-10-09" };
 	const writer = (current: string) => {
 		let result: string | null = null;
 		return { apply: vi.fn(async (_file: unknown, edit: (text: string) => string | null) => ((result = edit(current)), result !== null)), result: () => result };
@@ -147,14 +148,42 @@ describe("ticking a card's line", () => {
 
 	it("completes the line's box, as a click does, leaving the rest", async () => {
 		const w = writer(text);
-		expect(await tickSubtask(w as never, file, 4, "/")).toBe(true);
+		expect(await markSubtask(w as never, file, target, "done")).toBe(true);
 		expect(w.result()).toBe(text.replace("- [/] Doing", "- [x] Doing"));
 	});
 
-	it("leaves a line that moved or changed alone", async () => {
+	it("cancels it with a dash", async () => {
 		const w = writer(text);
-		expect(await tickSubtask(w as never, file, 3, "/")).toBe(false);
-		expect(await tickSubtask(w as never, file, 4, " ")).toBe(false);
+		expect(await markSubtask(w as never, file, target, "cancelled")).toBe(true);
+		expect(w.result()).toBe(text.replace("- [/] Doing", "- [-] Doing"));
+	});
+
+	it("leaves a line that moved or changed alone, its text included", async () => {
+		const w = writer(text);
+		expect(await markSubtask(w as never, file, { ...target, lineIndex: 3 }, "done")).toBe(false);
+		expect(await markSubtask(w as never, file, { ...target, marker: " " }, "done")).toBe(false);
+		expect(await markSubtask(w as never, file, { ...target, text: "Something else" }, "done")).toBe(false);
 		expect(w.result()).toBeNull();
+		const swapped = writer("---\n---\n- [ ] A\n- [ ] B\n");
+		expect(await markSubtask(swapped as never, file, { lineIndex: 2, marker: " ", text: "B" }, "done")).toBe(false);
+	});
+});
+
+describe("card details", () => {
+	it("carry each line's text and whether a box is nested under it", () => {
+		const model = list({ kind: "agenda" }, on());
+		const syntax = cards(model).find((card) => card.title === "Windows");
+		expect(syntax?.lines.map((line) => [line.text, line.hasChildren])).toEqual([["Windows >2026-10-02", true]]);
+		const standup = cards(model).find((card) => card.title === "Standup");
+		expect(standup?.lines.map((line) => line.hasChildren)).toEqual([false, false, false]);
+	});
+
+	it("leave out the cards of a project, an area and Loose while a tag filter is active, saying no matches", () => {
+		const picked = new Set(["nothing"]);
+		for (const domain of [{ kind: "project", path: "Ta Da/projects/Ta Da MVP.md" }, { kind: "area", path: "Ta Da/areas/Work.md" }, { kind: "loose" }] as const) {
+			const model = list(domain, on(), { picked });
+			expect(fromNotes(model), domain.kind).toBeUndefined();
+			expect(model.empty, domain.kind).not.toBeNull();
+		}
 	});
 });

@@ -32,8 +32,10 @@ export interface TaskAttributeHost {
  * Replaces the date (`kind` due) or parent of the checkbox line holding `pos` with `value`, or removes it for null, as
  * `SubtaskLine` splices it: only that token changes. Does nothing when the line isn't a subtask.
  */
-export function editAttribute(view: EditorView, pos: number, kind: "due" | "parent", value: LocalDate | string | null): void {
+export function editAttribute(view: EditorView, pos: number, kind: "due" | "parent", value: LocalDate | string | null, expectedLine?: string): void {
+	if (pos > view.state.doc.length) return;
 	const line = view.state.doc.lineAt(pos);
+	if (expectedLine !== undefined && line.text !== expectedLine) return;
 	const next = kind === "due" ? settingDue(value as LocalDate | null, line.text) : settingParent(value as string | null, line.text);
 	if (next === null || next === line.text) return;
 	view.dispatch({ changes: { from: line.from, to: line.to, insert: next } });
@@ -80,7 +82,7 @@ class DatePill extends WidgetType {
 	}
 
 	override eq(other: WidgetType): boolean {
-		return other instanceof DatePill && other.label === this.label && other.tooltip === this.tooltip && other.overdue === this.overdue;
+		return other instanceof DatePill && other.label === this.label && other.tooltip === this.tooltip && other.overdue === this.overdue && other.date.equals(this.date);
 	}
 
 	override toDOM(view: EditorView): HTMLElement {
@@ -89,7 +91,11 @@ class DatePill extends WidgetType {
 		el.textContent = this.label;
 		el.setAttribute("aria-label", this.tooltip);
 		el.addEventListener("mousedown", (event) => event.preventDefault());
-		el.addEventListener("click", () => this.host.pickDate(this.date, (date) => editAttribute(view, view.posAtDOM(el), "due", date)));
+		el.addEventListener("click", () => {
+			const pos = view.posAtDOM(el);
+			const line = view.state.doc.lineAt(pos).text;
+			this.host.pickDate(this.date, (date) => editAttribute(view, pos, "due", date, line));
+		});
 		return el;
 	}
 
@@ -121,7 +127,11 @@ class ParentChip extends WidgetType {
 		el.appendChild(title);
 		el.setAttribute("aria-label", this.kind === "unresolved" ? `${this.title}, no project or area` : `In ${this.title}`);
 		el.addEventListener("mousedown", (event) => event.preventDefault());
-		el.addEventListener("click", () => this.host.pickParent(this.title, (title) => editAttribute(view, view.posAtDOM(el), "parent", title)));
+		el.addEventListener("click", () => {
+			const pos = view.posAtDOM(el);
+			const line = view.state.doc.lineAt(pos).text;
+			this.host.pickParent(this.title, (title) => editAttribute(view, pos, "parent", title, line));
+		});
 		return el;
 	}
 

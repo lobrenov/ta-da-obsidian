@@ -1921,10 +1921,6 @@
 	text-overflow: ellipsis;
 }
 
-.ta-da-parent-chip.is-unresolved .ta-da-parent-chip-title {
-	text-decoration: line-through;
-}
-
 /* Live Preview: a checkbox line's date pill and parent chip, in place of `>YYYY-MM-DD` and `@[[Title]]` */
 
 .ta-da-attr-pill {

@@ -10,7 +10,16 @@ const friday = date("2026-10-02");
 /** The trigger with the caret at the end of `line`, or at the `¦` in it. */
 function at(line: string, trigger: typeof dateTrigger): ReturnType<typeof dateTrigger> {
 	const caret = line.indexOf("¦");
-	return caret < 0 ? trigger(line, line.length) : trigger(line.replace("¦", ""), caret);
+	const text = line.replace("¦", "");
+	const ch = caret < 0 ? text.length : caret;
+	// As typed: the menu opens on the marker just typed and stays open for its start.
+	let open: number | null = null;
+	let found: ReturnType<typeof dateTrigger> = null;
+	for (let c = 1; c <= ch; c++) {
+		found = trigger(text, c, open);
+		open = found?.start ?? null;
+	}
+	return found;
 }
 
 describe("dateTrigger", () => {
@@ -46,6 +55,30 @@ describe("dateTrigger", () => {
 			expect(at(line, dateTrigger), line).toBeNull();
 		}
 		expect(dateTrigger("- [ ] a >fri", 3)).toBeNull();
+	});
+});
+
+describe("typing after an older marker", () => {
+	it("doesn't open the date menu over existing text, or on text typed after a closed menu", () => {
+		const line = "- [ ] call >fri about lunch";
+		expect(dateTrigger(line, 15)).toBeNull();
+		expect(dateTrigger(line, line.length)).toBeNull();
+		expect(dateTrigger("- [ ] on >2026-10-02", 20)).toBeNull();
+	});
+
+	it("opens only on the marker just typed, or while open on its start", () => {
+		expect(dateTrigger("- [ ] a >", 9)).toEqual({ start: 8, end: 9, query: "" });
+		expect(dateTrigger("- [ ] a >fr", 11)).toBeNull();
+		expect(dateTrigger("- [ ] a >fr", 11, 8)).toEqual({ start: 8, end: 11, query: "fr" });
+		expect(dateTrigger("- [ ] a >fr", 11, 5)).toBeNull();
+	});
+
+	it("doesn't open the parent menu over existing text", () => {
+		const line = "- [ ] call @bob about lunch";
+		expect(parentTrigger(line, 15)).toBeNull();
+		expect(parentTrigger(line, line.length)).toBeNull();
+		expect(parentTrigger("- [ ] call @", 12)).toEqual({ start: 11, end: 12, query: "" });
+		expect(parentTrigger(line, 15, 11)).toEqual({ start: 11, end: 15, query: "bob" });
 	});
 });
 

@@ -51,4 +51,14 @@ export function registerTaskAttributes(plugin: Plugin, taDaIndex: TaDaIndex): vo
 	};
 	plugin.register(taDaIndex.onChange(refresh));
 	void taDaIndex.ready.then(refresh);
+	// The overdue tint follows the day.
+	let day = localToday();
+	plugin.registerInterval(
+		window.setInterval(() => {
+			const now = localToday();
+			if (now.equals(day)) return;
+			day = now;
+			refresh();
+		}, 60_000),
+	);
 }

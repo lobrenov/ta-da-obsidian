@@ -158,11 +158,15 @@ export interface SubtaskLineModel {
 	/** 0-based line in its file, and the box's marker there: how a tick and a click find the line. */
 	lineIndex: number;
 	marker: string;
+	/** The line's text as written, attributes included. */
+	text: string;
 	/** The line's text without its attributes. */
 	title: string;
+	/** A box is nested under it: the subtasks glyph. */
+	hasChildren: boolean;
 	date: RowDate | null;
-	/** The parent chip: the project or area the line is filed under (`unresolved` is drawn struck). Null when there is none or this is its own page. */
-	parent: { title: string; kind: "project" | "area" | "unresolved" } | null;
+	/** The parent chip: the project or area the line is filed under. Null when there is none, it resolves to nothing, or this is its own page. */
+	parent: { title: string; kind: "project" | "area" } | null;
 }
 
 /**
@@ -240,12 +244,16 @@ export function subtaskCards(index: VaultIndex, cards: SubtaskCard[], today: Loc
 		lines: card.lines.map((line): SubtaskLineModel => {
 			const parent = line.parent === null ? null : parentItem(index, line.parent);
 			const hidden = parent !== null && parent.path === options.hideParent;
+			const boxes = index.get(card.path)?.checkboxes ?? [];
+			const at = boxes.findIndex((box) => box.lineIndex === line.lineIndex);
 			return {
 				lineIndex: line.lineIndex,
 				marker: line.marker,
+				text: line.text,
 				title: line.title,
+				hasChildren: at >= 0 && boxes[at + 1]?.isNested === true,
 				date: line.due && (options.dates !== "agenda" || line.due.compare(today) < 0) ? pillOf("due", line.due, today, options.dates === "agenda") : null,
-				parent: line.parent === null || hidden ? null : { title: parent?.title ?? line.parent, kind: parent === null ? "unresolved" : parent.properties.kind === "area" ? "area" : "project" },
+				parent: parent === null || hidden ? null : { title: parent.title, kind: parent.properties.kind === "area" ? "area" : "project" },
 			};
 		}),
 	}));
