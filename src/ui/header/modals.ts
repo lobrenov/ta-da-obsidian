@@ -1,4 +1,4 @@
-import { type App, Modal, SuggestModal, ToggleComponent } from "obsidian";
+import { type App, Modal, Platform, SuggestModal, ToggleComponent } from "obsidian";
 import { occurrences } from "../../core/index/queries";
 import type { VaultIndex } from "../../core/index/vaultIndex";
 import type { Item } from "../../core/model/item";
@@ -12,6 +12,14 @@ import { dateLabel, weekdayDayMonth } from "./headerModel";
 import { monthTitle } from "../dates";
 import { monthGrid, weekdayLetter, weekdayOrder } from "./monthGrid";
 
+/** On mobile, a Cancel button beside a picker's field that closes it. */
+function addCancel(modal: SuggestModal<unknown>): void {
+	if (!Platform.isMobile) return;
+	const button = element(modal.inputEl.ownerDocument, "button", "ta-da-prompt-cancel", "Cancel");
+	button.addEventListener("click", () => modal.close());
+	modal.inputEl.parentElement?.appendChild(button);
+}
+
 /** The project or area menu: a filtered list with None first and the current choice ticked. */
 export class ParentModal extends SuggestModal<ParentChoice> {
 	constructor(
@@ -22,6 +30,7 @@ export class ParentModal extends SuggestModal<ParentChoice> {
 	) {
 		super(app);
 		this.setPlaceholder(placeholder);
+		addCancel(this);
 	}
 
 	getSuggestions(query: string): ParentChoice[] {
@@ -55,6 +64,7 @@ export class TagModal extends SuggestModal<TagChoice> {
 		super(app);
 		this.setPlaceholder("Add or remove a tag");
 		this.emptyStateText = "No tags. Type a name to add one.";
+		addCancel(this);
 	}
 
 	getSuggestions(query: string): TagChoice[] {
