@@ -20,6 +20,7 @@ Ta Da is a "one task, one file" based to-do list concept, with tasks, projects, 
 - **New task menu**: a new task command for a task, project or area. I recommend binding to e.g. `CTRL / ⌘ + Shift + N`.
 - **File menu**: Move, Schedule, Set deadline, Tags and Status on one file, or on several picked rows. 
 - **Logging**: once a day, completed tasks and projects move to the Logbook and completed repeating tasks move forward.
+- **Subtasks from notes**: a checkbox line takes a due date (`>2026-10-02`) and a project or area (`@[[Ta Da MVP]]`), typed with suggestions and drawn as a pill and a chip. With the setting on, open subtasks in notes are listed as cards in the Agenda, on their project or area, or in Loose tasks.
 
 <p>
   <picture>
@@ -54,6 +55,7 @@ The plugin creates files where the apps do, in `Ta Da/` at the vault's top level
 
 ## Settings
 - Hide properties on Ta Da files.
+- Subtasks from notes, shared with Ta Da through `Ta Da/settings.json` in the vault.
 - Open Agenda, Tasks and Tags on startup, one setting each.
 - Collapse the list pane.
 - Daily notes: the folder and template for daily notes, and for week notes, which can be turned off. These are shared with Ta Da through `Ta Da/settings.json` in the vault.
