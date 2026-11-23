@@ -26,7 +26,7 @@ export interface InlineAttributes {
 	parent: InlineParent | null;
 }
 
-const [space, tab, backtick, greater, at, open, close, paren, closeParen, newline] = [0x20, 0x09, 0x60, 0x3e, 0x40, 0x5b, 0x5d, 0x28, 0x29, 0x0a];
+const [space, tab, backtick, greater, at, open, close, paren, closeParen, newline, backslash] = [0x20, 0x09, 0x60, 0x3e, 0x40, 0x5b, 0x5d, 0x28, 0x29, 0x0a, 0x5c];
 
 const alphanumeric = /^[\p{L}\p{M}\p{N}]$/u;
 
@@ -64,7 +64,28 @@ function afterCodeSpan(text: string, i: number): number {
 	return i + length;
 }
 
-/** The index after the `[[…]]` or `[text](target)` that starts at `i`, or after the bracket when it isn't one. */
+/** The `]` that closes the `[` at `i`, skipping nested brackets, escapes and code spans. */
+function closingBracket(text: string, from: number): number | null {
+	let depth = 0;
+	let j = from;
+	while (j < text.length) {
+		const code = text.charCodeAt(j);
+		if (code === backslash) j++;
+		else if (code === backtick) j = afterCodeSpan(text, j) - 1;
+		else if (code === open) depth++;
+		else if (code === close) {
+			depth--;
+			if (depth === 0) return j;
+		}
+		j++;
+	}
+	return null;
+}
+
+/**
+ * The index after the `[[…]]`, `[text](target)` or `[text][ref]` that starts at `i`, or after the bracket when it isn't
+ * one. The text's brackets nest.
+ */
 function afterLink(text: string, i: number): number {
 	if (i + 1 < text.length && text.charCodeAt(i + 1) === open) {
 		for (let j = i + 2; j + 1 < text.length; j++) {
@@ -72,10 +93,24 @@ function afterLink(text: string, i: number): number {
 		}
 		return i + 1;
 	}
-	const end = text.indexOf("]", i + 1);
-	if (end < 0 || end + 1 >= text.length || text.charCodeAt(end + 1) !== paren) return i + 1;
-	const closing = text.indexOf(")", end + 2);
-	return closing < 0 ? i + 1 : closing + 1;
+	const end = closingBracket(text, i);
+	if (end === null || end + 1 >= text.length) return i + 1;
+	if (text.charCodeAt(end + 1) === open) {
+		const ref = text.indexOf("]", end + 2);
+		return ref < 0 ? i + 1 : ref + 1;
+	}
+	if (text.charCodeAt(end + 1) !== paren) return i + 1;
+	let depth = 0;
+	for (let j = end + 1; j < text.length; j++) {
+		const code = text.charCodeAt(j);
+		if (code === backslash) j++;
+		else if (code === paren) depth++;
+		else if (code === closeParen) {
+			depth--;
+			if (depth === 0) return j + 1;
+		}
+	}
+	return i + 1;
 }
 
 /** The attributes in `text`, the text after a checkbox's box. */
@@ -116,15 +151,15 @@ export function parseInlineAttributes(text: string): InlineAttributes {
 	return found;
 }
 
-/** `text` less `range` and the whitespace run before it, or after it when the range starts the text. */
+/** `text` less `range` and the one space or tab before it, or after it when the range starts the text. */
 export function removingAttribute(range: [number, number], text: string): string {
 	let start = range[0];
 	let end = range[0] + range[1];
 	const isSpace = (i: number): boolean => text.charCodeAt(i) === space || text.charCodeAt(i) === tab;
 	if (start > 0) {
-		while (start > 0 && isSpace(start - 1)) start--;
-	} else {
-		while (end < text.length && isSpace(end)) end++;
+		if (isSpace(start - 1)) start--;
+	} else if (end < text.length && isSpace(end)) {
+		end++;
 	}
 	return text.slice(0, start) + text.slice(end);
 }

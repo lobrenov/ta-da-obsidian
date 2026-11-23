@@ -11,7 +11,9 @@ type Splice = { range: [number, number] | null; token: string | null };
  * `line` with the text after its box edited by `edit`, which gets that text and says which token to replace (if any) and
  * with what (null removes it, or adds nothing). Null when the line isn't a subtask (an icon box isn't).
  */
-function splicing(line: string, edit: (rest: string) => Splice): string | null {
+function splicing(source: string, edit: (rest: string) => Splice): string | null {
+	const ending = source.endsWith("\r") ? "\r" : "";
+	const line = ending === "" ? source : source.slice(0, -1);
 	const markerEndAt = markerEnd(line, markerStart(line));
 	const found = markerEndAt === null ? null : box(line, markerEndAt);
 	const state = found === null ? null : checkboxState(found.marker);
@@ -21,19 +23,19 @@ function splicing(line: string, edit: (rest: string) => Splice): string | null {
 	const head = line.slice(0, start);
 	const rest = line.slice(start);
 	const { range, token } = edit(rest);
-	if (range && token !== null) return head + rest.slice(0, range[0]) + token + rest.slice(range[0] + range[1]);
-	if (range) return head + removingAttribute(range, rest);
+	if (range && token !== null) return head + rest.slice(0, range[0]) + token + rest.slice(range[0] + range[1]) + ending;
+	if (range) return head + removingAttribute(range, rest) + ending;
 	if (token !== null) {
 		const trailing = /[ \t]*$/.exec(rest)?.[0] ?? "";
 		const base = rest.slice(0, rest.length - trailing.length);
-		return head + (base === "" ? token : `${base} ${token}`) + trailing;
+		return head + (base === "" ? token : `${base} ${token}`) + trailing + ending;
 	}
-	return line;
+	return line + ending;
 }
 
 /**
  * The line with its due date set to `date`: an existing `>YYYY-MM-DD` is replaced, or removed for null, else the token is
- * added at the end of the text. `line` is a subtask's content without its line ending; null when it isn't one.
+ * added at the end of the text. `line` is a subtask's content without its line ending, or with a `\r` that's kept; null when it isn't one.
  */
 export function settingDue(date: LocalDate | null, line: string): string | null {
 	return splicing(line, (rest) => ({ range: parseInlineAttributes(rest).due?.range ?? null, token: date === null ? null : `>${date.toString()}` }));

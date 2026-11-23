@@ -139,6 +139,10 @@ function run(testCase: WriteCase, today: LocalDate): unknown {
 				stripped: strippedOf(found, args.text as string),
 			};
 		}
+		case "SubtaskLine.settingDue":
+			return subtaskLine.settingDue(nullableDate(args.date), args.line as string);
+		case "SubtaskLine.settingParent":
+			return subtaskLine.settingParent(nullable(args.title), args.line as string);
 		case "SubtaskLine.setDue":
 			return subtaskLine.setDue(nullableDate(args.date), input, args.line as number);
 		case "SubtaskLine.setParent":

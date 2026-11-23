@@ -3,6 +3,7 @@ import { type Item, isLogged, titleOfPath } from "../model/item";
 import type { LocalDate } from "../model/localDate";
 import { isClosed } from "../model/status";
 import { folderOf } from "../storage/vault";
+import { identityKey } from "../text";
 import { byTitle, type VaultIndex } from "./vaultIndex";
 
 /** The listed subtask lines of one file, in file order. */
@@ -19,15 +20,20 @@ export interface SubtaskCard {
  * parent that resolves. Each query returns cards by source title, then path; `today` is passed in.
  */
 
-/** The project a `@[[Title]]` resolves to, else the area: the first of each by path. */
+/** The live project a `@[[Title]]` resolves to, else the live area: the first of each by path. A logged file resolves nothing. */
 export function parentItem(index: Pick<VaultIndex, "itemsTitled">, title: string): Item | null {
-	const found = index.itemsTitled(title);
+	const found = index.itemsTitled(title).filter((item) => !isLogged(item));
 	return found.find((item) => item.properties.kind === "project") ?? found.find((item) => item.properties.kind === "area") ?? null;
+}
+
+/** An open box that isn't nested or quoted, in a file that isn't logged or closed. */
+function isOpenLine(box: Checkbox, item: Item): boolean {
+	return box.state === "open" && !box.isNested && !box.isQuoted && !isLogged(item) && !isClosed(item.properties.status);
 }
 
 /** Whether `box` in `item` is a listed line. */
 export function isListed(index: VaultIndex, box: Checkbox, item: Item): boolean {
-	if (box.state !== "open" || box.isNested || box.isQuoted || isLogged(item) || isClosed(item.properties.status)) return false;
+	if (!isOpenLine(box, item)) return false;
 	return item.properties.kind === "note" || box.due !== null || (box.parent !== null && parentItem(index, box.parent) !== null);
 }
 
@@ -54,6 +60,30 @@ export function noteSubtasksFrom(index: VaultIndex, from: LocalDate, through: Lo
 /** The lines whose parent resolves to this project or area, leaving out its own file's. */
 export function noteSubtasksIn(index: VaultIndex, parent: Item): SubtaskCard[] {
 	return cards(index, (item, box) => item.path !== parent.path && box.parent !== null && parentItem(index, box.parent)?.path === parent.path);
+}
+
+/** Every project's and area's cards at once, by the parent's path, as `noteSubtasksIn` gives them, in one pass. */
+export function noteSubtasksByParent(index: VaultIndex): Map<string, SubtaskCard[]> {
+	const resolved = new Map<string, string | null>();
+	const pathOf = (title: string): string | null => {
+		const key = identityKey(title);
+		const known = resolved.get(key);
+		if (known !== undefined) return known;
+		const found = parentItem(index, title)?.path ?? null;
+		resolved.set(key, found);
+		return found;
+	};
+	const grouped = new Map<string, { item: Item; lines: Checkbox[] }[]>();
+	for (const item of index.items.values()) {
+		const byParent = new Map<string, Checkbox[]>();
+		for (const box of item.checkboxes) {
+			if (!isOpenLine(box, item) || box.parent === null) continue;
+			const parent = pathOf(box.parent);
+			if (parent !== null && parent !== item.path) byParent.set(parent, [...(byParent.get(parent) ?? []), box]);
+		}
+		for (const [parent, lines] of byParent) grouped.set(parent, [...(grouped.get(parent) ?? []), { item, lines }]);
+	}
+	return new Map([...grouped].map(([parent, found]) => [parent, found.sort((a, b) => byTitle(a.item, b.item)).map(({ item, lines }) => ({ path: item.path, lines, title: titleOfPath(item.path), folder: folderOf(item.path) }))]));
 }
 
 /** A note's lines with no due date and no parent that resolves. */

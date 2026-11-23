@@ -5,7 +5,7 @@ import { VaultIndex } from "../src/core/index/vaultIndex";
 import { TagFilter, groupings, listSections, type ListSection } from "../src/core/index/grouping";
 import { type FolderNode, folderTree, notesIn } from "../src/core/index/noteQueries";
 import * as queries from "../src/core/index/queries";
-import { type SubtaskCard, looseNoteSubtasks, noteSubtasksFrom, noteSubtasksIn, noteSubtasksOn } from "../src/core/index/subtaskQueries";
+import { type SubtaskCard, looseNoteSubtasks, noteSubtasksByParent, noteSubtasksFrom, noteSubtasksIn, noteSubtasksOn } from "../src/core/index/subtaskQueries";
 import { type TagNode, itemsTagged, tagBrowser, tagSuggestions, tagTree, untagged } from "../src/core/index/tagQueries";
 import { type Item, isLogged, type Warning } from "../src/core/model/item";
 import { LocalDate } from "../src/core/model/localDate";
@@ -163,6 +163,7 @@ describe.each(queriesExport.vaults)("queries: $name", (vault) => {
 					.map((parent): [string, unknown] => [parent.path, cardsJson(noteSubtasksIn(index, parent))]),
 			),
 		subtasksLoose: () => cardsJson(looseNoteSubtasks(index)),
+		subtasksByParent: () => fromPaths([...noteSubtasksByParent(index)].map(([path, found]): [string, unknown] => [path, cardsJson(found)])),
 		dayMarksWithoutSubtasks: () => {
 			const from = LocalDate.parse("2026-10-01") as LocalDate;
 			const through = LocalDate.parse("2026-10-31") as LocalDate;

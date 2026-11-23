@@ -52,7 +52,7 @@ describe("From notes", () => {
 		expect(cards(model).map((card) => [card.title, lineTitles(card)])).toEqual([
 			["2026-10-02", ["Tomorrow"]],
 			["Draft", ["Dated here"]],
-			["Standup", ["Both"]],
+			["Standup", ["Both", "Logged parent but dated"]],
 		]);
 		expect(cards(model)[0]?.lines[0]).toMatchObject({ date: null, parent: { title: "Ta Da MVP", kind: "project" } });
 		expect(model.sections[0]?.message).toBeNull();
@@ -74,7 +74,7 @@ describe("From notes", () => {
 			cards(list({ kind: "agenda" }, on({ agenda: { selection: { kind: "week", week }, monthOpen: false } }))).flatMap((card) => card.lines.map((line) => `${card.title}: ${line.title} ${line.date?.text}`));
 		expect(dated(new ISOWeek(2026, 40))).toContain("Draft: Dated here Sat");
 		expect(dated(new ISOWeek(2026, 40))).toContain("Syntax: at the start Today");
-		expect(dated(new ISOWeek(2026, 41))).toEqual(["Standup: Doing 9 Oct", "Ta Da MVP: Own dated 9 Oct", "Ta Da MVP: Own to self and dated 9 Oct"]);
+		expect(dated(new ISOWeek(2026, 41))).toEqual(["Standup: Doing 9 Oct", "Syntax: Reference [text >2026-10-06][ref] Wed", "Syntax: Spaced   twice Thu", "Ta Da MVP: Own dated 9 Oct", "Ta Da MVP: Own to self and dated 9 Oct"]);
 	});
 
 	it("lists a project's lines, with the chip hidden on its own page and its own file's left out", () => {
@@ -116,7 +116,7 @@ describe("From notes", () => {
 			["Syntax", "Notes"],
 			["Windows", "Notes"],
 		]);
-		expect(lineTitles(cards(model)[1])).toEqual(["Loose", "Unresolved"]);
+		expect(lineTitles(cards(model)[1])).toEqual(["Loose", "Unresolved", "Logged parent"]);
 		expect(model.empty).toBeNull();
 		expect(describeList(model).some((line) => line.includes("# From notes"))).toBe(true);
 	});
