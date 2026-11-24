@@ -167,8 +167,8 @@ export class NavigatorView extends ItemView {
 		);
 		this.register(this.deps.taDaIndex.onChange(() => this.refresh()));
 		this.registerEvent(this.app.workspace.on("file-open", (file) => this.select(file?.path ?? null, true)));
-		this.registerEvent(
-			this.app.vault.on("delete", () => {
+		this.register(
+			this.deps.taDaIndex.onDeleted(() => {
 				this.trashStale = true;
 				this.maybeRefreshTrash();
 			}),

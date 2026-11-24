@@ -10,8 +10,8 @@ const { applyStatus } = await import("../src/ui/navigator/actions");
 
 type Handler = (...args: never[]) => void;
 
-/** A plugin whose layout is ready and whose vault has no files, keeping the handlers it's given. */
-function makePlugin(): { plugin: never; handlers: Record<string, Handler>; unload: () => void } {
+/** A plugin whose layout is ready and whose vault has `files` (each reading as a Doing task), keeping the handlers it's given. */
+function makePlugin(files: object[] = [], read: (file: { path: string }) => Promise<string> = async () => task("Doing")): { plugin: never; handlers: Record<string, Handler>; unload: () => void } {
 	const handlers: Record<string, Handler> = {};
 	const cleanups: (() => void)[] = [];
 	const on = (name: string, handler: Handler): object => {
@@ -21,7 +21,7 @@ function makePlugin(): { plugin: never; handlers: Record<string, Handler>; unloa
 	const plugin = {
 		app: {
 			workspace: { onLayoutReady: (callback: () => void) => callback(), on },
-			vault: { on, getFiles: () => [], cachedRead: async () => "" },
+			vault: { on, getFiles: () => files, cachedRead: read },
 			metadataCache: { on },
 		},
 		register: (cleanup: () => void) => cleanups.push(cleanup),
@@ -139,5 +139,94 @@ describe("applyStatus", () => {
 
 	it("leaves the file alone when its own text already has the status", () => {
 		expect(edit("Done")(task("Done"))).toBeNull();
+	});
+});
+
+describe("TaDaIndex change notifications", () => {
+	beforeEach(() => vi.useFakeTimers());
+	afterEach(() => vi.useRealTimers());
+	const saved = (handlers: Record<string, Handler>, path: string, text: string): void =>
+		(handlers["changed"] as unknown as (file: object, text: string) => void)(file(path), text);
+
+	it("calls no listener when a save leaves the item as indexed, or a file that isn't an item", async () => {
+		const { plugin, handlers } = makePlugin();
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		index.onChange(listener);
+		index.start();
+		await vi.advanceTimersByTimeAsync(500);
+		saved(handlers, "Ta Da/tasks/A.md", task("Doing"));
+		await vi.advanceTimersByTimeAsync(500);
+		listener.mockClear();
+
+		saved(handlers, "Ta Da/tasks/A.md", task("Doing"));
+		saved(handlers, "Ta Da/Elsewhere.txt.md", "not a Ta Da file");
+		(handlers["quick-preview"] as unknown as (file: object, text: string) => void)(file("Ta Da/tasks/A.md"), task("Doing"));
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(listener).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(2500);
+		saved(handlers, "Ta Da/tasks/A.md", task("Done"));
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
+
+	it("calls a listener when an item appears or goes, and for a deleted non-item not at all", async () => {
+		const { plugin, handlers } = makePlugin();
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		const deleted = vi.fn();
+		index.onChange(listener);
+		index.onDeleted(deleted);
+		index.start();
+		await vi.advanceTimersByTimeAsync(500);
+		listener.mockClear();
+		(handlers["delete"] as unknown as (file: object) => void)(file("Ta Da/tasks/Never.md"));
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).not.toHaveBeenCalled();
+		expect(deleted).not.toHaveBeenCalled();
+
+		saved(handlers, "Ta Da/tasks/A.md", task("Doing"));
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(1);
+		(handlers["delete"] as unknown as (file: object) => void)(file("Ta Da/tasks/A.md"));
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(2);
+		expect(deleted).toHaveBeenCalledTimes(1);
+	});
+
+	it("takes the file's text once the autosave window has passed since the editor's", async () => {
+		const { plugin, handlers } = makePlugin();
+		const index = new TaDaIndex(plugin);
+		index.start();
+		await vi.advanceTimersByTimeAsync(500);
+		(handlers["quick-preview"] as unknown as (file: object, text: string) => void)(file("Ta Da/tasks/A.md"), task("Doing"));
+		await vi.advanceTimersByTimeAsync(2500);
+		expect((index as unknown as { recentEdits: Map<string, unknown> }).recentEdits.size).toBe(0);
+		saved(handlers, "Ta Da/tasks/A.md", task("Done"));
+		expect(index.index.get("Ta Da/tasks/A.md")?.properties.status).toBe("Done");
+	});
+
+	it("builds in batches without calling listeners until it ends, then calls them once", async () => {
+		const files = Array.from({ length: 200 }, (_, at) => file(`Ta Da/tasks/T${at}.md`));
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const { plugin } = makePlugin(files, async (read) => {
+			if (read.path === "Ta Da/tasks/T199.md") await gate;
+			return task("Doing");
+		});
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		index.onChange(listener);
+		index.start();
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(index.built).toBe(false);
+		expect(index.index.items.size).toBeGreaterThanOrEqual(192);
+		expect(listener).not.toHaveBeenCalled();
+		release();
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(index.built).toBe(true);
+		expect(index.index.items.size).toBe(200);
+		expect(listener).toHaveBeenCalledTimes(1);
 	});
 });

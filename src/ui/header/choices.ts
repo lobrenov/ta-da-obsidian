@@ -16,8 +16,8 @@ export interface ParentChoice {
 
 /** The index as the menus read it. */
 export interface ParentSource {
-	projects: Item[];
-	areas: Item[];
+	projects: readonly Item[];
+	areas: readonly Item[];
 	areaOf(item: Item): Item | null;
 }
 

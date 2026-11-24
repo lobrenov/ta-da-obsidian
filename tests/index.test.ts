@@ -432,3 +432,59 @@ describe("identity and order", () => {
 		expect(index.itemsTitled("CAFÉ")).toEqual([project]);
 	});
 });
+
+describe("VaultIndex per-kind lists", () => {
+	const lists = (index: VaultIndex): Record<string, string[]> => {
+		const all = [...index.items.values()];
+		const paths = (items: readonly Item[]): string[] => items.map((item) => item.path);
+		return {
+			liveItems: paths(index.liveItems),
+			tasks: paths(index.tasks),
+			projects: paths(index.projects),
+			areas: paths(index.areas),
+			logged: paths(index.logged),
+			expectedLive: paths(all.filter((item) => !isLogged(item))),
+			expectedTasks: paths(all.filter((item) => !isLogged(item) && item.properties.kind === "task")),
+			expectedProjects: paths(all.filter((item) => !isLogged(item) && item.properties.kind === "project")),
+			expectedAreas: paths(all.filter((item) => !isLogged(item) && item.properties.kind === "area")),
+			expectedLogged: paths(all.filter((item) => isLogged(item))),
+		};
+	};
+	const same = (index: VaultIndex): void => {
+		const found = lists(index);
+		expect(found["liveItems"]).toEqual(found["expectedLive"]);
+		expect(found["tasks"]).toEqual(found["expectedTasks"]);
+		expect(found["projects"]).toEqual(found["expectedProjects"]);
+		expect(found["areas"]).toEqual(found["expectedAreas"]);
+		expect(found["logged"]).toEqual(found["expectedLogged"]);
+	};
+
+	it("equal a full filter after update and remove", () => {
+		const index = new VaultIndex([
+			makeItem("Ta Da/tasks/A.md", "type: task"),
+			makeItem("Ta Da/projects/P.md", "type: project"),
+			makeItem("Ta Da/areas/H.md", "type: area"),
+			makeItem("Ta Da/logbook/2026-09/Old.md", "type: task\nstatus: Done"),
+			makeItem("Notes/N.md", "type: note"),
+		]);
+		same(index);
+		index.update(makeItem("Ta Da/tasks/B.md", "type: task"));
+		same(index);
+		index.update(makeItem("Ta Da/tasks/A.md", "type: task\nstatus: Done"));
+		same(index);
+		index.update(makeItem("Ta Da/logbook/2026-09/Old2.md", "type: project\nstatus: Done"));
+		same(index);
+		index.remove("Ta Da/tasks/A.md");
+		index.remove("Ta Da/logbook/2026-09/Old.md");
+		index.remove("Ta Da/areas/H.md");
+		same(index);
+		expect(index.tasks.map((item) => item.path)).toEqual(["Ta Da/tasks/B.md"]);
+	});
+
+	it("shows a replaced item, not the one before", () => {
+		const index = new VaultIndex([makeItem("Ta Da/tasks/A.md", "type: task")]);
+		expect(index.tasks[0]?.properties.status).not.toBe("Done");
+		index.update(makeItem("Ta Da/tasks/A.md", "type: task\nstatus: Done"));
+		expect(index.tasks[0]?.properties.status).toBe("Done");
+	});
+});

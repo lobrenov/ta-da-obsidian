@@ -9,7 +9,7 @@ export function makeItem(path: string, frontmatter: string, body = ""): Item {
 	return item;
 }
 
-export function titles(items: Item[]): string[] {
+export function titles(items: readonly Item[]): string[] {
 	return items.map((item) => item.title);
 }
 

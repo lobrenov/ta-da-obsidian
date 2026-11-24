@@ -115,8 +115,8 @@ export type ParentRow =
 
 /** What the parent menu reads from the index. */
 export interface ParentSource {
-	projects: Item[];
-	areas: Item[];
+	projects: readonly Item[];
+	areas: readonly Item[];
 	areaOf(item: Item): Item | null;
 }
 

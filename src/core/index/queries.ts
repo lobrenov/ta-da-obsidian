@@ -265,7 +265,7 @@ export function looseProjects(index: VaultIndex): ProjectProgress[] {
 
 /** Every area by title, each with its active projects by title. */
 export function areaProjects(index: VaultIndex): AreaProjects[] {
-	return index.areas.sort(byTitle).map((area) => ({
+	return [...index.areas].sort(byTitle).map((area) => ({
 		area,
 		projects: index
 			.projectsIn(area)

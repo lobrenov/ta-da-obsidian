@@ -58,8 +58,8 @@ function readVault(folder: string): Map<string, string> {
 const maskYaml = (warnings: Warning[]): unknown[] =>
 	warnings.map((warning) => (warning.case === "invalidYAML" ? { case: "invalidYAML" } : warning));
 
-const sortedPaths = (items: Item[]): string[] => items.map((item) => item.path).sort(compareCodeUnits);
-const inOrder = (items: Item[]): string[] => items.map((item) => item.path);
+const sortedPaths = (items: readonly Item[]): string[] => items.map((item) => item.path).sort(compareCodeUnits);
+const inOrder = (items: readonly Item[]): string[] => items.map((item) => item.path);
 const entries = (list: queries.AgendaEntry[]): unknown =>
 	list.map((entry) => ({ path: entry.item.path, date: entry.date.toString(), kind: entry.kind }));
 const progress = (list: queries.ProjectProgress[]): unknown =>

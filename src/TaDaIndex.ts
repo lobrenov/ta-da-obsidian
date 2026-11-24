@@ -1,5 +1,6 @@
 import { type Plugin, TFile, TFolder, type TAbstractFile } from "obsidian";
 import { VaultIndex } from "./core/index/vaultIndex";
+import type { Item } from "./core/model/item";
 import { parseItem } from "./core/parsing/parseItem";
 
 const readBatch = 64;
@@ -26,11 +27,14 @@ export class TaDaIndex {
 	/** The latest change seen for each path with a read pending, so a slow read never overwrites a newer change. */
 	private readonly generations = new Map<string, number>();
 	private readonly listeners = new Set<() => void>();
+	private readonly deleteListeners = new Set<() => void>();
+	/** Whether the first build is still reading files, when changes are held back until it ends. */
+	private building = false;
 	private changeTimer: number | undefined;
 	/** Per path, the timer that will take an editor's latest text. */
 	private readonly editTimers = new Map<string, number>();
-	/** Per path, the editor text last seen and when. */
-	private readonly recentEdits = new Map<string, { text: string; at: number }>();
+	/** Per path, the editor text last seen and when, dropped by its timer once `autosaveWindow` has passed. */
+	private readonly recentEdits = new Map<string, { text: string; at: number; timer: number }>();
 
 	constructor(private readonly plugin: Plugin) {
 		this.ready = new Promise((resolve) => {
@@ -44,7 +48,10 @@ export class TaDaIndex {
 			window.clearTimeout(this.changeTimer);
 			for (const timer of this.editTimers.values()) window.clearTimeout(timer);
 			this.editTimers.clear();
+			for (const { timer } of this.recentEdits.values()) window.clearTimeout(timer);
+			this.recentEdits.clear();
 			this.listeners.clear();
+			this.deleteListeners.clear();
 			this.resolveReady();
 		});
 		this.plugin.app.workspace.onLayoutReady(() => {
@@ -63,7 +70,15 @@ export class TaDaIndex {
 		return () => this.listeners.delete(listener);
 	}
 
+	/** Calls `listener` when a file that was a Ta Da item or note is deleted, or a folder holding one. Returns a function that stops listening. */
+	onDeleted(listener: () => void): () => void {
+		this.deleteListeners.add(listener);
+		return () => this.deleteListeners.delete(listener);
+	}
+
+	/** Schedules the listeners, unless the first build is still running: it calls them once, when it ends. */
 	private changed(): void {
+		if (this.building) return;
 		window.clearTimeout(this.changeTimer);
 		this.changeTimer = window.setTimeout(() => {
 			for (const listener of [...this.listeners]) listener();
@@ -72,9 +87,12 @@ export class TaDaIndex {
 
 	private async build(): Promise<void> {
 		const files = this.plugin.app.vault.getFiles().filter(isMarkdown);
+		this.building = true;
 		for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
+			if (start > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 			await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
 		}
+		this.building = false;
 		if (!this.unloaded) this.built = true;
 		this.resolveReady();
 		this.changed();
@@ -98,7 +116,9 @@ export class TaDaIndex {
 		if (!isMarkdown(file)) return;
 		const path = file.path;
 		window.clearTimeout(this.editTimers.get(path));
-		this.recentEdits.set(path, { text, at: Date.now() });
+		window.clearTimeout(this.recentEdits.get(path)?.timer);
+		const forget = window.setTimeout(() => this.recentEdits.delete(path), autosaveWindow);
+		this.recentEdits.set(path, { text, at: Date.now(), timer: forget });
 		this.editTimers.set(
 			path,
 			window.setTimeout(() => {
@@ -132,18 +152,25 @@ export class TaDaIndex {
 		this.apply(file, text);
 	}
 
-	/** Replaces a file's item; a file that isn't a Ta Da file or note, or that can't be parsed, leaves the index. */
+	/**
+	 * Replaces a file's item; a file that isn't a Ta Da file or note, or that can't be parsed, leaves the index. Listeners
+	 * hear of it only when the item appears, goes or differs from the one indexed.
+	 */
 	private apply(file: TFile, text: string): void {
 		if (!isMarkdown(file)) return;
 		this.generations.delete(file.path);
+		const old = this.index.get(file.path);
+		let item: Item | null = null;
 		try {
-			const item = parseItem(text, file.path);
-			if (item) this.index.update(item);
-			else this.index.remove(file.path);
+			item = parseItem(text, file.path);
 		} catch {
-			this.index.remove(file.path);
+			item = null;
 		}
-		this.changed();
+		if (item) this.index.update(item);
+		else this.index.remove(file.path);
+		if (item || old) {
+			if (!item || !old || JSON.stringify(item) !== JSON.stringify(old)) this.changed();
+		}
 	}
 
 	private renamed(file: TAbstractFile, oldPath: string): void {
@@ -157,26 +184,31 @@ export class TaDaIndex {
 	}
 
 	private deleted(file: TAbstractFile): void {
-		if (file instanceof TFolder) this.removeUnder(file.path);
-		else this.remove(file.path);
+		const removed = file instanceof TFolder ? this.removeUnder(file.path) : this.remove(file.path);
+		if (removed) for (const listener of [...this.deleteListeners]) listener();
 	}
 
-	/** Drops a path from the index and cancels any read pending for it. */
-	private remove(path: string): void {
+	/** Drops a path from the index and cancels any read pending for it. Whether it was indexed. */
+	private remove(path: string): boolean {
 		this.generations.delete(path);
 		window.clearTimeout(this.editTimers.get(path));
 		this.editTimers.delete(path);
+		window.clearTimeout(this.recentEdits.get(path)?.timer);
 		this.recentEdits.delete(path);
+		const had = this.index.get(path) !== undefined;
 		this.index.remove(path);
-		this.changed();
+		if (had) this.changed();
+		return had;
 	}
 
-	private removeUnder(folder: string): void {
+	/** Drops every path under a folder. Whether any was indexed. */
+	private removeUnder(folder: string): boolean {
 		const prefix = `${folder}/`;
+		let removed = false;
 		for (const path of [...this.index.items.keys(), ...this.generations.keys()]) {
-			if (path.startsWith(prefix)) this.remove(path);
+			if (path.startsWith(prefix) && this.remove(path)) removed = true;
 		}
-		this.changed();
+		return removed;
 	}
 }
 

@@ -37,6 +37,9 @@ export class VaultIndex {
 	/** Tag path to the tag as spelled by the first carrier (live before logged, then by path), and that path. */
 	private readonly tagsByPath = new Map<string, { tag: Tag; path: string }>();
 
+	/** The lists below, built on first use and dropped when an item that belongs to one is added, replaced or removed. */
+	private readonly lists: { live?: Item[]; tasks?: Item[]; projects?: Item[]; areas?: Item[]; logged?: Item[] } = {};
+
 	constructor(items: Item[] = []) {
 		for (const item of items) this.update(item);
 	}
@@ -53,6 +56,8 @@ export class VaultIndex {
 	update(item: Item): void {
 		const old = this.itemsByPath.get(item.path);
 		this.itemsByPath.set(item.path, item);
+		if (old) this.dropLists(old);
+		this.dropLists(item);
 		if (old) {
 			this.removeLinks(old);
 			this.removeTags(old);
@@ -70,27 +75,41 @@ export class VaultIndex {
 		const old = this.itemsByPath.get(path);
 		if (!old) return;
 		this.itemsByPath.delete(path);
+		this.dropLists(old);
 		this.removeTitle(path);
 		this.removeLinks(old);
 		this.removeTags(old);
 		removeFrom(this.notesByFolder, folderOf(path), path);
 	}
 
-	/** Items that aren't logged. */
-	get liveItems(): Item[] {
-		return [...this.itemsByPath.values()].filter((item) => !isLogged(item));
+	/** Forgets the lists an item is in. */
+	private dropLists(item: Item): void {
+		if (isLogged(item)) {
+			this.lists.logged = undefined;
+			return;
+		}
+		this.lists.live = undefined;
+		const { kind } = item.properties;
+		if (kind === "task") this.lists.tasks = undefined;
+		else if (kind === "project") this.lists.projects = undefined;
+		else if (kind === "area") this.lists.areas = undefined;
 	}
 
-	get tasks(): Item[] {
-		return this.liveItems.filter((item) => item.properties.kind === "task");
+	/** Items that aren't logged, in the order they were added. The list is shared; copy it to change it. */
+	get liveItems(): readonly Item[] {
+		return (this.lists.live ??= [...this.itemsByPath.values()].filter((item) => !isLogged(item)));
 	}
 
-	get projects(): Item[] {
-		return this.liveItems.filter((item) => item.properties.kind === "project");
+	get tasks(): readonly Item[] {
+		return (this.lists.tasks ??= this.liveItems.filter((item) => item.properties.kind === "task"));
 	}
 
-	get areas(): Item[] {
-		return this.liveItems.filter((item) => item.properties.kind === "area");
+	get projects(): readonly Item[] {
+		return (this.lists.projects ??= this.liveItems.filter((item) => item.properties.kind === "project"));
+	}
+
+	get areas(): readonly Item[] {
+		return (this.lists.areas ??= this.liveItems.filter((item) => item.properties.kind === "area"));
 	}
 
 	get notes(): Item[] {
@@ -113,9 +132,9 @@ export class VaultIndex {
 		return names;
 	}
 
-	/** Logged tasks and projects. */
-	get logged(): Item[] {
-		return [...this.itemsByPath.values()].filter((item) => isLogged(item));
+	/** Logged tasks and projects. The list is shared; copy it to change it. */
+	get logged(): readonly Item[] {
+		return (this.lists.logged ??= [...this.itemsByPath.values()].filter((item) => isLogged(item)));
 	}
 
 	/** Every tag carried by an item, spelled as in the first carrier (live before logged, then by path), in no order. */
