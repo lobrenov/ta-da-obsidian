@@ -34,6 +34,8 @@ export class Logbook {
 			if (item) index.update(item);
 			else index.remove(file.path);
 		},
+		/** Drops a path that's gone from the vault from the index. */
+		private readonly drop: (path: string) => void = (path) => index.remove(path),
 	) {}
 
 	/**
@@ -161,7 +163,7 @@ export class Logbook {
 		for (const path of paths) {
 			const file = this.app.vault.getFileByPath(path);
 			if (!file) {
-				this.index.remove(path);
+				this.drop(path);
 				continue;
 			}
 			try {

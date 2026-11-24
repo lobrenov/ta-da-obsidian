@@ -6,6 +6,7 @@ vi.stubGlobal("window", globalThis);
 
 const { TFile } = await import("obsidian");
 const { TaDaIndex } = await import("../src/TaDaIndex");
+const { Logbook } = await import("../src/Logbook");
 const { applyStatus } = await import("../src/ui/navigator/actions");
 
 type Handler = (...args: never[]) => void;
@@ -171,7 +172,7 @@ describe("TaDaIndex change notifications", () => {
 		expect(listener).toHaveBeenCalledTimes(1);
 	});
 
-	it("calls a listener when an item appears or goes, and for a deleted non-item not at all", async () => {
+	it("calls a listener when an item appears or goes, and onDeleted only for an item", async () => {
 		const { plugin, handlers } = makePlugin();
 		const index = new TaDaIndex(plugin);
 		const listener = vi.fn();
@@ -183,8 +184,8 @@ describe("TaDaIndex change notifications", () => {
 		listener.mockClear();
 		(handlers["delete"] as unknown as (file: object) => void)(file("Ta Da/tasks/Never.md"));
 		await vi.advanceTimersByTimeAsync(500);
-		expect(listener).not.toHaveBeenCalled();
 		expect(deleted).not.toHaveBeenCalled();
+		listener.mockClear();
 
 		saved(handlers, "Ta Da/tasks/A.md", task("Doing"));
 		await vi.advanceTimersByTimeAsync(500);
@@ -229,4 +230,96 @@ describe("TaDaIndex change notifications", () => {
 		expect(index.index.items.size).toBe(200);
 		expect(listener).toHaveBeenCalledTimes(1);
 	});
+
+	it("calls a listener when the Logbook reads a changed file or a missing one into the index", async () => {
+		const { plugin, handlers } = makePlugin();
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		index.onChange(listener);
+		index.start();
+		await vi.advanceTimersByTimeAsync(500);
+		const path = "Ta Da/tasks/R.md";
+		saved(handlers, path, "---\ntype: task\nstatus: Doing\ndueDate: 2026-10-01\n---\n");
+		await vi.advanceTimersByTimeAsync(500);
+		listener.mockClear();
+
+		const present = new Map<string, object>([[path, file(path)]]);
+		let text = "---\ntype: task\nstatus: Doing\ndueDate: 2026-10-08\n---\n";
+		const app = { vault: { getFileByPath: (at: string) => present.get(at) ?? null } };
+		const writer = { read: async () => text };
+		const logbook = new Logbook(app as never, index.index, writer as never, () => LocalDate.parse("2026-10-05") as LocalDate, (f, t) => index.sync(f, t), (p) => index.drop(p));
+		await logbook.reread([path]);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(1);
+		expect(index.index.get(path)?.properties.dueDate?.toString()).toBe("2026-10-08");
+
+		saved(handlers, path, text);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(1);
+
+		present.delete(path);
+		await logbook.reread([path]);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listener).toHaveBeenCalledTimes(2);
+		expect(index.index.get(path)).toBeUndefined();
+	});
+
+	it("calls a listener when a plain markdown file is created, renamed or deleted, but not when one is edited", async () => {
+		const { plugin, handlers } = makePlugin();
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		index.onChange(listener);
+		index.start();
+		await vi.advanceTimersByTimeAsync(500);
+		const run = async (event: string, ...args: object[] | [object, string]): Promise<void> => {
+			listener.mockClear();
+			(handlers[event] as unknown as (...a: unknown[]) => void)(...args);
+			await vi.advanceTimersByTimeAsync(500);
+		};
+		const plain = file("Reserved/Foo.md");
+		await run("create", plain);
+		expect(listener).toHaveBeenCalledTimes(1);
+		await run("rename", plain, "Reserved/Bar.md");
+		expect(listener).toHaveBeenCalledTimes(1);
+		await run("delete", plain);
+		expect(listener).toHaveBeenCalledTimes(1);
+		await run("changed", plain, "plain text");
+		listener.mockClear();
+		await run("changed", plain, "plain text");
+		expect(listener).not.toHaveBeenCalled();
+	});
+
+	it("clears the build and still calls listeners once when a read throws", async () => {
+		const files = [file("Ta Da/tasks/A.md")];
+		const { plugin } = makePlugin(files, async () => {
+			throw new Error("gone");
+		});
+		const index = new TaDaIndex(plugin);
+		const listener = vi.fn();
+		index.onChange(listener);
+		index.start();
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(listener).toHaveBeenCalledTimes(1);
+		expect((index as unknown as { building: boolean }).building).toBe(false);
+	});
+
+	it("tells deleted listeners of a markdown delete while building, before the file was read", async () => {
+		const files = Array.from({ length: 70 }, (_, at) => file(`Ta Da/tasks/T${at}.md`));
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const { plugin, handlers } = makePlugin(files, async (read) => {
+			if (read.path === "Ta Da/tasks/T69.md") await gate;
+			return task("Doing");
+		});
+		const index = new TaDaIndex(plugin);
+		const deleted = vi.fn();
+		index.onDeleted(deleted);
+		index.start();
+		await vi.advanceTimersByTimeAsync(200);
+		(handlers["delete"] as unknown as (file: object) => void)(files[69] as object);
+		expect(deleted).toHaveBeenCalledTimes(1);
+		release();
+		await vi.advanceTimersByTimeAsync(500);
+	});
 });
+

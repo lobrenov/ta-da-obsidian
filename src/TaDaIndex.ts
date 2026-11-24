@@ -88,14 +88,17 @@ export class TaDaIndex {
 	private async build(): Promise<void> {
 		const files = this.plugin.app.vault.getFiles().filter(isMarkdown);
 		this.building = true;
-		for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
-			if (start > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-			await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
+		try {
+			for (let start = 0; start < files.length && !this.unloaded; start += readBatch) {
+				if (start > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+				await Promise.all(files.slice(start, start + readBatch).map((file) => this.read(file)));
+			}
+			if (!this.unloaded) this.built = true;
+		} finally {
+			this.building = false;
+			this.resolveReady();
+			this.changed();
 		}
-		this.building = false;
-		if (!this.unloaded) this.built = true;
-		this.resolveReady();
-		this.changed();
 	}
 
 	private registerEvents(): void {
@@ -150,6 +153,17 @@ export class TaDaIndex {
 		if (this.generations.get(path) !== generation) return;
 		this.generations.delete(path);
 		this.apply(file, text);
+		this.changed();
+	}
+
+	/** Takes the text of a file another part of the plugin has just written or moved into the index, telling listeners if its item differs. */
+	sync(file: TFile, text: string): void {
+		this.apply(file, text);
+	}
+
+	/** Drops a path another part of the plugin found gone from the vault, telling listeners if it was indexed. */
+	drop(path: string): void {
+		this.remove(path);
 	}
 
 	/**
@@ -185,7 +199,9 @@ export class TaDaIndex {
 
 	private deleted(file: TAbstractFile): void {
 		const removed = file instanceof TFolder ? this.removeUnder(file.path) : this.remove(file.path);
-		if (removed) for (const listener of [...this.deleteListeners]) listener();
+		const markdown = file instanceof TFolder || (file instanceof TFile && isMarkdown(file));
+		if (markdown) this.changed();
+		if (removed || (this.building && markdown)) for (const listener of [...this.deleteListeners]) listener();
 	}
 
 	/** Drops a path from the index and cancels any read pending for it. Whether it was indexed. */
