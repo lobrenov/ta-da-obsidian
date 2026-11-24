@@ -73,6 +73,15 @@ describe("the area's delete confirmation", () => {
 		expect(areaTrashMessage(index, area("Empty"))).toMatch(/^Empty moves to the Trash\./);
 		expect(areaTrashMessage(index, area("Solo"))).toMatch(/^Solo and its 1 own task move to the Trash\./);
 	});
+
+	it("keeps the Trash wording for the system trash and Obsidian's own, and says permanent for none", () => {
+		const trashed = areaTrashMessage(index, area("Home"), "local");
+		expect(areaTrashMessage(index, area("Home"), "system")).toBe(trashed);
+		expect(areaTrashMessage(index, area("Home"))).toBe(trashed);
+		expect(areaTrashMessage(index, area("Home"), "none")).toBe(
+			"Home, its 3 projects and their 2 tasks, and its 1 own task will be deleted permanently.\n\nObsidian's “Deleted files” setting is “Permanently delete”, so this can't be undone.",
+		);
+	});
 });
 
 describe("trashPaths", () => {

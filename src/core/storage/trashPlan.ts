@@ -12,8 +12,11 @@ export function filesToTrash(index: VaultIndex, path: string): string[] {
 
 const count = (n: number, noun: string): string => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);
 
-/** What the delete confirmation says about an area: what goes with it, and what a restore brings back. */
-export function areaTrashMessage(index: VaultIndex, area: Item): string {
+/** Whether Obsidian's "Deleted files" setting (`trashOption`) deletes permanently. */
+export const deletesPermanently = (trashOption: unknown): boolean => trashOption === "none";
+
+/** What the delete confirmation says about an area: what goes with it, and what a restore brings back; with `trashOption` "none", that it can't be undone. */
+export function areaTrashMessage(index: VaultIndex, area: Item, trashOption?: unknown): string {
 	const projects = index.projectsIn(area);
 	const projectTasks = projects.reduce((total, project) => total + index.tasksIn(project).length, 0);
 	const own = index.tasksIn(area).length;
@@ -22,6 +25,7 @@ export function areaTrashMessage(index: VaultIndex, area: Item): string {
 	if (own > 0) parts.push(`its ${count(own, "own task")}`);
 	const last = parts[parts.length - 1];
 	const list = parts.length > 2 ? `${parts.slice(0, -1).join(", ")}, and ${last}` : parts.join(" and ");
+	if (deletesPermanently(trashOption)) return `${list} will be deleted permanently.\n\nObsidian's “Deleted files” setting is “Permanently delete”, so this can't be undone.`;
 	return `${list} ${parts.length === 1 ? "moves" : "move"} to the Trash.\n\nRestoring ${area.title} brings back the area alone. Restoring a project or task brings ${area.title} back with it.`;
 }
 

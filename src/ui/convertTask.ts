@@ -86,7 +86,7 @@ export async function convertToProject(host: ConvertHost, file: TFile, choice: C
 	return true;
 }
 
-/** Makes each subtask in the project's body a task under it; once they're all made, their lines leave its file. */
+/** Makes each subtask in the project's body a task under it; once they're all made, their lines leave its file. A failure part way removes only the lines of the tasks made. */
 async function extractSubtasks(host: ConvertHost, file: TFile): Promise<void> {
 	const { vault } = host.app;
 	const project = titleOfPath(file.path);
@@ -94,22 +94,39 @@ async function extractSubtasks(host: ConvertHost, file: TFile): Promise<void> {
 	const { extracts } = extractAll(split.body);
 	if (extracts.length === 0) return;
 	const key = (list: Extract[]): string => JSON.stringify(list.map(({ title, status, body }) => [title, status, body]));
-	const same = (text: string): boolean => key(extractAll(splitFrontmatter(text).body).extracts) === key(extracts);
+	/** Removes the lines of the first `count` subtasks, unless the file's subtasks changed since they were read. */
+	const removeLines = (count: number): Promise<boolean> =>
+		host.writer.apply(file, (current) => {
+			const now = splitFrontmatter(current);
+			const found = extractAll(now.body).extracts;
+			if (key(found) !== key(extracts)) return null;
+			let body = now.body;
+			for (const { range } of found.slice(0, count)) body = body.slice(0, range[0]) + body.slice(range[0] + range[1]);
+			return now.block + body;
+		});
 
+	let made = 0;
 	try {
 		for (const found of extracts) {
 			await createTask(vault, found.title, taskText(found, project, null, host.today()));
+			made++;
 		}
 	} catch (error) {
-		new Notice(`Couldn't make the subtasks of “${project}” its tasks: ${message(error)} They stay in its file.`);
+		const reason = `Couldn't make the subtasks of “${project}” its tasks: ${message(error)}`;
+		if (made === 0) {
+			new Notice(`${reason} They stay in its file.`);
+			return;
+		}
+		const tasks = made === 1 ? "1 task was" : `${made} tasks were`;
+		const left = await removeLines(made).then(
+			(removed) => (removed ? "only their lines left its file." : "but its file changed meanwhile, so their lines are still in it."),
+			(failure: unknown) => `but their lines couldn't be removed: ${message(failure)}`,
+		);
+		new Notice(`${reason} ${tasks} made, ${left}`);
 		return;
 	}
 	try {
-		const removed = await host.writer.apply(file, (current) => {
-			if (!same(current)) return null;
-			const now = splitFrontmatter(current);
-			return now.block + extractAll(now.body).text;
-		});
+		const removed = await removeLines(made);
 		if (!removed) new Notice(`The subtasks of “${project}” were made tasks, but its file changed meanwhile, so they're still in it.`);
 	} catch (error) {
 		new Notice(`The subtasks of “${project}” were made tasks, but their lines couldn't be removed: ${message(error)}`);

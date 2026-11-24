@@ -176,12 +176,21 @@ describe("convertToProject", () => {
 	});
 
 	it("removes no lines when a task can't be made, and says so", async () => {
-		const run = setup({ createFailsAt: 1 });
+		const run = setup({ createFailsAt: 0 });
 		expect(await convertToProject(run.host, run.file, choice)).toBe(true);
-		expect(run.log).toEqual(["rewrite", "rename", "create"]);
+		expect(run.log).toEqual(["rewrite", "rename"]);
 		expect(run.state.text).toContain("- [ ] Book flights");
 		expect(run.state.text).toContain("- [x] Pack");
 		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: disk full They stay in its file."]);
+	});
+
+	it("removes only the lines of the tasks already made when a later one fails", async () => {
+		const three = "---\ntype: task\nproject: \"[[Holiday]]\"\n---\nIntro\n- [ ] One\n- [ ] Two\n- [ ] Three\n";
+		const run = setup({ text: three, createFailsAt: 2 });
+		expect(await convertToProject(run.host, run.file, choice)).toBe(true);
+		expect(run.created.map((made) => made.path)).toEqual(["Ta Da/tasks/One.md", "Ta Da/tasks/Two.md"]);
+		expect(run.state.text.endsWith("---\nIntro\n- [ ] Three\n")).toBe(true);
+		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: disk full 2 tasks were made, only their lines left its file."]);
 	});
 
 	it("says so when the lines can't be removed", async () => {

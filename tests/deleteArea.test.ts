@@ -34,12 +34,12 @@ const index = new VaultIndex([
 	makeItem("Ta Da/tasks/Mow.md", 'type: task\narea: "[[Home]]"'),
 ]);
 
-function setup() {
+function setup(trashOption?: string) {
 	opened.length = 0;
 	const files = new Map([...index.items.keys()].map((path) => [path, { path, basename: path }]));
 	const trashed: string[] = [];
 	const app = {
-		vault: { getFileByPath: (path: string) => files.get(path) ?? null },
+		vault: { getFileByPath: (path: string) => files.get(path) ?? null, getConfig: (key: string) => (key === "trashOption" ? trashOption : undefined) },
 		fileManager: { trashFile: async (file: { path: string }) => void trashed.push(file.path) },
 	};
 	return { app, files, trashed };
@@ -67,6 +67,19 @@ describe("deleteItem", () => {
 		button("Cancel").dispatchEvent(new window.Event("click"));
 		await tick();
 		expect(trashed).toEqual([]);
+	});
+
+	it("says the area is deleted permanently when Obsidian's Deleted files setting is Permanently delete", () => {
+		const { app, files } = setup("none");
+		deleteItem(app as never, index, files.get("Ta Da/areas/Solo.md") as never);
+		expect(opened[0]?.contentEl.textContent).toContain("deleted permanently");
+		expect(opened[0]?.contentEl.textContent).not.toContain("to the Trash");
+	});
+
+	it("says the area moves to the Trash for any other Deleted files setting", () => {
+		const { app, files } = setup("local");
+		deleteItem(app as never, index, files.get("Ta Da/areas/Solo.md") as never);
+		expect(opened[0]?.contentEl.textContent).toContain("to the Trash");
 	});
 
 	it("deletes the area file first when confirmed, the button counting the files", async () => {

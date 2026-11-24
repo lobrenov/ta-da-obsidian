@@ -30,5 +30,5 @@ export function deleteItem(app: App, index: VaultIndex, file: TFile): void {
 		void trashPaths(app, paths);
 		return;
 	}
-	new DeleteAreaModal(app, areaTrashTitle(item), areaTrashMessage(index, item), paths.length, () => void trashPaths(app, paths)).open();
+	new DeleteAreaModal(app, areaTrashTitle(item), areaTrashMessage(index, item, app.vault.getConfig?.("trashOption")), paths.length, () => void trashPaths(app, paths)).open();
 }

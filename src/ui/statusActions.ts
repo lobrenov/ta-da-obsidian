@@ -15,8 +15,8 @@ import {
 } from "../core/writing/statusRules";
 import { Logbook, unlogMessage } from "../Logbook";
 import type { Writer } from "../Writer";
-import { applyStatus } from "./navigator/actions";
 import { CompletionModal } from "./CompletionModal";
+import { statusEdit } from "./header/edits";
 
 /**
  * Every status change the plugin makes goes through here, so the apps' rules hold wherever it's set: the header, the
@@ -95,11 +95,20 @@ export class StatusActions {
 	}
 
 	private async apply(changes: StatusChange[]): Promise<void> {
+		let failed = 0;
 		for (const change of changes) {
 			const file = this.app.vault.getFileByPath(change.path);
-			if (file) await applyStatus(this.writer, file, change.status, this.today());
-			else new Notice(`Couldn't set the status: “${change.path}” isn't in the vault.`);
+			if (!file) {
+				new Notice(`Couldn't set the status: “${change.path}” isn't in the vault.`);
+				continue;
+			}
+			try {
+				await this.writer.apply(file, statusEdit(change.status, file.path, this.today()));
+			} catch {
+				failed++;
+			}
 		}
+		if (failed > 0) new Notice(`Couldn't set the status of ${failed === 1 ? "1 file" : `${failed} files`}.`);
 	}
 
 	/** Puts logged files back through the `Logbook`, so links follow, then Doing and the project links at the new paths. */

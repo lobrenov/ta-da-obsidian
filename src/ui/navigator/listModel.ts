@@ -500,7 +500,7 @@ function trashList(ctx: ListContext): ListModel {
 	});
 	return {
 		domain: { kind: "trash" },
-		header: { ...noHeader, title: "Trash", icon: { type: "icon", name: "trash-2", tint: "muted" } },
+		header: { ...noHeader, title: "Trash", icon: { type: "icon", name: "trash-2", tint: "muted" }, lines: ["Lists only Obsidian's .trash folder"] },
 		groupList: null,
 		grouping: null,
 		filter: null,

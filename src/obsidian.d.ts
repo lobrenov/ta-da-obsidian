@@ -15,6 +15,10 @@ declare module "obsidian" {
 			draggable?: { type: string; file?: TFile; files?: TFile[] } | null;
 		};
 	}
+	interface Vault {
+		/** A vault setting by key, such as `trashOption` ("system", "local" or "none"). In Obsidian at runtime, not in its typings; guard the call. */
+		getConfig?(key: string): unknown;
+	}
 	interface MetadataCache {
 		/** Every tag in the vault, with `#` and as written, to its use count. In Obsidian at runtime, not in its typings; guard the call. */
 		getTags?(): Record<string, number>;
