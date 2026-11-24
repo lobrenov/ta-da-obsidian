@@ -10,7 +10,7 @@ export interface FrontmatterSplit {
 }
 
 /**
- * Frontmatter is a `---` first line up to the next `---` line (trailing spaces allowed, LF or CRLF).
+ * Frontmatter is a `---` first line (after an optional byte-order mark, which stays in the block) up to the next `---` line (trailing spaces allowed, LF or CRLF).
  * Without a closing fence the whole file is body.
  */
 export function splitFrontmatter(text: string): FrontmatterSplit {
@@ -42,9 +42,10 @@ export function splitFrontmatter(text: string): FrontmatterSplit {
 	return none;
 }
 
-/** A `---` line, trailing spaces, tabs and a CR allowed. */
+/** A `---` line, a leading byte-order mark dropped, trailing spaces, tabs and a CR allowed. */
 export function isFenceLine(line: string): boolean {
+	const start = line.startsWith("\uFEFF") ? 1 : 0;
 	let end = line.length;
-	while (end > 0 && (line[end - 1] === " " || line[end - 1] === "\t" || line[end - 1] === "\r")) end--;
-	return line.slice(0, end) === "---";
+	while (end > start && (line[end - 1] === " " || line[end - 1] === "\t" || line[end - 1] === "\r")) end--;
+	return line.slice(start, end) === "---";
 }

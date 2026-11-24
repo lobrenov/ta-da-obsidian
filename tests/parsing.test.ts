@@ -13,6 +13,16 @@ const read = (yaml: string): NonNullable<ReturnType<typeof readProperties>> => {
 };
 
 describe("frontmatter splitter", () => {
+	it("finds frontmatter after a leading byte-order mark, which stays in the block", () => {
+		const text = "\uFEFF---\ntype: task\n---\nBody\n";
+		const split = splitFrontmatter(text);
+		expect(split.yaml).toBe("type: task\n");
+		expect(split.block).toBe("\uFEFF---\ntype: task\n---\n");
+		expect(split.body).toBe("Body\n");
+		expect(split.bodyFirstLineIndex).toBe(3);
+		expect(splitFrontmatter("\uFEFFtype: task\n---\n").yaml).toBeNull();
+	});
+
 	it("separates frontmatter from body", () => {
 		const split = splitFrontmatter("---\ntype: task\nstatus: Doing\n---\nBody line\n");
 		expect(split.yaml).toBe("type: task\nstatus: Doing\n");
