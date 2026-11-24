@@ -1,6 +1,6 @@
 import { type App, Notice, type TFile } from "obsidian";
 import type { VaultIndex } from "../core/index/vaultIndex";
-import { areaTrashMessage, areaTrashTitle, filesToTrash } from "../core/storage/trashPlan";
+import { areaTrashMessage, areaTrashTitle, deletesPermanently, filesToTrash, projectDeleteMessage } from "../core/storage/trashPlan";
 import { DeleteAreaModal } from "./DeleteAreaModal";
 
 /**
@@ -22,13 +22,13 @@ export async function trashPaths(app: App, paths: string[]): Promise<void> {
 	}
 }
 
-/** Deletes a project with its live tasks; an area, with its projects and their tasks and its own, after asking. */
+/** Deletes a project with its live tasks, after asking when Obsidian deletes permanently; an area, with its projects and their tasks and its own, after asking. */
 export function deleteItem(app: App, index: VaultIndex, file: TFile): void {
 	const item = index.get(file.path);
 	const paths = filesToTrash(index, file.path);
-	if (item?.properties.kind !== "area") {
-		void trashPaths(app, paths);
-		return;
-	}
-	new DeleteAreaModal(app, areaTrashTitle(item), areaTrashMessage(index, item, app.vault.getConfig?.("trashOption")), paths.length, () => void trashPaths(app, paths)).open();
+	const trashOption = app.vault.getConfig?.("trashOption");
+	const confirm = (): void => void trashPaths(app, paths);
+	if (item?.properties.kind === "area") new DeleteAreaModal(app, areaTrashTitle(item), areaTrashMessage(index, item, trashOption), paths.length, confirm).open();
+	else if (item?.properties.kind === "project" && deletesPermanently(trashOption)) new DeleteAreaModal(app, areaTrashTitle(item), projectDeleteMessage(index, item), paths.length, confirm).open();
+	else confirm();
 }

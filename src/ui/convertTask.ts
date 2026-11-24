@@ -112,11 +112,12 @@ async function extractSubtasks(host: ConvertHost, file: TFile): Promise<void> {
 			made++;
 		}
 	} catch (error) {
-		const reason = `Couldn't make the subtasks of “${project}” its tasks: ${message(error)}`;
 		if (made === 0) {
-			new Notice(`${reason} They stay in its file.`);
+			new Notice(`Couldn't make the subtasks of “${project}” its tasks: ${message(error)} They stay in its file.`);
 			return;
 		}
+		const cause = message(error);
+		const reason = `Couldn't make the subtasks of “${project}” its tasks: ${cause.endsWith(".") ? cause : `${cause}.`}`;
 		const tasks = made === 1 ? "1 task was" : `${made} tasks were`;
 		const left = await removeLines(made).then(
 			(removed) => (removed ? "only their lines left its file." : "but its file changed meanwhile, so their lines are still in it."),

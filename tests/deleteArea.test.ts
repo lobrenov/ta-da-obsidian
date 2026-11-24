@@ -57,6 +57,25 @@ describe("deleteItem", () => {
 		expect(trashed).toEqual(["Ta Da/projects/Reno.md", "Ta Da/tasks/Paint.md"]);
 	});
 
+	it("asks before deleting a project when Deleted files is Permanently delete, and Cancel moves nothing", async () => {
+		const { app, files, trashed } = setup("none");
+		deleteItem(app as never, index, files.get("Ta Da/projects/Reno.md") as never);
+		await tick();
+		expect(opened[0]?.titleText).toBe("Delete “Reno”?");
+		expect(opened[0]?.contentEl.textContent).toContain("Reno and its 1 task will be deleted permanently");
+		button("Cancel").dispatchEvent(new window.Event("click"));
+		await tick();
+		expect(trashed).toEqual([]);
+	});
+
+	it("deletes the project and its tasks when that is confirmed", async () => {
+		const { app, files, trashed } = setup("none");
+		deleteItem(app as never, index, files.get("Ta Da/projects/Reno.md") as never);
+		button("Delete 2 files").dispatchEvent(new window.Event("click"));
+		await tick();
+		expect(trashed).toEqual(["Ta Da/projects/Reno.md", "Ta Da/tasks/Paint.md"]);
+	});
+
 	it("asks before deleting an area, and Cancel moves nothing", async () => {
 		const { app, files, trashed } = setup();
 		deleteItem(app as never, index, files.get("Ta Da/areas/Home.md") as never);

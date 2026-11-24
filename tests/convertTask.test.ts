@@ -190,7 +190,30 @@ describe("convertToProject", () => {
 		expect(await convertToProject(run.host, run.file, choice)).toBe(true);
 		expect(run.created.map((made) => made.path)).toEqual(["Ta Da/tasks/One.md", "Ta Da/tasks/Two.md"]);
 		expect(run.state.text.endsWith("---\nIntro\n- [ ] Three\n")).toBe(true);
-		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: disk full 2 tasks were made, only their lines left its file."]);
+		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: disk full. 2 tasks were made, only their lines left its file."]);
+	});
+
+	it("says so when the file changed before the made tasks' lines could go", async () => {
+		const three = "---\ntype: task\n---\n- [ ] One\n- [ ] Two\n- [ ] Three\n";
+		const run = setup({ text: three, createFailsAt: 1 });
+		run.app.vault.create.mockImplementationOnce(async (path: string) => {
+			run.state.text = run.state.text.replace("Three", "Tree");
+			return { path };
+		});
+		await convertToProject(run.host, run.file, choice);
+		expect(run.state.text).toContain("- [ ] One");
+		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: disk full. 2 tasks were made, but its file changed meanwhile, so their lines are still in it."]);
+	});
+
+	it("says so when the made tasks' lines can't be removed, and keeps a message's own full stop", async () => {
+		const run = setup({ createFailsAt: 1, removeFails: true });
+		run.app.vault.create.mockImplementation(async (path: string) => {
+			if (run.created.length === 1) throw new Error("Disk full.");
+			run.created.push({ path, text: "" });
+			return { path };
+		});
+		await convertToProject(run.host, run.file, choice);
+		expect(notices).toEqual(["Couldn't make the subtasks of “Trip” its tasks: Disk full. 1 task was made, but their lines couldn't be removed: locked"]);
 	});
 
 	it("says so when the lines can't be removed", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { VaultIndex } from "../src/core/index/vaultIndex";
-import { areaTrashMessage, areaTrashTitle, filesToTrash } from "../src/core/storage/trashPlan";
+import { areaTrashMessage, areaTrashTitle, filesToTrash, projectDeleteMessage } from "../src/core/storage/trashPlan";
 import { makeItem } from "./support";
 
 const notices: string[] = [];
@@ -80,6 +80,14 @@ describe("the area's delete confirmation", () => {
 		expect(areaTrashMessage(index, area("Home"))).toBe(trashed);
 		expect(areaTrashMessage(index, area("Home"), "none")).toBe(
 			"Home, its 3 projects and their 2 tasks, and its 1 own task will be deleted permanently.\n\nObsidian's “Deleted files” setting is “Permanently delete”, so this can't be undone.",
+		);
+	});
+});
+
+describe("projectDeleteMessage", () => {
+	it("says the project and its live tasks are deleted permanently", () => {
+		expect(projectDeleteMessage(index, index.get("Ta Da/projects/Reno.md") as never)).toBe(
+			"Reno and its 1 task will be deleted permanently.\n\nObsidian's “Deleted files” setting is “Permanently delete”, so this can't be undone.",
 		);
 	});
 });

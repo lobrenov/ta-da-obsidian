@@ -46,12 +46,14 @@ export class StatusActions {
 	 * so a project asks only about open tasks that weren't in the set.
 	 */
 	async setAll(files: TFile[], status: Status): Promise<void> {
+		const failures: Failures = { count: 0, reason: null };
 		const kindOf = (file: TFile): string | undefined => this.index.get(file.path)?.properties.kind;
 		for (const file of [...files.filter((f) => kindOf(f) === "task"), ...files.filter((f) => kindOf(f) !== "task")]) {
 			const item = this.index.get(file.path);
 			const plan = item ? planStatus(this.index, item, status) : { changes: [{ path: file.path, status }] };
-			await this.runAsync("ask" in plan ? withoutSet(plan, files) : plan);
+			addFailures(failures, await this.runAsync("ask" in plan ? withoutSet(plan, files) : plan));
 		}
+		this.report(failures);
 	}
 
 	/** Completes an open file or reopens a closed one. */
@@ -62,17 +64,18 @@ export class StatusActions {
 
 	private run(plan: StatusPlan): void {
 		if ("ask" in plan) this.ask(plan.ask);
-		else void this.apply(plan.changes).then(() => (plan.unlog ? this.unlog(plan.unlog) : undefined));
+		else void this.apply(plan.changes).then((failures) => (this.report(failures), plan.unlog ? this.unlog(plan.unlog) : undefined));
 	}
 
-	/** Resolves once the plan is applied, or the question is cancelled. */
-	private async runAsync(plan: StatusPlan): Promise<void> {
+	/** Resolves once the plan is applied, or the question is cancelled, to the changes that failed. */
+	private async runAsync(plan: StatusPlan): Promise<Failures> {
 		if (!("ask" in plan)) {
-			await this.apply(plan.changes);
+			const failures = await this.apply(plan.changes);
 			if (plan.unlog) await this.unlog(plan.unlog);
-			return;
+			return failures;
 		}
-		await new Promise<void>((resolve) => {
+		const none: Failures = { count: 0, reason: null };
+		return new Promise<Failures>((resolve) => {
 			let answered = false;
 			const { ask } = plan;
 			const modal = new CompletionModal(this.app, ask, (tasksAs: ClosedStatus) => {
@@ -83,7 +86,7 @@ export class StatusActions {
 			modal.onClose = () => {
 				onClose();
 				queueMicrotask(() => {
-					if (!answered) resolve();
+					if (!answered) resolve(none);
 				});
 			};
 			modal.open();
@@ -91,24 +94,27 @@ export class StatusActions {
 	}
 
 	private ask(question: CompletionQuestion): void {
-		new CompletionModal(this.app, question, (tasksAs: ClosedStatus) => void this.apply(planAnswer(this.index, question, tasksAs))).open();
+		new CompletionModal(this.app, question, (tasksAs: ClosedStatus) => void this.apply(planAnswer(this.index, question, tasksAs)).then((failures) => this.report(failures))).open();
 	}
 
-	private async apply(changes: StatusChange[]): Promise<void> {
-		let failed = 0;
+	/** Applies each change, carrying on past one that fails; the failures are returned, not shown. */
+	private async apply(changes: StatusChange[]): Promise<Failures> {
+		const failures: Failures = { count: 0, reason: null };
 		for (const change of changes) {
 			const file = this.app.vault.getFileByPath(change.path);
-			if (!file) {
-				new Notice(`Couldn't set the status: “${change.path}” isn't in the vault.`);
-				continue;
-			}
 			try {
+				if (!file) throw new Error("A file isn't in the vault.");
 				await this.writer.apply(file, statusEdit(change.status, file.path, this.today()));
-			} catch {
-				failed++;
+			} catch (error) {
+				addFailures(failures, { count: 1, reason: error instanceof Error ? error.message : String(error) });
 			}
 		}
-		if (failed > 0) new Notice(`Couldn't set the status of ${failed === 1 ? "1 file" : `${failed} files`}.`);
+		return failures;
+	}
+
+	/** One notice with how many files failed and the first reason, never their names. */
+	private report({ count, reason }: Failures): void {
+		if (count > 0) new Notice(`Couldn't set the status of ${count === 1 ? "1 file" : `${count} files`}: ${reason}`);
 	}
 
 	/** Puts logged files back through the `Logbook`, so links follow, then Doing and the project links at the new paths. */
@@ -120,9 +126,20 @@ export class StatusActions {
 	/** Answers a question: sets the project and the tasks it has open now. Returns the paths set. */
 	async answer(question: CompletionQuestion, tasksAs: ClosedStatus): Promise<string[]> {
 		const changes = planAnswer(this.index, question, tasksAs);
-		await this.apply(changes);
+		this.report(await this.apply(changes));
 		return changes.map((change) => change.path);
 	}
+}
+
+/** How many status changes failed, and why the first did. */
+interface Failures {
+	count: number;
+	reason: string | null;
+}
+
+function addFailures(total: Failures, more: Failures): void {
+	total.count += more.count;
+	total.reason ??= more.reason;
 }
 
 /** A project's question without the tasks set with it, which the index may not show closed yet; no question when none are left. */
