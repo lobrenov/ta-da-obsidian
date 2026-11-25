@@ -32,15 +32,17 @@ export function sameDomain(a: Domain, b: Domain): boolean {
 	return domainKey(a) === domainKey(b);
 }
 
-/** The lists with a Group choice. Every project shares one. */
+/** The lists with a Group choice. Every project and area shares one. */
 export type GroupedList = "agenda" | "loose" | "project";
 
 export function groupedListOf(domain: Domain): GroupedList | null {
 	switch (domain.kind) {
 		case "agenda":
 		case "loose":
-		case "project":
 			return domain.kind;
+		case "project":
+		case "area":
+			return "project";
 		default:
 			return null;
 	}

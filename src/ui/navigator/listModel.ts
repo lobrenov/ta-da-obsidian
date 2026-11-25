@@ -324,16 +324,12 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 	const filter = new TagFilter(options.picked);
 	const projects = filter.apply(allProjects);
 	const tasks = filter.apply(allTasks);
-	const open = tasks.filter((task) => !isClosed(task.properties.status));
-	const closed = tasks.filter((task) => isClosed(task.properties.status));
+	const grouping = groupingOf("project", options.groupings);
 	const rowOptions: TaskRowOptions = { dates: "elsewhere", place: false };
 	const key = domainKey({ kind: "area", path: area.path });
 	const sections: SectionModel[] = [];
 	if (projects.length > 0) sections.push(plain("projects", projects.map((project) => lineRow(index, project, today))));
-	if (open.length > 0) sections.push(plain("tasks", open.map((task) => taskRow(index, task, today, rowOptions))));
-	if (closed.length > 0) {
-		sections.push(foldable(`${key}|Completed`, { style: "count", title: "Completed", count: closed.length, quiet: true }, closed.map((task) => taskRow(index, task, today, rowOptions)), true, options));
-	}
+	sections.push(...taskSections(ctx, tasks, grouping, rowOptions, key, options));
 	const notes = fromNotes(ctx, key, ctx.notes.noteSubtasks && !filter.isActive ? noteSubtasksIn(index, area) : [], { dates: "elsewhere", hideParent: area.path }, options);
 	if (notes) sections.push(notes);
 	const files = [...allProjects, ...allTasks];
@@ -347,8 +343,8 @@ function areaList(area: Item, ctx: ListContext, options: ListOptions): ListModel
 			lines: [`${plural(allProjects.length, "project")} · ${plural(openCount, "task")}`],
 			file: { path: area.path, label: "Open area file" },
 		},
-		groupList: null,
-		grouping: null,
+		groupList: "project",
+		grouping,
 		filter: filterModel(files, options.picked, projects.length + tasks.length),
 		sections,
 		empty: files.length === 0 && !notes ? "No tasks" : sections.length === 0 ? noMatches : null,
@@ -364,7 +360,7 @@ function taskSections(ctx: ListContext, tasks: Item[], grouping: Grouping, rowOp
 			`${foldKey}|${foldName(section, grouping)}`,
 			{ style: "count", title: section.title, count: section.tasks.length, quiet: isClosedSection(section) },
 			section.tasks.map((task) => taskRow(index, task, today, rowOptions)),
-			startsFolded(section, grouping),
+			startsFolded(section),
 			options,
 		),
 	);
@@ -562,14 +558,14 @@ function foldName(section: ListSection, grouping: Grouping): string {
 	return grouping === "Open" ? section.title : `${grouping}: ${section.title}`;
 }
 
-/** Done, Cancelled, and Date's and Tag's Completed start folded. */
-function startsFolded(section: ListSection, grouping: Grouping): boolean {
+/** Done, Cancelled and Completed start folded. */
+function startsFolded(section: ListSection): boolean {
 	const kind = section.kind;
 	switch (kind.case) {
 		case "status":
 			return isClosed(kind.value);
 		case "completed":
-			return grouping === "Date" || grouping === "Tag";
+			return true;
 		default:
 			return false;
 	}

@@ -4,7 +4,7 @@ import { TagFilter } from "../src/core/index/grouping";
 import { VaultIndex } from "../src/core/index/vaultIndex";
 import { LocalDate } from "../src/core/model/localDate";
 import { trashedItems } from "../src/core/storage/trash";
-import { domainKey, groupingOf, readDomain } from "../src/ui/navigator/domain";
+import { domainKey, groupedListOf, groupingOf, readDomain } from "../src/ui/navigator/domain";
 import { visiblePaths, visibleRows } from "../src/ui/navigator/listModel";
 import { loadFixtureIndex } from "./fixtureVault";
 import { context, describeList, list } from "./navigatorSupport";
@@ -224,21 +224,57 @@ describe("areas and projects", () => {
 		]);
 	});
 
-	it("shows an area's projects, then its own open tasks, then its Completed folded", () => {
+	it("shows an area's projects, then its own tasks under Open, with Completed folded", () => {
 		const model = list({ kind: "area", path: "areas/Personal.md" }, ctx);
 		expect(model.header.title).toBe("Personal");
 		expect(model.header.lines).toEqual(["2 projects · 2 tasks"]);
 		expect(model.header.file).toEqual({ path: "areas/Personal.md", label: "Open area file" });
-		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# -", "    Pay rent | [Not Started] | due Today", "    Book a dentist | [Not Started]"]);
+		expect(describeList(model)).toEqual(["# -", "    project | Garden | line", "    project | Ta Da | line | 2 open", "# Open 2", "    Pay rent | [Not Started] | due Today", "    Book a dentist | [Not Started]"]);
 		const index = new VaultIndex([
 			makeItem("Ta Da/areas/Home.md", "type: area"),
 			makeItem("Ta Da/tasks/Open.md", 'type: task\nstatus: Doing\narea: "[[Home]]"'),
 			makeItem("Ta Da/tasks/Shut.md", 'type: task\nstatus: Done\ncompletedDate: 2026-09-20\narea: "[[Home]]"'),
 		]);
 		const home = list({ kind: "area", path: "Ta Da/areas/Home.md" }, context(index, today));
-		expect(describeList(home)).toEqual(["# -", "    Open | [Doing]", "+ quiet Completed 1", "    Shut | [Done]"]);
+		expect(describeList(home)).toEqual(["# Open 1", "    Open | [Doing]", "+ quiet Completed 1", "    Shut | [Done]"]);
 		expect(visiblePaths(home)).toEqual(["Ta Da/tasks/Open.md"]);
 		expect(visiblePaths(list({ kind: "area", path: "Ta Da/areas/Home.md" }, context(index, today), { folds: new Set(["area:Ta Da/areas/Home.md|Completed"]) }))).toEqual(["Ta Da/tasks/Open.md", "Ta Da/tasks/Shut.md"]);
+	});
+
+	it("groups an area's tasks by the project grouping, its projects first", () => {
+		const index = new VaultIndex([
+			makeItem("Ta Da/areas/Home.md", "type: area"),
+			makeItem("Ta Da/projects/P.md", 'type: project\nstatus: Doing\narea: "[[Home]]"'),
+			makeItem("Ta Da/tasks/Open.md", 'type: task\nstatus: Doing\ndueDate: 2026-10-02\narea: "[[Home]]"\ntags: [x]'),
+			makeItem("Ta Da/tasks/Shut.md", 'type: task\nstatus: Done\ncompletedDate: 2026-09-20\narea: "[[Home]]"'),
+		]);
+		const home = { kind: "area", path: "Ta Da/areas/Home.md" } as const;
+		const ctx = context(index, today);
+		const open = list(home, ctx);
+		expect(open.groupList).toBe("project");
+		expect(open.grouping).toBe("Open");
+		expect(open.sections.map((s) => s.id)).toEqual(["projects", "area:Ta Da/areas/Home.md|Open", "area:Ta Da/areas/Home.md|Completed"]);
+		expect(describeList(list(home, ctx, { groupings: { project: "Status" } }))).toEqual([
+			"# -",
+			"    project | P | line",
+			"# Doing 1",
+			"    Open | [Doing] | due Today | 1 tag",
+			"+ quiet Done 1",
+			"    Shut | [Done]",
+		]);
+		const date = list(home, ctx, { groupings: { project: "Date" } });
+		expect(date.grouping).toBe("Date");
+		expect(date.sections[0]?.id).toBe("projects");
+		expect(date.sections.slice(1).every((s) => s.foldable)).toBe(true);
+		const tag = list(home, ctx, { groupings: { project: "Tag" } });
+		expect(tag.grouping).toBe("Tag");
+		expect(tag.sections[0]?.id).toBe("projects");
+		expect(tag.sections.find((s) => s.id.endsWith("Completed"))?.folded).toBe(true);
+	});
+
+	it("shares one grouping between areas and projects", () => {
+		expect(groupedListOf({ kind: "area", path: "a" })).toBe("project");
+		expect(groupedListOf({ kind: "area", path: "a" })).toBe(groupedListOf({ kind: "project", path: "b" }));
 	});
 
 	it("shows a project's status, progress and tasks by Open", () => {
